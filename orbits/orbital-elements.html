@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inertial Frame Orbital Elements | OTC OW</title>
+    <meta name="description" content="An interactive 3D visualizer of the six Classical Orbital Elements (COEs) in the Earth-Centered Inertial (ECI) frame: semi-major axis, eccentricity, inclination, RAAN, argument of perigee, and true anomaly.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <style>
+        :root {
+            --param-a: #e0b64f;
+            --param-e: #34d399;
+            --param-i: #38bdf8;
+            --param-raan: #a3e635;
+            --param-argp: #f472b6;
+            --param-nu: #c4a1ff;
+        }
+
+        /* Caption: below the view, so that nothing covers the drawing */
+        .tool-hud {
+            position: static;
+            max-width: none;
+            margin-top: 0.5rem;
+            padding: 0;
+            min-height: 2.7em;
+            background: none;
+            border: 0;
+            border-radius: 0;
+            font-size: 0.84rem;
+            line-height: 1.35;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .tool-hud b { font-weight: 600; color: #ffffff; }
+        .hud-note { color: #fbbf24; }
+
+        /* Labels in the view */
+        .tool-label.measure {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0 0.25rem;
+            border-radius: 3px;
+            background: rgba(6, 11, 20, 0.72);
+        }
+
+        .tool-label.measure .val { margin-left: 0.35rem; color: #ffffff; }
+
+        .tool-label.measure.active {
+            outline: 1px solid currentColor;
+            background: rgba(6, 11, 20, 0.85);
+        }
+
+        .tool-label.word { color: var(--text-muted); font-size: 0.72rem; }
+
+        /* Controls: one row */
+        .panel.controls { padding: 0.5rem 0.75rem; }
+
+        .ctl-preset {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .ctl-preset select {
+            padding: 0.34rem 0.5rem;
+            font-family: inherit;
+            font-size: 0.82rem;
+            color: var(--text-main);
+            background: var(--surface-hover);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+        }
+
+        .ctl-preset select:focus { outline: none; border-color: var(--accent-blue); }
+
+        /* Side panels */
+        .tool-side .panel { padding: 0.8rem 0.85rem; display: flex; flex-direction: column; }
+
+        .param-list {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.15rem;
+        }
+
+        .param {
+            padding: 0.32rem 0.45rem 0.4rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .param:hover { background: rgba(255, 255, 255, 0.03); }
+        .param.selected { background: rgba(58, 130, 247, 0.16); }
+
+        .param[data-param="a"] { --row-color: var(--param-a); }
+        .param[data-param="e"] { --row-color: var(--param-e); }
+        .param[data-param="i"] { --row-color: var(--param-i); }
+        .param[data-param="raan"] { --row-color: var(--param-raan); }
+        .param[data-param="argp"] { --row-color: var(--param-argp); }
+        .param[data-param="nu"] { --row-color: var(--param-nu); }
+
+        .param-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .param-name {
+            min-width: 0;
+            font-size: 0.86rem;
+            font-weight: 500;
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        .param-name .sym {
+            display: inline-block;
+            width: 1.15rem;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--row-color);
+        }
+
+        .param-value {
+            display: flex;
+            align-items: center;
+            flex: 0 0 auto;
+        }
+
+        .param-value input[type="number"] {
+            width: 4.6rem;
+            padding: 0.1rem 0.2rem;
+            font-family: var(--font-mono);
+            font-size: 0.84rem;
+            text-align: right;
+            color: #ffffff;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .param-value input[type="number"]::-webkit-outer-spin-button,
+        .param-value input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .param-value input[type="number"]:hover { border-color: var(--border-subtle); }
+
+        .param-value input[type="number"]:focus {
+            outline: none;
+            background: #060b14;
+            border-color: var(--accent-blue);
+        }
+
+        .param-unit {
+            width: 1.35rem;
+            padding-left: 0.2rem;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            color: var(--text-muted);
+        }
+
+        .param input[type="range"] {
+            display: block;
+            width: 100%;
+            margin: 0.2rem 0 0;
+            accent-color: var(--row-color);
+        }
+
+        .stat-grid { gap: 0.55rem 0.8rem; }
+
+        .vector-box {
+            display: grid;
+            gap: 0.2rem;
+            margin-top: 0.6rem;
+            padding-top: 0.55rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .vector-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.4rem;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .vector-coords {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        @media (min-width: 1081px) {
+            .tool-layout { --aside-w: 22.5rem; }
+        }
+
+        /* Short large screens: tighter rows, so that the panels still fit on one screen. */
+        @media (min-width: 1081px) and (min-height: 600px) and (max-height: 700px) {
+            .tool-side .panel { padding: 0.55rem 0.85rem; }
+            .param { padding: 0.16rem 0.45rem 0.2rem; }
+            .stat-grid { gap: 0.35rem 0.8rem; }
+        }
+
+        @media (max-width: 640px) {
+            .tool-hud { font-size: 0.8rem; min-height: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Inertial Frame Orbital Elements</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../study-guides.html" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study Guides</span>
+                    <span class="nav-text-short">Guides</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <!-- Stage Column: 3D Scene + Controls -->
+            <div class="col tool-stage-col">
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view">
+                        <canvas id="scene" aria-label="A 3D view of Earth and an orbit, with the six orbital elements measured on it and labeled with their current values."></canvas>
+                        <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                        <div class="tool-hint" id="view-hint">Drag to rotate. Scroll or pinch to zoom.</div>
+                        <div class="tool-status" id="status" style="display: none;"></div>
+                    </div>
+                    <div class="tool-hud" id="hud" aria-live="polite"></div>
+                </div>
+
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play">Pause</button>
+                            <button class="btn" id="reset-view">Reset View</button>
+                        </div>
+                        <label class="ctl-preset">Example orbit
+                            <select id="preset">
+                                <option value="iss">Space Station</option>
+                                <option value="gps">GPS</option>
+                                <option value="molniya">Molniya</option>
+                                <option value="geo">Geostationary</option>
+                                <option value="sso">Sun-Synchronous</option>
+                                <option value="" hidden>Custom</option>
+                            </select>
+                        </label>
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="speed">Animation speed</label>
+                                <span class="control-value" id="speed-value">Normal</span>
+                            </div>
+                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                        </div>
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="show-labels" checked>Labels</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side Panels -->
+            <aside class="tool-side">
+                <div class="col">
+                    <div class="panel">
+                        <div class="panel-title">The Six Elements</div>
+                        <div class="param-list">
+                            <div class="param" data-param="a">
+                                <div class="param-head">
+                                    <label class="param-name" for="a-number"><span class="sym">a</span>Semi-major axis</label>
+                                    <span class="param-value"><input type="number" id="a-number" min="6500" max="45000" step="1"><span class="param-unit">km</span></span>
+                                </div>
+                                <input type="range" id="a-range" min="6500" max="45000" step="50" aria-label="Semi-major axis slider">
+                            </div>
+
+                            <div class="param" data-param="e">
+                                <div class="param-head">
+                                    <label class="param-name" for="e-number"><span class="sym">e</span>Eccentricity</label>
+                                    <span class="param-value"><input type="number" id="e-number" min="0" max="0.85" step="0.001"><span class="param-unit"></span></span>
+                                </div>
+                                <input type="range" id="e-range" min="0" max="0.85" step="0.01" aria-label="Eccentricity slider">
+                            </div>
+
+                            <div class="param" data-param="i">
+                                <div class="param-head">
+                                    <label class="param-name" for="i-number"><span class="sym">i</span>Inclination</label>
+                                    <span class="param-value"><input type="number" id="i-number" min="0" max="180" step="0.1"><span class="param-unit">°</span></span>
+                                </div>
+                                <input type="range" id="i-range" min="0" max="180" step="0.5" aria-label="Inclination slider">
+                            </div>
+
+                            <div class="param" data-param="raan">
+                                <div class="param-head">
+                                    <label class="param-name" for="raan-number"><span class="sym">Ω</span>RAAN</label>
+                                    <span class="param-value"><input type="number" id="raan-number" step="1"><span class="param-unit">°</span></span>
+                                </div>
+                                <input type="range" id="raan-range" min="0" max="359" step="1" aria-label="RAAN slider">
+                            </div>
+
+                            <div class="param" data-param="argp">
+                                <div class="param-head">
+                                    <label class="param-name" for="argp-number"><span class="sym">ω</span>Argument of perigee</label>
+                                    <span class="param-value"><input type="number" id="argp-number" step="1"><span class="param-unit">°</span></span>
+                                </div>
+                                <input type="range" id="argp-range" min="0" max="359" step="1" aria-label="Argument of perigee slider">
+                            </div>
+
+                            <div class="param" data-param="nu">
+                                <div class="param-head">
+                                    <label class="param-name" for="nu-number"><span class="sym">ν</span>True anomaly</label>
+                                    <span class="param-value"><input type="number" id="nu-number" step="1"><span class="param-unit">°</span></span>
+                                </div>
+                                <input type="range" id="nu-range" min="0" max="359" step="1" aria-label="True anomaly slider">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="panel">
+                        <div class="panel-title">Resulting Orbit</div>
+                        <div class="stat-grid">
+                            <div class="stat-item"><span class="stat-label">Direction of motion</span><span class="stat-value" id="val-direction"></span></div>
+                            <div class="stat-item"><span class="stat-label">Period, T</span><span class="stat-value" id="val-period"></span></div>
+                            <div class="stat-item"><span class="stat-label">Perigee altitude</span><span class="stat-value" id="val-hp"></span></div>
+                            <div class="stat-item"><span class="stat-label">Apogee altitude</span><span class="stat-value" id="val-ha"></span></div>
+                            <div class="stat-item"><span class="stat-label">Distance from center, r</span><span class="stat-value" id="val-r"></span></div>
+                            <div class="stat-item"><span class="stat-label">Speed, v</span><span class="stat-value" id="val-v"></span></div>
+                        </div>
+                        <div class="vector-box">
+                            <div class="vector-row"><span>Position, r̄ (km)</span><span class="vector-coords" id="val-r-vec"></span></div>
+                            <div class="vector-row"><span>Velocity, v̄ (km/s)</span><span class="vector-coords" id="val-v-vec"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <p class="model-note">Model: two-body motion in the Earth-Centered Inertial (ECI) frame, whose axes are centered on Earth and do not turn with it. Earth and the orbit share one scale; markers are enlarged. Every orbit plays in the same time, so compare orbits with the period readout. Earth turns by the true amount for each orbit’s period.</p>
+    </main>
+
+    <footer class="site-footer">
+        <p>OTC OW Study Guides and Interactive Tools</p>
+    </footer>
+
+    <script src="../assets/tool-kit.js"></script>
+    <script src="../assets/earth-land.js"></script>
+    <script src="../assets/earth-scene.js"></script>
+    <script src="orbital-elements.js"></script>
+</body>
+</html>

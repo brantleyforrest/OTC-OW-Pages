@@ -66,10 +66,12 @@
     //     layer.place(width, height, [overlayBoxes]);
     // Important labels are placed first. Each label takes a free spot beside its point, so
     // labels do not overlap each other or the overlays. An optional label is hidden when no
-    // spot is free.
+    // spot is free. With { wide: true }, a label with no free spot beside its point also tries
+    // spots farther out, for views with many labels that must all stay on screen.
     class LabelLayer {
-        constructor(root) {
+        constructor(root, { wide = false } = {}) {
             this.root = root;
+            this.wide = wide;
             this.labels = [];
             this.shown = [];
             if (document.fonts && document.fonts.ready) {
@@ -129,13 +131,25 @@
                         spots.push([x + 10, o.y + o.h + 6], [o.x + o.w + 8, y - h / 2]);
                     }
                 }
+                if (this.wide) {
+                    for (const d of [24, 42, 62]) {
+                        spots.push(
+                            [x + d, y - h / 2], [x - w - d, y - h / 2],
+                            [x - w / 2, y - h - d], [x - w / 2, y + d],
+                            [x + d, y - h - d], [x + d, y + d],
+                            [x - w - d, y - h - d], [x - w - d, y + d]
+                        );
+                    }
+                }
                 const at = (i) => ({
                     x: Math.min(Math.max(4, spots[i][0]), viewWidth - w - 6),
                     y: Math.min(Math.max(4, spots[i][1]), viewHeight - h - 4),
                     w, h
                 });
                 // Use the usual spot when free, then the previous spot, so that labels do not jump.
-                const previous = label.spot < spots.length ? label.spot : 0;
+                // A spot from the wider search is not kept, so that a label returns beside its point.
+                const nearSpots = spots.length - (this.wide ? 24 : 0);
+                const previous = label.spot < nearSpots ? label.spot : 0;
                 let chosen = -1;
                 for (const i of [0, previous, ...spots.keys()]) {
                     const r = at(i);
