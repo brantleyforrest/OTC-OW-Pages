@@ -9,16 +9,16 @@ A starting point for new interactive tools. It runs as is, using a placeholder m
 1. Create a topic folder at the top level of the repository, such as `frames/`. Keep it one level deep, so that the `../` links still work.
 2. Copy `tool-template.html` and one script into it, and rename both:
    - `tool-template-2d.js` for a tool drawn on a 2D canvas.
-   - `tool-template-3d.js` for a tool drawn in 3D with Three.js.
+   - `tool-template-3d.js` for a tool drawn in 3D with Three.js. It includes the shared 3D Earth and stars.
 3. In the HTML:
    - Remove the `robots` line.
    - Replace the title, description, tool name, and all placeholder text.
-   - Keep one `<script>` line for your script, and delete the other.
+   - Keep the `<script>` lines for your script, and delete the others. A 3D tool also keeps the two Earth scripts.
 4. In the script, replace the sections marked `REPLACE`.
 5. Remove controls and panels the tool does not need. Add only what the user asked for.
 6. Register the tool as described in `AGENTS.md` section 6.
 
-To preview the template itself, open `tool-template.html` from a local file. To preview the 3D version, change which `<script>` line is active.
+To preview the template itself, open `tool-template.html` from a local file. To preview the 3D version, change which `<script>` lines are active.
 
 ## What You Get
 
@@ -26,6 +26,7 @@ To preview the template itself, open `tool-template.html` from a local file. To 
 |---|---|
 | `assets/tool-theme.css` | Navigation bar, one-screen layout, view box, labels, status box, panels, controls, and phone layout |
 | `assets/tool-kit.js` | Canvas sizing, animation loop, button groups, and label placement |
+| `assets/earth-scene.js` | 3D Earth with land outlines and atmosphere, and the star field. Needs `assets/earth-land.js` |
 
 Put a style or helper in these shared files only if more than one tool needs it.
 

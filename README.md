@@ -23,6 +23,7 @@ The web portal is established at `index.html`. The following tools are available
 
 * **[Reference Frame Observatory](frames/frame-observatory.html):** An animated 3D view of one Earth and two spacecraft, seen from the ECI, ECEF, and RIC reference frames.
 * **[Solar vs. Sidereal Day Visualizer](time/solar-sidereal-day.html):** A view from above the North Pole showing why a solar day is longer than a sidereal day.
+* **[Orbit Equation Explorer](orbits/orbit-equation.html):** A 3D view of an orbit around Earth, with each parameter of the orbit equation set by hand or animated through its range.
 
 ---
 

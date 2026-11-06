@@ -732,6 +732,7 @@
         camFrom.logDist = cam.logDist;
         blend.s = 0;
         blend.spinMorph = false;
+        for (const item of labels) item.width = 0;
     }
 
     function selectFrame(frame) {
@@ -931,6 +932,10 @@
         secondMarker.scale.setScalar(px(20));
         siteMarker.scale.setScalar(px(15));
         sunMarker.scale.setScalar(px(30));
+
+        // Keep scene world matrices and camera inverse matrix in sync for label placement
+        scene.updateMatrixWorld(true);
+        camera.updateMatrixWorld();
     }
 
     /* Inset camera for the RIC view: same scene, pulled back to include Earth. */
@@ -953,15 +958,16 @@
         const w = blend.weights;
         const earthCenter = root.position;
         const on = state.show.labels ? 1 : 0;
-        const shown = [];
         for (const item of labels) {
             let opacity = on;
             if (item.kind === 'axis') {
-                const crowded = item.frame === 'RIC' && viewW < 640;
-                const ghostLabel = state.show.others && !crowded ? 0.5 * (item.frame === 'RIC' ? 1 : 1 - w.RIC) : 0;
+                const ghostLabel = state.show.others ? 0.5 * (item.frame === 'RIC' ? 1 : 1 - w.RIC) : 0;
                 opacity *= lerp(ghostLabel, 1, w[item.frame]);
                 const hint = item.el.querySelector('.hint');
-                if (hint) hint.style.opacity = w[item.frame];
+                if (hint) {
+                    hint.style.opacity = w[item.frame];
+                    hint.style.display = w[item.frame] > 0.05 ? '' : 'none';
+                }
             } else if (item.kind === 'second') {
                 opacity *= w.RIC;
             } else if (item.kind === 'site') {
@@ -1003,65 +1009,11 @@
             if (!item.width) {
                 item.width = item.el.offsetWidth;
                 item.height = item.el.offsetHeight;
-                const core = item.el.firstElementChild;
-                item.coreWidth = core ? core.offsetWidth : item.width;
             }
-            const main = item.kind !== 'axis' || w[item.frame] > 0.5;
-            shown.push({ item, x, y, main, box: main ? item.width : item.coreWidth });
-        }
-        placeLabels(shown);
-    }
-
-    // Places the most important labels first. Each later label takes a free spot beside
-    // its point. A faded label or the Sun label is hidden when no spot is free.
-    function placeLabels(shown) {
-        const taken = [];
-        if (hudBox) taken.push(hudBox);
-        if (blend.weights.RIC > 0.6) {
-            const m = viewportInset();
-            const caption = 34;
-            taken.push({ x: m.x, y: viewH - m.y - insetH - caption, w: insetW, h: insetH + caption });
-        }
-        const clash = (r) => taken.some((o) => r.x < o.x + o.w + 3 && o.x < r.x + r.w + 3 && r.y < o.y + o.h + 2 && o.y < r.y + r.h + 2);
-        const rank = (s) => (s.main ? (s.item.kind === 'axis' ? 0 : 1) : 2);
-        shown.sort((a, b) => rank(a) - rank(b));
-        for (const s of shown) {
-            const { item, x, y, box } = s;
-            const h = item.height || 20;
-            const spots = [
-                [x + 10, y - 9], [x + 10, y - 9 - h], [x + 10, y + 7],
-                [x - box - 10, y - 9], [x - box - 10, y - 9 - h], [x - box - 10, y + 7]
-            ];
-            const underHud = hudBox && x > hudBox.x - 10 && x < hudBox.x + hudBox.w + 10 && y > hudBox.y - 10 && y < hudBox.y + hudBox.h + 10;
-            if (underHud) {
-                spots.push([hudBox.x + hudBox.w + 8, y - 9], [x + 10, hudBox.y + hudBox.h + 6]);
-            }
-            const at = (i) => {
-                const px = Math.min(Math.max(4, spots[i][0]), viewW - box - 6);
-                const py = Math.min(Math.max(4, spots[i][1]), viewH - h - 4);
-                return { x: px, y: py, w: box, h };
-            };
-            // Use the usual spot when free, then the previous spot, so that labels do not jump.
-            let chosen = -1;
-            const previous = (item.spot || 0) < spots.length ? (item.spot || 0) : 0;
-            const order = [0, previous, ...spots.keys()];
-            for (const i of order) {
-                const r = at(i);
-                // Screen edges can push a label back onto its own point, so reject that spot too.
-                const onPoint = x > r.x - 8 && x < r.x + box + 8 && y > r.y - 2 && y < r.y + h + 2;
-                if (!onPoint && !clash(r)) { chosen = i; break; }
-            }
-            if (chosen < 0) {
-                if (!s.main || item.kind === 'sun') {
-                    item.el.style.display = 'none';
-                    continue;
-                }
-                chosen = 0;
-            }
-            item.spot = chosen;
-            const r = at(chosen);
-            taken.push(r);
-            item.el.style.transform = `translate(${r.x.toFixed(1)}px, ${r.y.toFixed(1)}px)`;
+            // Pin the label right at the arrow tip with a small offset.
+            const lx = Math.min(Math.max(4, x + 8), viewW - (item.width || 40) - 4);
+            const ly = Math.min(Math.max(4, y - 10), viewH - (item.height || 18) - 4);
+            item.el.style.transform = `translate(${lx.toFixed(1)}px, ${ly.toFixed(1)}px)`;
         }
     }
 

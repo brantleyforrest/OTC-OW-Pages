@@ -1,4 +1,5 @@
-// Starter for a tool drawn in 3D with Three.js. The sphere and moving point are placeholders.
+// Starter for a tool drawn in 3D with Three.js, around the shared Earth in assets/earth-scene.js.
+// The axes and moving point are placeholders.
 // Replace the sections marked REPLACE. Keep the structure around them.
 (async function () {
     'use strict';
@@ -69,14 +70,13 @@
     sun.position.set(6, 2, 5);
     scene.add(sun);
 
-    /* REPLACE: build the scene. Z points up. */
+    /* The shared Earth and stars. Earth has a radius of 1 and Z points north. */
+    const EARTH_SPIN_RATE = 6; // Degrees per second of animation. Set this for the tool.
     const SPHERE_RADIUS = 1;
-    const sphere = new THREE.Mesh(
-        new THREE.SphereGeometry(SPHERE_RADIUS, 48, 32),
-        new THREE.MeshStandardMaterial({ color: 0x28507f, roughness: 0.85 })
-    );
-    scene.add(sphere);
+    const earth = window.EarthScene.addEarth(THREE, renderer, scene);
+    const stars = window.EarthScene.addStars(THREE, scene);
 
+    /* REPLACE: build the rest of the scene. */
     const layer = new Kit.LabelLayer($('labels'));
     const axisTips = [];
     [[1, 0, 0, 'X'], [0, 1, 0, 'Y'], [0, 0, 1, 'Z']].forEach(([x, y, z, name]) => {
@@ -114,6 +114,7 @@
         const r = OPTIONS[state.option].radius;
         const a = state.t * Math.PI / 180;
         marker.position.set(r * Math.cos(a), r * Math.sin(a), 0);
+        earth.pivot.rotation.z = (state.t / SPEEDS[1].rate) * EARTH_SPIN_RATE * Math.PI / 180;
         path.visible = state.showPath;
     }
 
@@ -167,6 +168,7 @@
     function renderFrame() {
         updateScene();
         updateCamera();
+        stars.follow(camera);
         renderer.render(scene, camera);
         updateLabels();
     }
