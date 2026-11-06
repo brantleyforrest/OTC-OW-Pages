@@ -39,6 +39,20 @@ The web portal is established at `index.html`. The following tools are available
 
 ---
 
+## Contributing
+
+Before your first commit, install the image pre-commit hook. Git does not copy hooks when a repository is cloned, so each contributor must run this once per clone. Python 3 is required.
+
+```bash
+python scripts/backend/image_tools_backend.py --install-hook
+```
+
+After that, each commit automatically compresses any staged PNG, JPEG, or WebP images and stages the smaller versions, including commits made in GitHub Desktop. The hook never blocks a commit. If the Pillow image library is missing, the script tries to install it with `pip`.
+
+On Windows, `scripts\RUN_IMAGE_TOOLS.bat` opens a menu with the other image tools, where option 4 shows whether the hook is active. The menu's prune option rewrites Git history, so do not use it unless a maintainer has asked you to.
+
+---
+
 ## Data Credits
 
 Land outlines in `assets/earth-land.js` are derived from [Natural Earth](https://www.naturalearthdata.com/) 1:110m data, which is in the public domain.

@@ -2,3 +2,12 @@
 *.md
 !README.md
 !readme.md
+
+# Microsoft Word documents and lock files
+*.doc
+*.docx
+*.docm
+*.dotx
+*.dotm
+~$*.doc*
+

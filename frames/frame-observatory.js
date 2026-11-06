@@ -43,13 +43,13 @@
             classLabel: 'Treated as inertial',
             classStyle: 'inertial',
             anatomy: [
-                ['Origin', 'The center of mass of Earth.'],
+                ['Origin', "Earth's center of mass."],
                 ['Fundamental Plane', 'The equatorial plane.'],
-                ['Principal Axis', 'Î', 'Lies in the equatorial plane and points toward the vernal equinox.'],
+                ['Principal Axis', 'Î', 'In the equatorial plane, toward the vernal equinox.'],
                 ['Third Axis', 'K̂', "Along Earth's spin axis, through the North Pole."],
-                ['Remaining Axis', 'Ĵ', 'Lies in the equatorial plane, 90° east of the vernal equinox.'],
+                ['Remaining Axis', 'Ĵ', 'In the equatorial plane, 90° east of the vernal equinox.'],
                 ['Classification', 'Treated as inertial. Its axes do not rotate with Earth.'],
-                ['Purpose', 'Calculating orbits: predicting where a satellite will be, estimating its orbit from tracking measurements, and producing tables of predicted positions.']
+                ['Purpose', 'Calculating orbits and predicting where a satellite will be.']
             ]
         },
         ECEF: {
@@ -61,13 +61,13 @@
             classLabel: 'Non-inertial',
             classStyle: 'noninertial',
             anatomy: [
-                ['Origin', 'The center of mass of Earth, the same origin as ECI.'],
-                ['Fundamental Plane', 'The equatorial plane, the same plane as ECI. The axes within it rotate with Earth.'],
-                ['Principal Axis', 'X̂', 'Lies in the equatorial plane and points toward 0° latitude, 0° longitude, where the Prime Meridian crosses the equator.'],
+                ['Origin', "Earth's center of mass, as in ECI."],
+                ['Fundamental Plane', 'The equatorial plane, as in ECI, but the axes rotate with Earth.'],
+                ['Principal Axis', 'X̂', 'Toward 0° latitude, 0° longitude, where the Prime Meridian crosses the equator.'],
                 ['Third Axis', 'Ẑ', "Along Earth's spin axis, through the North Pole."],
-                ['Remaining Axis', 'Ŷ', 'Lies in the equatorial plane and points toward 0° latitude, 90° east longitude.'],
+                ['Remaining Axis', 'Ŷ', 'Toward 0° latitude, 90° east longitude.'],
                 ['Classification', 'Non-inertial, because it rotates with Earth.'],
-                ['Purpose', 'Specifying sensor locations, GPS navigation, antenna pointing coordinates, and satellite ground tracks.']
+                ['Purpose', 'Sensor locations, GPS navigation, antenna pointing, and ground tracks.']
             ]
         },
         RIC: {
@@ -80,11 +80,11 @@
             classStyle: 'noninertial',
             anatomy: [
                 ['Origin', 'The center of mass of the target spacecraft.'],
-                ['Fundamental Plane', "The target's orbital plane, the flat plane containing its orbit and Earth's center."],
-                ['Principal Axis', 'R̂', "Radial. Along the line from Earth's center through the target, pointing away from Earth."],
+                ['Fundamental Plane', "The target's orbital plane, containing its orbit and Earth's center."],
+                ['Principal Axis', 'R̂', "Radial. From Earth's center through the target, pointing away from Earth."],
                 ['Third Axis', 'Ĉ', "Cross-track. Perpendicular to the target's orbital plane."],
-                ['Remaining Axis', 'Î', 'In-track. Lies in the orbital plane, perpendicular to R̂, on the side toward which the target is moving.'],
-                ['Classification', 'Non-inertial. The frame travels around Earth with the target, and its axes complete one full turn per orbit.'],
+                ['Remaining Axis', 'Î', 'In-track. In the orbital plane, perpendicular to R̂, on the side the target moves toward.'],
+                ['Classification', 'Non-inertial. It travels with the target and turns once per orbit.'],
                 ['Purpose', 'Orienting and maneuvering two separate objects in space.']
             ]
         }
@@ -104,7 +104,7 @@
             tiltOffset: 0.4 * D2R,
             trailWindow: FM.SIDEREAL_DAY,
             speedStop: 4,
-            globalDistance: 21,
+            globalDistance: 20.5,
             localDistance: 0.46,
             caption: 'About 35,786 km above the equator. One orbit takes one Earth rotation.'
         },
@@ -115,7 +115,7 @@
             tiltOffset: 1.5 * D2R,
             trailWindow: null, // three orbits, set from the period
             speedStop: 1,
-            globalDistance: 6,
+            globalDistance: 5.6,
             localDistance: 0.26,
             caption: '700 km above the surface. One orbit takes about 99 minutes.'
         }
@@ -134,23 +134,23 @@
         const tilted = inclination > 0;
         if (frame === 'ECI') {
             if (orbit === 'GEO') {
-                return 'Earth turns inside fixed axes while the target traces a full circle once per rotation. The target\'s coordinates change constantly, and its speed reads the true orbital speed of about 3.07 km/s. Compare the stars with the ECEF view: here they stay still.';
+                return 'Earth turns inside fixed axes while the target traces one full circle per rotation. Its speed reads the true orbital speed, about 3.07 km/s. The stars stay still here, unlike in ECEF.';
             }
-            return 'The orbit stays a single fixed loop in space while Earth turns slowly beneath it. The target completes many orbits, but its path does not drift. This steadiness is why orbits are calculated in this frame.';
+            return 'The orbit stays one fixed loop in space while Earth turns beneath it. This steadiness is why orbits are calculated in this frame.';
         }
         if (frame === 'ECEF') {
             if (orbit === 'GEO' && !tilted) {
-                return 'The axes turn with Earth, so the continents stop moving. The target\'s circular path collapses to a single point, its coordinates stop changing, and its speed reads zero. The orbit did not change. Only the viewpoint did.';
+                return 'The axes turn with Earth, so the continents stop moving. The target\'s path collapses to a single point and its speed reads zero. The orbit did not change. Only the viewpoint did.';
             }
             if (orbit === 'GEO') {
-                return 'With a tilted orbit, the target no longer stays above one point. It swings north and south of the equator each day and traces a figure-eight that repeats. The ground site\'s coordinates still stay constant.';
+                return 'With a tilted orbit, the target swings north and south of the equator each day, tracing a repeating figure-eight. The ground site\'s coordinates still stay constant.';
             }
-            return 'The axes turn with Earth, so the continents stop moving. The target\'s path now winds around the globe and shifts west with each orbit, because Earth turns east beneath it. The path on the surface directly beneath a satellite is its ground track.';
+            return 'The continents stop moving. The target\'s path winds around the globe and shifts west each orbit, because Earth turns east beneath it. The path on the surface below is its ground track.';
         }
         const scale = orbit === 'GEO'
-            ? 'At this altitude, Earth is too far below to appear in the main view, so the inset shows it.'
+            ? 'Earth is too far below to appear here, so the inset shows it.'
             : 'Earth\'s surface moves beneath the view while its center stays directly below.';
-        return 'The target always sits at the origin, with coordinates of zero. The second spacecraft, on a slightly different orbit, traces a closed loop around it, and its RIC numbers stay small and easy to read. ' + scale;
+        return 'The target always sits at the origin, reading zero. The second spacecraft, on a slightly different orbit, traces a closed loop around it with small RIC numbers. ' + scale;
     }
 
     const OBJECT_NOTES = {
@@ -506,6 +506,9 @@
 
     /* Paths: wide lines drawn in display space, computed from the analytic orbit */
     const TRAIL_POINTS = 720;
+    const morphPoint = new THREE.Vector3();
+    const earthTurn = new THREE.Quaternion();
+    const spinAxis = new THREE.Vector3(0, 0, 1);
 
     class Ribbon {
         constructor(color, width) {
@@ -622,6 +625,26 @@
         }
     }
 
+    // The path during a change between ECI and ECEF. Each sample turns about the spin axis
+    // by a share of Earth's rotation since that sample, then with the scene. The newest point
+    // therefore stays on the spacecraft, and every point keeps its distance from Earth.
+    function computeSpinMorph(elementsObj, t, share, sceneQuaternion, out) {
+        const win = currentTrailWindow();
+        const n = TRAIL_POINTS;
+        const now = FM.earthAngle(t);
+        for (let i = 0; i < n; i++) {
+            const tk = t - win * (1 - i / (n - 1));
+            const p = FM.positionEci(elementsObj, tk);
+            const angle = share * (now - FM.earthAngle(tk));
+            const c = Math.cos(angle), s = Math.sin(angle);
+            morphPoint.set((c * p[0] - s * p[1]) / RE, (s * p[0] + c * p[1]) / RE, p[2] / RE);
+            morphPoint.applyQuaternion(sceneQuaternion);
+            out[i * 3] = morphPoint.x;
+            out[i * 3 + 1] = morphPoint.y;
+            out[i * 3 + 2] = morphPoint.z;
+        }
+    }
+
     /* Labels: HTML elements placed over the canvas */
     const labelRoot = $('labels');
     const labels = [];
@@ -708,11 +731,14 @@
         camFrom.el = cam.el;
         camFrom.logDist = cam.logDist;
         blend.s = 0;
+        blend.spinMorph = false;
     }
 
     function selectFrame(frame) {
         if (frame === state.frame) return;
+        const settled = blend.s >= 1;
         beginTransition();
+        blend.spinMorph = settled && frame !== 'RIC' && state.frame !== 'RIC';
         state.frame = frame;
         updateFrameUi();
         dirty = true;
@@ -735,6 +761,7 @@
     const toPoint = new THREE.Vector3();
     let viewW = 1, viewH = 1;
     let insetW = 0, insetH = 0;
+    let started = false;
 
     function sceneExtent() {
         return { axis: Math.max(1.9, 1.12 * scenario.a / RE) };
@@ -830,6 +857,11 @@
         for (const name of ['target', 'second']) {
             const ribbon = trails[name];
             if (!ribbon.mesh.visible && blend.s >= 1) continue;
+            if (name === 'target' && blend.spinMorph && blend.s < 1) {
+                computeSpinMorph(scenario.target, t, w.ECEF, root.quaternion, ribbon.points);
+                ribbon.commit();
+                continue;
+            }
             const live = ribbon.live || (ribbon.live = new Float32Array(TRAIL_POINTS * 3));
             computeTrail(name === 'second' ? scenario.second : scenario.target, state.frame, t, live, false);
             for (let i = 0; i < live.length; i++) {
@@ -843,6 +875,16 @@
         trails.track.mesh.visible = trackOn > 0.005;
         if (trails.track.mesh.visible) {
             computeTrail(scenario.target, 'ECEF', t, trails.track.points, true);
+            if (blend.s < 1) {
+                earthTurn.setFromAxisAngle(spinAxis, FM.earthAngle(t)).premultiply(root.quaternion);
+                const pts = trails.track.points;
+                for (let i = 0; i < pts.length; i += 3) {
+                    morphPoint.set(pts[i], pts[i + 1], pts[i + 2]).applyQuaternion(earthTurn);
+                    pts[i] = morphPoint.x;
+                    pts[i + 1] = morphPoint.y;
+                    pts[i + 2] = morphPoint.z;
+                }
+            }
             trails.track.commit();
         }
 
@@ -869,8 +911,10 @@
         const d = Math.exp(cam.logDist);
         const ce = Math.cos(cam.el * D2R), se = Math.sin(cam.el * D2R);
         const ca = Math.cos(cam.az * D2R), sa = Math.sin(cam.az * D2R);
-        camera.position.set(d * ce * ca, d * ce * sa, d * se);
-        camera.lookAt(0, 0, 0);
+        // In the Earth-centered views, aim slightly up the spin axis so that its arrow stays in view.
+        const lift = sceneExtent().axis * 0.15 * (1 - blend.weights.RIC);
+        camera.position.set(d * ce * ca, d * ce * sa, d * se + lift);
+        camera.lookAt(0, 0, lift);
 
         const earthDistance = camera.position.distanceTo(root.position);
         const farReach = earthDistance + 8;
@@ -909,6 +953,7 @@
         const w = blend.weights;
         const earthCenter = root.position;
         const on = state.show.labels ? 1 : 0;
+        const shown = [];
         for (const item of labels) {
             let opacity = on;
             if (item.kind === 'axis') {
@@ -955,11 +1000,68 @@
             }
             item.el.style.display = 'block';
             item.el.style.opacity = opacity;
-            // Keep the label on screen, offset from the point it names.
-            const box = item.width || (item.width = item.el.offsetWidth);
-            const px = Math.min(Math.max(4, x + 10), viewW - box - 6);
-            const py = Math.min(Math.max(4, y - 9), viewH - 22);
-            item.el.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)`;
+            if (!item.width) {
+                item.width = item.el.offsetWidth;
+                item.height = item.el.offsetHeight;
+                const core = item.el.firstElementChild;
+                item.coreWidth = core ? core.offsetWidth : item.width;
+            }
+            const main = item.kind !== 'axis' || w[item.frame] > 0.5;
+            shown.push({ item, x, y, main, box: main ? item.width : item.coreWidth });
+        }
+        placeLabels(shown);
+    }
+
+    // Places the most important labels first. Each later label takes a free spot beside
+    // its point. A faded label or the Sun label is hidden when no spot is free.
+    function placeLabels(shown) {
+        const taken = [];
+        if (hudBox) taken.push(hudBox);
+        if (blend.weights.RIC > 0.6) {
+            const m = viewportInset();
+            const caption = 34;
+            taken.push({ x: m.x, y: viewH - m.y - insetH - caption, w: insetW, h: insetH + caption });
+        }
+        const clash = (r) => taken.some((o) => r.x < o.x + o.w + 3 && o.x < r.x + r.w + 3 && r.y < o.y + o.h + 2 && o.y < r.y + r.h + 2);
+        const rank = (s) => (s.main ? (s.item.kind === 'axis' ? 0 : 1) : 2);
+        shown.sort((a, b) => rank(a) - rank(b));
+        for (const s of shown) {
+            const { item, x, y, box } = s;
+            const h = item.height || 20;
+            const spots = [
+                [x + 10, y - 9], [x + 10, y - 9 - h], [x + 10, y + 7],
+                [x - box - 10, y - 9], [x - box - 10, y - 9 - h], [x - box - 10, y + 7]
+            ];
+            const underHud = hudBox && x > hudBox.x - 10 && x < hudBox.x + hudBox.w + 10 && y > hudBox.y - 10 && y < hudBox.y + hudBox.h + 10;
+            if (underHud) {
+                spots.push([hudBox.x + hudBox.w + 8, y - 9], [x + 10, hudBox.y + hudBox.h + 6]);
+            }
+            const at = (i) => {
+                const px = Math.min(Math.max(4, spots[i][0]), viewW - box - 6);
+                const py = Math.min(Math.max(4, spots[i][1]), viewH - h - 4);
+                return { x: px, y: py, w: box, h };
+            };
+            // Use the usual spot when free, then the previous spot, so that labels do not jump.
+            let chosen = -1;
+            const previous = (item.spot || 0) < spots.length ? (item.spot || 0) : 0;
+            const order = [0, previous, ...spots.keys()];
+            for (const i of order) {
+                const r = at(i);
+                // Screen edges can push a label back onto its own point, so reject that spot too.
+                const onPoint = x > r.x - 8 && x < r.x + box + 8 && y > r.y - 2 && y < r.y + h + 2;
+                if (!onPoint && !clash(r)) { chosen = i; break; }
+            }
+            if (chosen < 0) {
+                if (!s.main || item.kind === 'sun') {
+                    item.el.style.display = 'none';
+                    continue;
+                }
+                chosen = 0;
+            }
+            item.spot = chosen;
+            const r = at(chosen);
+            taken.push(r);
+            item.el.style.transform = `translate(${r.x.toFixed(1)}px, ${r.y.toFixed(1)}px)`;
         }
     }
 
@@ -997,14 +1099,25 @@
         }
     }
 
+    // Matches the 0.7rem offset of the inset's outline in the page styles.
     function viewportInset() {
-        return { x: Math.round(0.7 * 16), y: Math.round(0.7 * 16) };
+        const offset = Math.round(0.7 * parseFloat(getComputedStyle(document.documentElement).fontSize));
+        return { x: offset, y: offset };
+    }
+
+    // Areas of the view that labels must stay clear of.
+    let hudBox = null;
+    function measureObstacles() {
+        const hud = $('hud');
+        const view = viewport.getBoundingClientRect();
+        const box = hud.getBoundingClientRect();
+        const overlaid = getComputedStyle(hud).position === 'absolute';
+        hudBox = overlaid ? { x: box.left - view.left, y: box.top - view.top, w: box.width, h: box.height } : null;
     }
 
     function resize() {
-        const rect = viewport.getBoundingClientRect();
-        viewW = Math.max(1, Math.floor(rect.width));
-        viewH = Math.max(1, Math.floor(rect.height));
+        viewW = Math.max(1, viewport.clientWidth);
+        viewH = Math.max(1, viewport.clientHeight);
         renderer.setSize(viewW, viewH, false);
         camera.aspect = viewW / viewH;
         insetW = Math.round(Math.max(130, Math.min(250, viewW * 0.26)));
@@ -1012,7 +1125,15 @@
         insetFrame.style.width = insetW + 'px';
         insetFrame.style.height = insetH + 'px';
         for (const item of labels) item.width = 0;
+        measureObstacles();
         dirty = true;
+        // Resizing clears the canvas, so draw at once to avoid a blank frame.
+        if (started) {
+            updateScene(0);
+            updateLabels();
+            render();
+            dirty = false;
+        }
     }
 
     new ResizeObserver(resize).observe(viewport);
@@ -1086,6 +1207,7 @@
         movingLine.className = 'moving';
         movingLine.textContent = `Appears to move: ${def.moving}`;
         hud.append(heldLine, movingLine);
+        measureObstacles();
 
         $('anatomy-name').textContent = def.name;
         const pill = $('class-pill');
@@ -1255,6 +1377,16 @@
     updateFrameUi();
     setPlaying(state.playing);
     statusEl.style.display = 'none';
+    started = true;
+
+    // Labels are measured for placement, so measure again once the page fonts arrive.
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+            for (const item of labels) item.width = 0;
+            measureObstacles();
+            dirty = true;
+        });
+    }
 
     let lastTime = performance.now();
     let lastReadout = 0;

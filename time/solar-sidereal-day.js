@@ -316,6 +316,7 @@
         ctx.arc(cx, cy, orbitR, 0, 2 * Math.PI);
         ctx.stroke();
 
+        let goldLabel = null;
         const travel = orbitTravelToday();
         if (travel > 0.02) {
             ctx.strokeStyle = COLORS.gold;
@@ -348,7 +349,8 @@
             ctx.stroke();
             if (travel > 3) {
                 const mid = state.dayStartOrbit + travel / 2;
-                label(`${travel.toFixed(1)}°`, cx + (arcR + 22) * dirX(mid), cy + (arcR + 14) * dirY(mid), COLORS.gold, 'center', 600);
+                goldLabel = { x: cx + (arcR + 22) * dirX(mid), y: cy + (arcR + 14) * dirY(mid) };
+                label(`${travel.toFixed(1)}°`, goldLabel.x, goldLabel.y, COLORS.gold, 'center', 600);
             }
         }
 
@@ -424,7 +426,13 @@
             ctx.stroke();
             if (extra > 4) {
                 const mid = starDir + extra / 2;
-                label(`${extra.toFixed(1)}°`, ex + (arcR + 26) * dirX(mid), ey + (arcR + 16) * dirY(mid), COLORS.extra, 'center', 600);
+                const redX = ex + (arcR + 26) * dirX(mid);
+                let redY = ey + (arcR + 16) * dirY(mid);
+                // Move this label clear of the gold label when the two meet.
+                if (goldLabel && Math.abs(redX - goldLabel.x) < 50 && Math.abs(redY - goldLabel.y) < 17) {
+                    redY = goldLabel.y + (redY < goldLabel.y ? -17 : 17);
+                }
+                label(`${extra.toFixed(1)}°`, redX, redY, COLORS.extra, 'center', 600);
             }
         }
 
@@ -483,10 +491,6 @@
         const place = (el, v) => { el.style.left = `${g.toPercent(v)}%`; };
         place($('tick-sidereal'), 360);
         place($('tick-solar'), end);
-        place($('text-sidereal-deg'), 360);
-        place($('text-sidereal-time'), 360);
-        place($('text-solar-deg'), end);
-        place($('text-solar-time'), end);
         place($('gauge-pointer'), state.rotation);
         const extraEl = $('gauge-extra');
         extraEl.style.left = `${g.toPercent(360)}%`;
@@ -522,11 +526,11 @@
         const k = state.exaggeration;
         $('exaggeration-value').textContent = k === 1 ? 'Real Earth' : `${k} times real`;
         $('scale-badge').innerHTML = k === 1
-            ? '<strong>Real Earth values.</strong> The extra rotation is too small to see here. Use the magnified scale.'
+            ? '<strong>Real Earth values.</strong> The extra rotation is too small to see here, so use the magnified scale in the side panel.'
             : `<strong>Orbital motion exaggerated ${k} times.</strong> Earth's rotation rate is unchanged.`;
         $('exaggeration-help').textContent = k === 1
-            ? 'Earth moves about 1° along its orbit each day. At this true scale, the magnified scale in the side panel shows the difference.'
-            : `Earth really moves about 1° along its orbit each day. This view uses about ${(drawnEnd - 360).toFixed(0)}° per day so that the geometry is visible, which also makes the drawn solar day longer than 24 hours.`;
+            ? 'Earth moves about 1° along its orbit each day.'
+            : `Earth really moves about 1° per day. This view uses about ${(drawnEnd - 360).toFixed(0)}°, which also makes the drawn solar day longer than 24 hours.`;
     }
 
     function setPlaying(value) {
@@ -550,9 +554,8 @@
     }
 
     function resize() {
-        const rect = stage.getBoundingClientRect();
-        W = Math.max(1, Math.floor(rect.width));
-        H = Math.max(1, Math.floor(rect.height));
+        W = Math.max(1, stage.clientWidth);
+        H = Math.max(1, stage.clientHeight);
         dpr = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = W * dpr;
         canvas.height = H * dpr;
