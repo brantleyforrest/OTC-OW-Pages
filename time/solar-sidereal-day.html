@@ -310,7 +310,7 @@
                     <canvas id="view" aria-label="Animated view of Earth rotating as it moves along its orbit around the Sun"></canvas>
                 </div>
 
-                <p class="ctl-caption phone-key"><b class="key-white">White arrow:</b> a point fixed to Earth. <b class="key-gold">Gold:</b> Earth's travel along its orbit this day. <b class="key-red">Red:</b> the extra rotation.</p>
+                <p class="ctl-caption phone-key"><b class="key-white">White arrow:</b> a point fixed to Earth. <b class="key-gold">Gold:</b> Earth's travel along its orbit. <b class="key-red">Red:</b> the extra rotation.</p>
 
                 <div class="panel controls">
                     <div class="ctl-row">
@@ -330,25 +330,25 @@
                     <div class="ctl-row">
                         <div class="ctl-grow">
                             <div class="control-label">
-                                <label for="exaggeration">Orbital motion, exaggerated for visibility</label>
-                                <span class="control-value" id="exaggeration-value"></span>
+                                <label for="rotations">Number of rotations</label>
+                                <span class="control-value" id="rotations-value"></span>
                             </div>
-                            <input type="range" id="exaggeration" min="1" max="30" step="1" value="20">
+                            <input type="range" id="rotations" min="1" max="30" step="1" value="10">
                         </div>
-                        <button class="btn" id="real-earth">Use Real Earth Values</button>
+                        <button class="btn" id="btn-toggle-rotations">Single Rotation (1 Day)</button>
                     </div>
-                    <p class="ctl-caption scale-note"><span class="scale-badge" id="scale-badge"></span> <span id="exaggeration-help"></span></p>
+                    <p class="ctl-caption scale-note"><span class="scale-badge" id="scale-badge"></span> <span id="rotations-help"></span></p>
                 </div>
             </div>
 
             <aside class="tool-side">
                 <div class="col">
                     <div class="panel accent">
-                        <div class="panel-title">This Day, Step by Step</div>
+                        <div class="panel-title" id="steps-title">10 Rotations, Step by Step</div>
                         <ol class="steps" id="steps">
-                            <li data-step="1"><strong>Start of the day</strong>The marked point faces the Sun, and a distant star lies in the same direction.</li>
-                            <li data-step="2"><strong>One sidereal day: 360° of rotation</strong>The point faces the star again. Earth has moved along its orbit, so the point does not yet face the Sun.</li>
-                            <li data-step="3"><strong>One solar day: a little more than 360°</strong>After a small extra rotation, the point faces the Sun again. A new day begins.</li>
+                            <li data-step="1"><strong id="step-1-title">Start of day 1</strong><span id="step-1-text">The marked point faces the Sun, and a distant star lies in the same direction.</span></li>
+                            <li data-step="2"><strong id="step-2-title">10 sidereal days: 10 full rotations (3,600°)</strong><span id="step-2-text">Earth completes 10 full 360° spins facing the distant star. Along its orbit, Earth has traveled 9.9°, falling behind the Sun.</span></li>
+                            <li data-step="3"><strong id="step-3-title">10 solar days: 10 full days (240 h)</strong><span id="step-3-text">After an accumulated 9.9° extra rotation (39 m), the point faces the Sun again.</span></li>
                         </ol>
                     </div>
 
@@ -360,7 +360,7 @@
                             <span>Difference</span><span class="mono" id="count-diff">0.000</span>
                             <span>Orbits of the Sun completed</span><span class="mono" id="count-orbits">0.000</span>
                         </div>
-                        <p class="helper">The difference always equals the number of orbits completed. A real year has 366.24 sidereal days and 365.24 solar days. To see this quickly, set the exaggeration to its maximum, turn off the milestone pauses, and let one full orbit play.</p>
+                        <p class="helper">The difference always equals the number of orbits completed. A real year has 366.24 sidereal days and 365.24 solar days. Over any period, the sidereal day count minus the solar day count exactly equals the fraction of the orbit completed.</p>
                     </div>
 
                     <div class="panel">
@@ -375,9 +375,9 @@
 
                 <div class="col">
                     <div class="panel">
-                        <div class="panel-title">Live Values for This Day</div>
+                        <div class="panel-title">Live Values</div>
                         <div class="stats">
-                            <div class="stat"><span class="label">Time since the day began</span><span class="value" id="clock">00 h 00 m 00 s</span></div>
+                            <div class="stat"><span class="label">Time elapsed</span><span class="value" id="clock">00 h 00 m 00 s</span></div>
                             <div class="stat"><span class="label">Earth's rotation so far</span><span class="value" id="rotation">0.000°</span></div>
                             <div class="stat"><span class="label">Earth's travel along its orbit</span><span class="value" id="orbit-travel">0.000°</span></div>
                             <div class="stat"><span class="label">Rotation needed to face the Sun</span><span class="value" id="needed">360.000°</span></div>
@@ -385,7 +385,7 @@
                     </div>
 
                     <div class="panel">
-                        <div class="panel-title">The End of the Day, Magnified</div>
+                        <div class="panel-title">End of the Sequence, Magnified</div>
                         <div class="gauge" id="gauge" aria-hidden="true">
                             <div class="gauge-track"></div>
                             <div class="gauge-extra" id="gauge-extra"></div>
@@ -397,18 +397,18 @@
                             <div class="gauge-text bottom solar" id="text-solar-time"></div>
                             <div class="gauge-pointer" id="gauge-pointer"></div>
                         </div>
-                        <p class="helper">The white marker shows Earth's rotation. The red segment is the extra rotation that separates the two definitions of a day.</p>
+                        <p class="helper">The white marker shows Earth's rotation. The red segment is the extra rotation needed to realign with the Sun.</p>
                     </div>
 
                     <div class="panel">
-                        <div class="panel-title">Real Earth Compared With This View</div>
+                        <div class="panel-title">Daily vs. Accumulated Values</div>
                         <table class="compare">
-                            <thead><tr><th></th><th>Real Earth</th><th>As drawn</th></tr></thead>
+                            <thead><tr><th></th><th>Single Day</th><th id="th-accumulated">Total (10 Days)</th></tr></thead>
                             <tbody>
-                                <tr><td>Sidereal day</td><td id="real-sidereal"></td><td id="drawn-sidereal"></td></tr>
-                                <tr><td>Solar day</td><td id="real-solar"></td><td id="drawn-solar"></td></tr>
-                                <tr><td>Difference</td><td id="real-diff"></td><td id="drawn-diff"></td></tr>
-                                <tr><td>Extra rotation</td><td id="real-extra"></td><td id="drawn-extra"></td></tr>
+                                <tr><td>Sidereal period</td><td id="single-sidereal"></td><td id="total-sidereal"></td></tr>
+                                <tr><td>Solar period</td><td id="single-solar"></td><td id="total-solar"></td></tr>
+                                <tr><td>Difference</td><td id="single-diff"></td><td id="total-diff"></td></tr>
+                                <tr><td>Extra rotation</td><td id="single-extra"></td><td id="total-extra"></td></tr>
                             </tbody>
                         </table>
                     </div>

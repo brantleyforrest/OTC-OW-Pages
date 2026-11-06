@@ -24,30 +24,34 @@
         orbit: '#27405f'
     };
 
-    const SPEEDS = [
-        { rate: 30, label: 'Slow' },
-        { rate: 60, label: 'Normal' },
-        { rate: 120, label: 'Fast' },
-        { rate: 240, label: 'Very fast' }
+    const SPEED_FACTORS = [
+        { factor: 0.5, label: 'Slow' },
+        { factor: 1.0, label: 'Normal' },
+        { factor: 2.0, label: 'Fast' },
+        { factor: 4.0, label: 'Very fast' }
     ];
 
     const state = {
-        exaggeration: 20,
-        orbitRate: 20 * REAL_ORBIT_RATE,
+        rotations: 10,      // number of rotations to observe (1 to 30)
         speedStop: 1,
         playing: false,
         pauses: true,
-        rotation: 0,        // degrees of rotation since the current day began
-        step: 1,            // 1 start or first part of day, 2 past sidereal day, 3 solar day complete
-        dayStartOrbit: -48, // Earth's orbital angle when this day began, degrees
-        dayStartSpin: 132,  // direction of the marked point when this day began, degrees
-        totalRotation: 0,   // rotation accumulated in earlier days
-        totalOrbit: 0       // orbital travel accumulated in earlier days
+        rotation: 0,        // degrees of rotation since the current sequence began
+        step: 1,            // 1 start/running, 2 reached N sidereal days, 3 reached N solar days
+        dayStartOrbit: -48, // Earth's orbital angle when this sequence began, degrees
+        dayStartSpin: 132,  // direction of the marked point when this sequence began, degrees
+        totalRotation: 0,   // rotation accumulated in earlier sequences
+        totalOrbit: 0       // orbital travel accumulated in earlier sequences
     };
 
+    function siderealTarget() {
+        return state.rotations * 360;
+    }
+
     function solarRotation() {
-        // Rotation for the marked point to face the Sun again, for the current orbit rate.
-        return 360 * SPIN_RATE / (SPIN_RATE - state.orbitRate);
+        // Rotation for the marked point to face the Sun again across state.rotations solar days.
+        const oneSolar = 360 * SPIN_RATE / (SPIN_RATE - REAL_ORBIT_RATE);
+        return state.rotations * oneSolar;
     }
 
     function clockTime() {
@@ -55,37 +59,62 @@
     }
 
     function orbitTravelToday() {
-        return state.orbitRate * clockTime();
+        return REAL_ORBIT_RATE * clockTime();
     }
 
     function formatDuration(seconds) {
         const total = Math.round(seconds);
-        const h = Math.floor(total / 3600);
-        const m = Math.floor(total / 60) % 60;
-        const s = total % 60;
+        const d = Math.floor(total / 86400);
+        const rem = total % 86400;
+        const h = Math.floor(rem / 3600);
+        const m = Math.floor((rem % 3600) / 60);
+        const s = rem % 60;
+        if (d > 0) {
+            return `${d}d ${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+        }
         return `${String(h).padStart(2, '0')} h ${String(m).padStart(2, '0')} m ${String(s).padStart(2, '0')} s`;
     }
 
     function formatShortDuration(seconds) {
         const total = Math.round(seconds);
-        const h = Math.floor(total / 3600);
-        const m = Math.floor(total / 60) % 60;
-        const s = total % 60;
+        const d = Math.floor(total / 86400);
+        const rem = total % 86400;
+        const h = Math.floor(rem / 3600);
+        const m = Math.floor((rem % 3600) / 60);
+        const s = rem % 60;
+        if (d > 0) {
+            if (h > 0) return `${d}d ${h}h ${m}m`;
+            return `${d}d ${m}m`;
+        }
         if (h > 0) return `${h} h ${String(m).padStart(2, '0')} m ${String(s).padStart(2, '0')} s`;
         return `${m} m ${String(s).padStart(2, '0')} s`;
+    }
+
+    function formatGaugeTime(seconds) {
+        const total = Math.round(seconds);
+        const d = Math.floor(total / 86400);
+        const rem = total % 86400;
+        const h = Math.floor(rem / 3600);
+        const m = Math.floor((rem % 3600) / 60);
+        if (d > 0) {
+            return `${d}d ${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`;
+        }
+        const s = rem % 60;
+        return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
     }
 
     /* ------------------------------------------------------------------ */
     /* Simulation                                                          */
     /* ------------------------------------------------------------------ */
 
-    function beginNextDay() {
+    function beginNextCycle() {
         const finished = solarRotation();
         state.totalRotation += finished;
-        state.totalOrbit += state.orbitRate * finished / SPIN_RATE;
+        state.totalOrbit += REAL_ORBIT_RATE * (finished / SPIN_RATE);
         state.dayStartSpin += finished;
-        state.dayStartOrbit += state.orbitRate * finished / SPIN_RATE;
+        state.dayStartOrbit += REAL_ORBIT_RATE * (finished / SPIN_RATE);
         state.rotation -= finished;
+        if (state.rotation < 0) state.rotation = 0;
         state.step = 1;
     }
 
@@ -98,53 +127,68 @@
         state.totalOrbit = 0;
     }
 
+    function getCruiseRate() {
+        const n = state.rotations;
+        const baseDuration = 5.5 + 0.32 * (n - 1);
+        const baseRate = (n * 360) / baseDuration;
+        return baseRate * SPEED_FACTORS[state.speedStop].factor;
+    }
+
     // Rotation rate in degrees per viewing second, slowed near the milestones so
     // that the small extra rotation can be followed.
     function rotationRate() {
-        const cruise = SPEEDS[state.speedStop].rate;
+        const cruise = getCruiseRate();
         if (!state.pauses) return cruise;
-        const end = solarRotation();
-        const slow = Math.max((end - 360) / 3.5, 0.28);
+        const siderealEnd = siderealTarget();
+        const solarEnd = solarRotation();
+        const extraSpan = solarEnd - siderealEnd;
+        const slow = Math.max(extraSpan / 2.5, 0.35);
         const r = state.rotation;
-        if (r < 12) return slow + (cruise - slow) * Math.min(1, r / 12 + 0.25);
-        if (r < 335) return cruise;
-        if (r < 358) return slow + (cruise - slow) * (358 - r) / 23;
-        return slow;
+
+        if (r < 15) return slow + (cruise - slow) * Math.min(1, r / 15);
+        const approachDist = Math.min(90, siderealEnd * 0.12);
+        if (r > siderealEnd - approachDist && r < siderealEnd) {
+            const frac = (siderealEnd - r) / approachDist;
+            return slow + (cruise - slow) * frac;
+        }
+        if (r >= siderealEnd) return slow;
+        return cruise;
     }
 
     function advance(dt) {
         let remaining = dt;
         while (remaining > 0 && state.playing) {
             if (state.step === 3) {
-                beginNextDay();
+                beginNextCycle();
             }
             const rate = rotationRate();
-            const end = solarRotation();
+            const siderealEnd = siderealTarget();
+            const solarEnd = solarRotation();
             let next = state.rotation + rate * remaining;
 
-            if (state.pauses && state.step === 1 && state.rotation < 360 && next >= 360) {
-                state.rotation = 360;
+            if (state.pauses && state.step === 1 && state.rotation < siderealEnd && next >= siderealEnd) {
+                state.rotation = siderealEnd;
                 state.step = 2;
                 setPlaying(false);
                 return;
             }
-            if (state.pauses && next >= end) {
-                state.rotation = end;
+            if (state.pauses && next >= solarEnd) {
+                state.rotation = solarEnd;
                 state.step = 3;
                 setPlaying(false);
                 return;
             }
             if (!state.pauses) {
-                // Without pauses, cross days continuously.
-                if (next >= end) {
-                    const used = (end - state.rotation) / rate;
-                    state.rotation = end;
+                // Without pauses, cross cycles continuously.
+                if (next >= solarEnd) {
+                    const used = (solarEnd - state.rotation) / rate;
+                    state.rotation = solarEnd;
                     state.step = 3;
-                    beginNextDay();
+                    beginNextCycle();
                     remaining -= used;
                     continue;
                 }
-                state.step = next >= 360 ? 2 : 1;
+                state.step = next >= siderealEnd ? 2 : 1;
             }
             state.rotation = next;
             remaining = 0;
@@ -437,7 +481,10 @@
         }
 
         /* The marked point: an arrow fixed to Earth */
-        const facing = state.step === 3 ? COLORS.solar : (state.step === 2 && Math.abs(state.rotation - 360) < 1e-6 ? COLORS.sidereal : '#ffffff');
+        const siderealEnd = siderealTarget();
+        const facing = state.step === 3
+            ? COLORS.solar
+            : (state.step === 2 && Math.abs(state.rotation - siderealEnd) < 1e-4 ? COLORS.sidereal : '#ffffff');
         arrow(ex, ey, ex + arrowLen * dirX(spinNow), ey + arrowLen * dirY(spinNow), facing, 3, 13);
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
@@ -458,7 +505,7 @@
         const small = W < 640;
         if (!small) {
             label('White arrow: a point fixed to Earth', 14, keyY - 38, COLORS.text);
-            label('Gold: Earth\'s travel along its orbit this day', 14, keyY - 19, COLORS.gold);
+            label('Gold: Earth\'s travel along its orbit', 14, keyY - 19, COLORS.gold);
             label('Red: the extra rotation', 14, keyY, COLORS.extra);
         }
     }
@@ -470,18 +517,21 @@
     const stepItems = [...$('steps').children];
 
     function gaugePlacement() {
+        const siderealEnd = siderealTarget();
         const end = solarRotation();
-        const span = end - 360;
+        const span = end - siderealEnd;
         const margin = Math.max(span * 0.42, 0.5);
-        const lo = 360 - margin, hi = end + margin;
-        return { lo, hi, end, toPercent: (v) => Math.min(100, Math.max(0, (v - lo) / (hi - lo) * 100)) };
+        const lo = siderealEnd - margin, hi = end + margin;
+        return { lo, hi, siderealEnd, end, toPercent: (v) => Math.min(100, Math.max(0, (v - lo) / (hi - lo) * 100)) };
     }
 
     function updatePanels() {
         const end = solarRotation();
+        const siderealEnd = siderealTarget();
         const t = clockTime();
         $('clock').textContent = formatDuration(t);
-        $('rotation').textContent = `${state.rotation.toFixed(3)}°`;
+        const currentRev = state.rotation / 360;
+        $('rotation').textContent = `${state.rotation.toFixed(1)}° (${currentRev.toFixed(2)} rev)`;
         $('orbit-travel').textContent = `${orbitTravelToday().toFixed(3)}°`;
         $('needed').textContent = `${end.toFixed(3)}°`;
 
@@ -489,16 +539,16 @@
 
         const g = gaugePlacement();
         const place = (el, v) => { el.style.left = `${g.toPercent(v)}%`; };
-        place($('tick-sidereal'), 360);
+        place($('tick-sidereal'), siderealEnd);
         place($('tick-solar'), end);
         place($('gauge-pointer'), state.rotation);
         const extraEl = $('gauge-extra');
-        extraEl.style.left = `${g.toPercent(360)}%`;
-        extraEl.style.width = `${g.toPercent(end) - g.toPercent(360)}%`;
-        $('text-sidereal-deg').textContent = '360°';
-        $('text-solar-deg').textContent = `${end.toFixed(3)}°`;
-        $('text-sidereal-time').textContent = formatDuration(SIDEREAL_DAY);
-        $('text-solar-time').textContent = formatDuration(end / SPIN_RATE);
+        extraEl.style.left = `${g.toPercent(siderealEnd)}%`;
+        extraEl.style.width = `${Math.max(0, g.toPercent(end) - g.toPercent(siderealEnd))}%`;
+        $('text-sidereal-deg').textContent = `${siderealEnd.toLocaleString()}°`;
+        $('text-solar-deg').textContent = `${end.toFixed(1)}°`;
+        $('text-sidereal-time').textContent = formatGaugeTime(state.rotations * SIDEREAL_DAY);
+        $('text-solar-time').textContent = formatGaugeTime(state.rotations * SOLAR_DAY);
 
         const starsCount = (state.totalRotation + state.rotation) / 360;
         const orbitTotal = state.totalOrbit + orbitTravelToday();
@@ -510,27 +560,50 @@
     }
 
     function updateComparison() {
-        const realEnd = 360 * SPIN_RATE / (SPIN_RATE - REAL_ORBIT_RATE);
-        const drawnEnd = solarRotation();
-        const realSolar = realEnd / SPIN_RATE;
-        const drawnSolar = drawnEnd / SPIN_RATE;
-        $('real-sidereal').textContent = formatDuration(SIDEREAL_DAY);
-        $('drawn-sidereal').textContent = formatDuration(SIDEREAL_DAY);
-        $('real-solar').textContent = formatDuration(realSolar);
-        $('drawn-solar').textContent = formatDuration(drawnSolar);
-        $('real-diff').textContent = formatShortDuration(realSolar - SIDEREAL_DAY);
-        $('drawn-diff').textContent = formatShortDuration(drawnSolar - SIDEREAL_DAY);
-        $('real-extra').textContent = `${(realEnd - 360).toFixed(3)}°`;
-        $('drawn-extra').textContent = `${(drawnEnd - 360).toFixed(3)}°`;
+        const n = state.rotations;
+        const oneSolarRot = 360 * SPIN_RATE / (SPIN_RATE - REAL_ORBIT_RATE);
+        const oneSolarSec = oneSolarRot / SPIN_RATE;
+        const oneExtraDeg = oneSolarRot - 360;
 
-        const k = state.exaggeration;
-        $('exaggeration-value').textContent = k === 1 ? 'Real Earth' : `${k} times real`;
-        $('scale-badge').innerHTML = k === 1
-            ? '<strong>Real Earth values.</strong> The extra rotation is too small to see here, so use the magnified scale in the side panel.'
-            : `<strong>Orbital motion exaggerated ${k} times.</strong> Earth's rotation rate is unchanged.`;
-        $('exaggeration-help').textContent = k === 1
-            ? 'Earth moves about 1° along its orbit each day.'
-            : `Earth really moves about 1° per day. This view uses about ${(drawnEnd - 360).toFixed(0)}°, which also makes the drawn solar day longer than 24 hours.`;
+        const totalSiderealSec = n * SIDEREAL_DAY;
+        const totalSolarSec = n * oneSolarSec;
+        const totalExtraDeg = n * oneExtraDeg;
+
+        $('single-sidereal').textContent = formatDuration(SIDEREAL_DAY);
+        $('total-sidereal').textContent = formatDuration(totalSiderealSec);
+        $('single-solar').textContent = formatDuration(oneSolarSec);
+        $('total-solar').textContent = formatDuration(totalSolarSec);
+        $('single-diff').textContent = formatShortDuration(oneSolarSec - SIDEREAL_DAY);
+        $('total-diff').textContent = formatShortDuration(totalSolarSec - totalSiderealSec);
+        $('single-extra').textContent = `${oneExtraDeg.toFixed(3)}°`;
+        $('total-extra').textContent = `${totalExtraDeg.toFixed(3)}°`;
+
+        $('th-accumulated').textContent = n === 1 ? 'Total (1 Day)' : `Total (${n} Days)`;
+        $('rotations-value').textContent = n === 1 ? '1 rotation (1 day)' : `${n} rotations (${n} days)`;
+        $('btn-toggle-rotations').textContent = n === 1 ? 'Default (10 Rotations)' : 'Single Rotation (1 Day)';
+
+        $('steps-title').textContent = n === 1 ? 'This Day, Step by Step' : `${n} Rotations, Step by Step`;
+        $('step-1-title').textContent = n === 1 ? 'Start of the day' : 'Start of day 1';
+        $('step-1-text').textContent = 'The marked point faces the Sun, and a distant star lies in the same direction.';
+
+        if (n === 1) {
+            $('step-2-title').textContent = 'One sidereal day: 360° of rotation';
+            $('step-2-text').textContent = 'The point faces the star again. Earth has moved about 1° along its orbit, so the point does not yet face the Sun.';
+            $('step-3-title').textContent = 'One solar day: about 361° of rotation';
+            $('step-3-text').textContent = 'After an extra 0.986° rotation (3 m 56 s), the point faces the Sun again. A new day begins.';
+        } else {
+            $('step-2-title').textContent = `${n} sidereal days: ${n} full rotations (${(n * 360).toLocaleString()}°)`;
+            $('step-2-text').textContent = `Earth completes ${n} full 360° spins facing the distant star. Along its orbit, Earth has traveled ${totalExtraDeg.toFixed(1)}°, falling behind the Sun.`;
+            $('step-3-title').textContent = `${n} solar days: ${n} full days (${Math.round(totalSolarSec / 3600)} h)`;
+            $('step-3-text').textContent = `After an accumulated ${totalExtraDeg.toFixed(1)}° extra rotation (${formatShortDuration(totalSolarSec - totalSiderealSec)}), the point faces the Sun again.`;
+        }
+
+        $('scale-badge').innerHTML = n === 1
+            ? '<strong>Real Earth values.</strong> 1 rotation (1 day). The extra rotation per day is 0.986°.'
+            : `<strong>${n} rotations (${n} days).</strong> Real Earth physics throughout; no exaggerated orbit rate.`;
+        $('rotations-help').textContent = n === 1
+            ? 'In 1 day, Earth moves about 1° along its orbit, creating the 3 m 56 s difference.'
+            : `Over ${n} rotations, Earth travels ${totalExtraDeg.toFixed(1)}° along its orbit, accumulating a ${totalExtraDeg.toFixed(1)}° (${formatShortDuration(totalSolarSec - totalSiderealSec)}) difference between star and Sun alignment.`;
     }
 
     function setPlaying(value) {
@@ -538,12 +611,11 @@
         $('play').textContent = value ? 'Pause' : (state.step === 1 && state.rotation === 0 ? 'Play' : 'Continue');
     }
 
-    function setExaggeration(k) {
-        state.exaggeration = k;
-        state.orbitRate = k * REAL_ORBIT_RATE;
-        $('exaggeration').value = k;
+    function setRotations(n) {
+        state.rotations = Math.max(1, Math.min(30, n));
+        $('rotations').value = state.rotations;
         restart();
-        setPlaying(state.playing);
+        setPlaying(false);
         updateComparison();
         refresh();
     }
@@ -563,7 +635,7 @@
     }
 
     $('play').addEventListener('click', () => {
-        if (!state.playing && state.step === 3) beginNextDay();
+        if (!state.playing && state.step === 3) beginNextCycle();
         setPlaying(!state.playing);
         refresh();
     });
@@ -574,15 +646,17 @@
     });
     $('speed').addEventListener('input', (e) => {
         state.speedStop = Number(e.target.value);
-        $('speed-value').textContent = SPEEDS[state.speedStop].label;
+        $('speed-value').textContent = SPEED_FACTORS[state.speedStop].label;
     });
     $('pause-milestones').addEventListener('change', (e) => {
         state.pauses = e.target.checked;
-        if (state.step === 3) beginNextDay();
+        if (state.step === 3) beginNextCycle();
         refresh();
     });
-    $('exaggeration').addEventListener('input', (e) => setExaggeration(Number(e.target.value)));
-    $('real-earth').addEventListener('click', () => setExaggeration(1));
+    $('rotations').addEventListener('input', (e) => setRotations(Number(e.target.value)));
+    $('btn-toggle-rotations').addEventListener('click', () => {
+        setRotations(state.rotations === 1 ? 10 : 1);
+    });
 
     new ResizeObserver(resize).observe(stage);
 
@@ -596,7 +670,7 @@
         refresh();
     }
 
-    $('speed-value').textContent = SPEEDS[state.speedStop].label;
+    $('speed-value').textContent = SPEED_FACTORS[state.speedStop].label;
     updateComparison();
     resize();
     setPlaying(false);
