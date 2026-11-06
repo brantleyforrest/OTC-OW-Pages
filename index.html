@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Tools | OTC OW</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-navy: #0c2340;
+            --deep-space: #060b14;
+            --surface-card: #0d1726;
+            --surface-hover: #132238;
+            --border-subtle: #1c2e4a;
+            --border-accent: #244c8c;
+            --accent-blue: #3a82f7;
+            --ussf-gold: #c59b3c;
+            --gold-glow: rgba(197, 155, 60, 0.25);
+            --text-main: #f0f4fa;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --badge-green: #10b981;
+            --badge-amber: #f59e0b;
+            --badge-blue: #38bdf8;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--deep-space);
+            color: var(--text-main);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(24, 76, 140, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(197, 155, 60, 0.08) 0%, transparent 35%);
+            background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation Bar */
+        .top-nav {
+            background: rgba(6, 11, 20, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-inner {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 1.05rem;
+            letter-spacing: -0.01em;
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .nav-brand:hover {
+            opacity: 0.9;
+        }
+
+        .nav-brand-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(36, 76, 140, 0.25);
+            border: 1px solid var(--border-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-blue);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.5rem 0.9rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+            position: relative;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-link.active {
+            color: #ffffff;
+            background: rgba(36, 76, 140, 0.3);
+            border: 1px solid var(--border-accent);
+            font-weight: 600;
+        }
+
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 20%;
+            right: 20%;
+            height: 2px;
+            background: var(--ussf-gold);
+            border-radius: 2px;
+        }
+
+        .nav-link-ext {
+            color: var(--text-dim);
+        }
+
+        .nav-link-ext:hover {
+            color: #ffffff;
+        }
+
+        .nav-text-short {
+            display: none;
+        }
+
+        /* Seamless View Container */
+        .portal-view {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+            animation: viewFade 0.15s ease-in-out;
+        }
+
+        .portal-view.active {
+            display: flex;
+        }
+
+        @keyframes viewFade {
+            from { opacity: 0.6; }
+            to { opacity: 1; }
+        }
+
+        /* Hero Header */
+        header.hero {
+            padding: 3.5rem 1.5rem 2.5rem;
+            max-width: 900px;
+            margin: 0 auto;
+            text-align: center;
+            width: 100%;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5.5vw, 2.85rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+            background: linear-gradient(135deg, #ffffff 40%, #c5d4ea 80%, var(--ussf-gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Main Content Layout */
+        main.content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0.5rem 1.5rem 4rem;
+            width: 100%;
+            flex-grow: 1;
+        }
+
+        /* Standardized Portal Card */
+        .portal-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            max-width: 680px;
+            margin: 0 auto 2.5rem;
+            width: 100%;
+        }
+
+        .portal-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--border-accent), var(--ussf-gold));
+        }
+
+        .portal-card-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            background: rgba(36, 76, 140, 0.2);
+            border: 1px solid var(--border-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            color: var(--accent-blue);
+        }
+
+        .portal-card-icon.gold {
+            background: rgba(197, 155, 60, 0.12);
+            border: 1px solid rgba(197, 155, 60, 0.35);
+            color: var(--ussf-gold);
+        }
+
+        .status-pill {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            display: inline-block;
+            margin-bottom: 1.25rem;
+        }
+
+        .status-pill.wip {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--badge-amber);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .portal-card h2 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 0.75rem;
+        }
+
+        .portal-card p.desc {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            max-width: 520px;
+            margin: 0 auto;
+            line-height: 1.65;
+        }
+
+        /* Action Buttons */
+        .btn-launch {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, #184c8c 0%, #2563eb 100%);
+            color: #ffffff;
+            font-size: 0.88rem;
+            font-weight: 600;
+            padding: 0.7rem 1.4rem;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-launch:hover {
+            background: linear-gradient(135deg, #1d58a3 0%, #3b82f6 100%);
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+        }
+
+        /* Footer */
+        footer.site-footer {
+            border-top: 1px solid var(--border-subtle);
+            padding: 2.5rem 1.5rem;
+            background: #040811;
+            text-align: center;
+            font-size: 0.88rem;
+            color: var(--text-main);
+            margin-top: auto;
+            width: 100%;
+        }
+
+        .footer-credit {
+            margin-top: 0.4rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Mobile / Phone Responsive Optimization */
+        @media (max-width: 640px) {
+            .top-nav {
+                height: auto;
+            }
+
+            .nav-inner {
+                padding: 0 1rem;
+                height: 54px;
+                gap: 0.5rem;
+            }
+
+            .nav-brand {
+                font-size: 0.95rem;
+                gap: 0.5rem;
+            }
+
+            .nav-brand-icon {
+                width: 28px;
+                height: 28px;
+            }
+
+            .nav-brand-icon svg {
+                width: 15px;
+                height: 15px;
+            }
+
+            .nav-links {
+                gap: 0.25rem;
+            }
+
+            .nav-link {
+                padding: 0.4rem 0.55rem;
+                font-size: 0.78rem;
+                gap: 0.3rem;
+            }
+
+            .nav-link svg {
+                width: 13px;
+                height: 13px;
+            }
+
+            .nav-text-full {
+                display: none;
+            }
+
+            .nav-text-short {
+                display: inline;
+            }
+
+            header.hero {
+                padding: 2.25rem 1rem 1.75rem;
+            }
+
+            main.content {
+                padding: 0.25rem 1rem 3rem;
+            }
+
+            .portal-card {
+                padding: 2rem 1.25rem;
+                margin: 0 auto 2rem;
+            }
+
+            .portal-card h2 {
+                font-size: 1.2rem;
+            }
+
+            .portal-card p.desc {
+                font-size: 0.9rem;
+            }
+
+            footer.site-footer {
+                padding: 2rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand" data-view="tools">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+
+            <div class="nav-links">
+                <a href="index.html" class="nav-link active" id="nav-tools" data-view="tools">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="study-guides.html" class="nav-link" id="nav-guides" data-view="guides">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study Guides</span>
+                    <span class="nav-text-short">Guides</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- View 1: Interactive Tools View -->
+    <div id="view-tools" class="portal-view active">
+        <header class="hero">
+            <h1>Interactive Tools</h1>
+        </header>
+
+        <main class="content">
+            <div class="portal-card">
+                <div class="portal-card-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <h2>Tools In Development</h2>
+                <p class="desc">Interactive 3D reference frame simulators, celestial time models, and orbital mechanics visualizers will be hosted here as they are developed.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- View 2: Study Guides View -->
+    <div id="view-guides" class="portal-view">
+        <header class="hero">
+            <h1>Study Guides</h1>
+        </header>
+
+        <main class="content">
+            <div class="portal-card">
+                <div class="portal-card-icon gold">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+
+                <span class="status-pill wip">Publication In Progress</span>
+                <h2>Guides In Development</h2>
+                <p class="desc">
+                    The study guide documents are actively being compiled. The location for the files is currently being finalized. Once released, links to the documents will be available here.
+                </p>
+
+                <div style="margin-top: 1.75rem;">
+                    <a href="index.html" class="btn-launch" data-view="tools">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        Return to Interactive Tools
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <p>OTC OW Study Guides and Interactive Tools</p>
+        <p class="footer-credit">Developed by Brantley Forrest and Grant Nehls</p>
+    </footer>
+
+    <!-- Seamless Client-Side Navigation Engine -->
+    <script>
+        function switchView(target, pushState = true) {
+            const isGuides = target === 'guides';
+            const toolsView = document.getElementById('view-tools');
+            const guidesView = document.getElementById('view-guides');
+            const navTools = document.getElementById('nav-tools');
+            const navGuides = document.getElementById('nav-guides');
+
+            if (isGuides) {
+                toolsView.classList.remove('active');
+                guidesView.classList.add('active');
+                navTools.classList.remove('active');
+                navGuides.classList.add('active');
+                document.title = 'Study Guides | OTC OW';
+                if (pushState) history.pushState({ view: 'guides' }, '', 'study-guides.html');
+            } else {
+                guidesView.classList.remove('active');
+                toolsView.classList.add('active');
+                navGuides.classList.remove('active');
+                navTools.classList.add('active');
+                document.title = 'Interactive Tools | OTC OW';
+                if (pushState) history.pushState({ view: 'tools' }, '', 'index.html');
+            }
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+
+        document.querySelectorAll('[data-view]').forEach(elem => {
+            elem.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetView = this.getAttribute('data-view');
+                switchView(targetView, true);
+            });
+        });
+
+        window.addEventListener('popstate', function(e) {
+            const path = window.location.pathname;
+            if (path.includes('study-guides')) {
+                switchView('guides', false);
+            } else {
+                switchView('tools', false);
+            }
+        });
+    </script>
+</body>
+</html>
