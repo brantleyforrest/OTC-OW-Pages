@@ -7,7 +7,7 @@ An open collection of interactive 3D visualizers, coordinate reference frame sim
 ## Live Deployment
 
 The interactive tools and 3D visualizers are accessible via GitHub Pages:
-**[https://brantleyforrest.github.io/OTC-OW/](https://brantleyforrest.github.io/OTC-OW/)**
+**[https://brantleyforrest.github.io/OTC-OW-Pages/](https://brantleyforrest.github.io/OTC-OW-Pages/)**
 
 ---
 
@@ -19,13 +19,16 @@ Three-dimensional orbital motion, celestial geometry, and rotating reference fra
 
 ## Current Status
 
-The web portal is established at `index.html`. Interactive visualizers and simulators are actively under development and will be integrated directly into this suite as each lesson module is completed.
+The web portal is established at `index.html`. The following tools are available:
+
+* **[Reference Frame Observatory](frames/frame-observatory.html):** An animated 3D view of one Earth and two spacecraft, seen from the ECI, ECEF, and RIC reference frames.
+* **[Solar vs. Sidereal Day Visualizer](time/solar-sidereal-day.html):** A view from above the North Pole showing why a solar day is longer than a sidereal day.
 
 ---
 
 ## Technical Architecture
 
-* **Zero Dependencies / Framework-Free:** Built using clean, native client-side web technologies (HTML5, responsive CSS, WebGL/Canvas, and vanilla JavaScript).
+* **Framework-Free:** Built using clean, native client-side web technologies (HTML5, responsive CSS, WebGL/Canvas, and vanilla JavaScript). The 3D tool loads Three.js from a CDN, so it needs an internet connection.
 * **Fast & Self-Contained:** Runs entirely in any standard modern web browser without requiring node build pipelines, backend servers, or external logins.
 * **Local Execution:** To run locally, simply clone the repository and open `index.html` in a web browser:
   ```bash
@@ -33,6 +36,12 @@ The web portal is established at `index.html`. Interactive visualizers and simul
   cd OTC-OW-Pages
   # Open index.html in your preferred browser
   ```
+
+---
+
+## Data Credits
+
+Land outlines in `assets/earth-land.js` are derived from [Natural Earth](https://www.naturalearthdata.com/) 1:110m data, which is in the public domain.
 
 ---
 

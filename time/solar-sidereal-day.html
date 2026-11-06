@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar vs. Sidereal Day | OTC OW</title>
+    <meta name="description" content="A view from above the North Pole showing why a solar day is about four minutes longer than a sidereal day.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <style>
+        :root {
+            --sidereal: #60a5fa;
+            --solar: #fb923c;
+            --extra: #f87171;
+        }
+
+        main.day-tool {
+            max-width: 1440px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 1.5rem 2.5rem;
+            flex-grow: 1;
+        }
+
+        .day-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 390px;
+            gap: 0.9rem;
+            align-items: start;
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            min-width: 0;
+        }
+
+        .stage {
+            position: relative;
+            height: clamp(400px, 62vh, 720px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #03060c;
+        }
+
+        .stage canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .scale-badge {
+            padding: 0.45rem 0.8rem;
+            border-radius: 8px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-subtle);
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .scale-badge strong { color: #ffffff; font-weight: 600; }
+
+        /* Playback */
+        .playback {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem 1.1rem;
+        }
+
+        .playback .buttons { display: flex; gap: 0.5rem; }
+        .playback .slider { flex: 1 1 190px; min-width: 170px; }
+
+        .exaggeration-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.5rem 1rem;
+            align-items: end;
+        }
+
+        .helper {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            line-height: 1.45;
+            margin-top: 0.35rem;
+        }
+
+        /* Steps */
+        .steps {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .steps li {
+            border: 1px solid var(--border-subtle);
+            border-left: 3px solid var(--border-subtle);
+            border-radius: 7px;
+            padding: 0.5rem 0.7rem;
+            font-size: 0.83rem;
+            line-height: 1.5;
+            color: var(--text-dim);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .steps li strong {
+            display: block;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .steps li.current {
+            color: var(--text-main);
+            background: var(--surface-hover);
+        }
+
+        .steps li.current strong { color: #ffffff; }
+        .steps li.current[data-step="1"] { border-left-color: var(--accent-gold); }
+        .steps li.current[data-step="2"] { border-left-color: var(--sidereal); }
+        .steps li.current[data-step="3"] { border-left-color: var(--solar); }
+
+        /* Live values */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem 1rem;
+        }
+
+        .stat .label {
+            display: block;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+
+        .stat .value {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            white-space: nowrap;
+        }
+
+        /* Magnified gauge */
+        .gauge {
+            position: relative;
+            height: 74px;
+            margin: 0.35rem 0.5rem 0.1rem;
+        }
+
+        .gauge-track {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 36px;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-subtle);
+        }
+
+        .gauge-extra {
+            position: absolute;
+            top: 36px;
+            height: 4px;
+            background: var(--extra);
+        }
+
+        .gauge-tick {
+            position: absolute;
+            top: 24px;
+            width: 2px;
+            height: 28px;
+            margin-left: -1px;
+        }
+
+        .gauge-tick.sidereal { background: var(--sidereal); }
+        .gauge-tick.solar { background: var(--solar); }
+
+        .gauge-text {
+            position: absolute;
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            line-height: 1.25;
+            white-space: nowrap;
+        }
+
+        .gauge-text.top { top: 0; }
+        .gauge-text.bottom { top: 54px; }
+        .gauge-text.sidereal { color: var(--sidereal); transform: translateX(-100%); text-align: right; padding-right: 2px; }
+        .gauge-text.solar { color: var(--solar); padding-left: 2px; }
+
+        .gauge-pointer {
+            position: absolute;
+            top: 29px;
+            width: 12px;
+            height: 18px;
+            margin-left: -6px;
+            border-radius: 3px;
+            background: #ffffff;
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+        }
+
+        /* Comparison table */
+        table.compare {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        table.compare th {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+            text-align: right;
+            padding: 0 0.3rem 0.3rem;
+        }
+
+        table.compare th:first-child { text-align: left; }
+
+        table.compare td {
+            padding: 0.36rem 0.3rem;
+            border-top: 1px solid var(--border-subtle);
+            text-align: right;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            white-space: nowrap;
+        }
+
+        table.compare td:first-child {
+            text-align: left;
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            white-space: normal;
+        }
+
+        .count-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.2rem 1rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .count-row .mono { color: #ffffff; text-align: right; }
+
+        .fact-list {
+            list-style: none;
+            font-size: 0.84rem;
+            line-height: 1.55;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+
+        .fact-list strong { color: #ffffff; font-weight: 600; }
+
+        .explain-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 0.9rem;
+        }
+
+        .model-note { margin-top: 0.9rem; }
+
+        @media (max-width: 1080px) {
+            .day-grid { grid-template-columns: minmax(0, 1fr); }
+            .stage { height: clamp(360px, 60vh, 640px); }
+        }
+
+        @media (max-width: 640px) {
+            main.day-tool { padding: 0 1rem 2rem; }
+            .gauge { margin: 0.35rem 1rem 0.1rem; }
+            .exaggeration-row { grid-template-columns: minmax(0, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../study-guides.html" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study Guides</span>
+                    <span class="nav-text-short">Guides</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="tool-header">
+        <a class="back-link" href="../index.html">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Interactive Tools
+        </a>
+        <h1>Solar vs. Sidereal Day Visualizer</h1>
+        <p>A view from above the North Pole. Earth spins while it moves along its orbit, so a marked point on Earth faces a distant star again before it faces the Sun again.</p>
+    </header>
+
+    <main class="day-tool">
+        <div class="day-grid">
+            <div class="col">
+                <div class="scale-badge" id="scale-badge"></div>
+                <div class="stage" id="stage">
+                    <canvas id="view" aria-label="Animated view of Earth rotating as it moves along its orbit around the Sun"></canvas>
+                </div>
+
+                <div class="panel playback">
+                    <div class="buttons">
+                        <button class="btn primary" id="play">Play</button>
+                        <button class="btn" id="restart">Restart</button>
+                    </div>
+                    <div class="slider">
+                        <div class="control-label">
+                            <label for="speed">Speed</label>
+                            <span class="control-value" id="speed-value"></span>
+                        </div>
+                        <input type="range" id="speed" min="0" max="3" step="1" value="1">
+                    </div>
+                    <label class="check"><input type="checkbox" id="pause-milestones" checked>Slow down and pause at each milestone</label>
+                </div>
+
+                <div class="panel">
+                    <div class="exaggeration-row">
+                        <div>
+                            <div class="control-label">
+                                <label for="exaggeration">Orbital motion, exaggerated for visibility</label>
+                                <span class="control-value" id="exaggeration-value"></span>
+                            </div>
+                            <input type="range" id="exaggeration" min="1" max="30" step="1" value="20">
+                        </div>
+                        <button class="btn" id="real-earth">Use Real Earth Values</button>
+                    </div>
+                    <p class="helper" id="exaggeration-help"></p>
+                </div>
+            </div>
+
+            <aside class="col">
+                <div class="panel accent">
+                    <div class="panel-title">This Day, Step by Step</div>
+                    <ol class="steps" id="steps">
+                        <li data-step="1"><strong>Start of the day</strong>The marked point faces the Sun, and a distant star lies in the same direction.</li>
+                        <li data-step="2"><strong>One sidereal day: 360° of rotation</strong>The point faces the star again. Earth has moved along its orbit, so the point does not yet face the Sun.</li>
+                        <li data-step="3"><strong>One solar day: a little more than 360°</strong>After a small extra rotation, the point faces the Sun again. A new day begins.</li>
+                    </ol>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Live Values for This Day</div>
+                    <div class="stats">
+                        <div class="stat"><span class="label">Time since the day began</span><span class="value" id="clock">00 h 00 m 00 s</span></div>
+                        <div class="stat"><span class="label">Earth's rotation so far</span><span class="value" id="rotation">0.000°</span></div>
+                        <div class="stat"><span class="label">Earth's travel along its orbit</span><span class="value" id="orbit-travel">0.000°</span></div>
+                        <div class="stat"><span class="label">Rotation needed to face the Sun</span><span class="value" id="needed">360.000°</span></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">The End of the Day, Magnified</div>
+                    <div class="gauge" id="gauge" aria-hidden="true">
+                        <div class="gauge-track"></div>
+                        <div class="gauge-extra" id="gauge-extra"></div>
+                        <div class="gauge-tick sidereal" id="tick-sidereal"></div>
+                        <div class="gauge-tick solar" id="tick-solar"></div>
+                        <div class="gauge-text top sidereal" id="text-sidereal-deg"></div>
+                        <div class="gauge-text bottom sidereal" id="text-sidereal-time"></div>
+                        <div class="gauge-text top solar" id="text-solar-deg"></div>
+                        <div class="gauge-text bottom solar" id="text-solar-time"></div>
+                        <div class="gauge-pointer" id="gauge-pointer"></div>
+                    </div>
+                    <p class="helper">The white marker shows Earth's rotation. The red segment is the extra rotation that separates the two definitions of a day.</p>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Real Earth Compared With This View</div>
+                    <table class="compare">
+                        <thead><tr><th></th><th>Real Earth</th><th>As drawn</th></tr></thead>
+                        <tbody>
+                            <tr><td>Sidereal day</td><td id="real-sidereal"></td><td id="drawn-sidereal"></td></tr>
+                            <tr><td>Solar day</td><td id="real-solar"></td><td id="drawn-solar"></td></tr>
+                            <tr><td>Difference</td><td id="real-diff"></td><td id="drawn-diff"></td></tr>
+                            <tr><td>Extra rotation</td><td id="real-extra"></td><td id="drawn-extra"></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </aside>
+        </div>
+
+        <div class="explain-grid" style="margin-top: 0.9rem;">
+            <div class="panel">
+                <div class="panel-title">Rotations Counted Since Restart</div>
+                <div class="count-row">
+                    <span>Against the distant stars (sidereal days)</span><span class="mono" id="count-stars">0.000</span>
+                    <span>Against the Sun (solar days)</span><span class="mono" id="count-sun">0.000</span>
+                    <span>Difference</span><span class="mono" id="count-diff">0.000</span>
+                    <span>Orbits of the Sun completed</span><span class="mono" id="count-orbits">0.000</span>
+                </div>
+                <p class="helper">The difference always equals the number of orbits completed. On real Earth, one year contains 366.24 sidereal days and 365.24 solar days. To see the pattern quickly, set the exaggeration to its maximum, turn off the milestone pauses, and let one full orbit play.</p>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Why the Difference Matters</div>
+                <ul class="fact-list">
+                    <li><strong>Geostationary orbits</strong> must match the sidereal day, because that is Earth's true rotation period.</li>
+                    <li><strong>Stars</strong> rise about 4 minutes earlier each night, or about 2 hours earlier each month.</li>
+                    <li><strong>Civil clocks</strong> follow the solar day, because daily life follows the Sun.</li>
+                </ul>
+            </div>
+        </div>
+
+        <p class="model-note">Model: a circular orbit, viewed from above the North Pole. Earth and the Sun are enlarged, and the distance between them is not to scale. The solar day shown is the average solar day; individual solar days vary from this average by up to about 30 seconds. Only the Northern Hemisphere is drawn on Earth.</p>
+    </main>
+
+    <footer class="site-footer">
+        <p>OTC OW Study Guides and Interactive Tools</p>
+    </footer>
+
+    <script src="../assets/earth-land.js"></script>
+    <script src="solar-sidereal-day.js"></script>
+</body>
+</html>
