@@ -50,11 +50,6 @@
 
         .tool-label.measure .val { margin-left: 0.35rem; color: #ffffff; }
 
-        .tool-label.measure.active {
-            outline: 1px solid currentColor;
-            background: rgba(6, 11, 20, 0.85);
-        }
-
         .tool-label.word { color: var(--text-muted); font-size: 0.72rem; }
 
         /* Controls: one row */
@@ -293,6 +288,7 @@
                         </div>
                         <label class="ctl-preset">Example orbit
                             <select id="preset">
+                                <option value="generic">Generic orbit</option>
                                 <option value="iss">Space Station</option>
                                 <option value="gps">GPS</option>
                                 <option value="molniya">Molniya</option>
@@ -392,12 +388,8 @@
             </aside>
         </div>
 
-        <p class="model-note">Model: two-body motion in the Earth-Centered Inertial (ECI) frame, whose axes are centered on Earth and do not turn with it. Earth and the orbit share one scale; markers are enlarged. Every orbit plays in the same time, so compare orbits with the period readout. Earth turns by the true amount for each orbit’s period.</p>
     </main>
 
-    <footer class="site-footer">
-        <p>OTC OW Study Guides and Interactive Tools</p>
-    </footer>
 
     <script src="../assets/tool-kit.js"></script>
     <script src="../assets/earth-land.js"></script>

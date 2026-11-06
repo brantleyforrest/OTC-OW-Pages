@@ -251,13 +251,13 @@ body {
     .tool-stage-col {
         position: sticky;
         top: calc(var(--nav-h) + 0.5rem);
-        height: calc(100vh - var(--nav-h) - 1.1rem);
-        height: calc(100dvh - var(--nav-h) - 1.1rem);
+        height: calc(100vh - var(--nav-h) - 1.5rem - 1px);
+        height: calc(100dvh - var(--nav-h) - 1.5rem - 1px);
     }
 
     .tool-side {
-        min-height: calc(100vh - var(--nav-h) - 1.1rem);
-        min-height: calc(100dvh - var(--nav-h) - 1.1rem);
+        min-height: calc(100vh - var(--nav-h) - 1.5rem - 1px);
+        min-height: calc(100dvh - var(--nav-h) - 1.5rem - 1px);
     }
 
     /* Any spare height is shared across the panels, not left in one place. */
@@ -557,13 +557,7 @@ input[type="range"] {
 
 .mono { font-family: var(--font-mono); }
 
-/* Notes and footer */
-.model-note {
-    color: var(--text-dim);
-    font-size: 0.78rem;
-    line-height: 1.55;
-}
-
+/* Footer */
 footer.site-footer {
     border-top: 1px solid var(--border-subtle);
     padding: 0.9rem 1.5rem;

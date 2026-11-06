@@ -666,20 +666,8 @@
             color: var(--text-muted);
             font-size: 0.9rem;
             line-height: 1.6;
-            margin-bottom: 1rem;
+            margin-bottom: 1.25rem;
             flex-grow: 1;
-        }
-
-        .card-math-highlight {
-            font-family: var(--font-mono);
-            font-size: 0.76rem;
-            line-height: 1.65;
-            color: var(--text-main);
-            background: rgba(36, 76, 140, 0.18);
-            border: 1px solid var(--border-subtle);
-            border-radius: 6px;
-            padding: 0.55rem 0.7rem;
-            margin-bottom: 1.1rem;
         }
 
         .tool-card .btn-launch {
@@ -926,7 +914,6 @@
                                 </div>
                                 <h2 class="card-title">Inertial Frame Orbital Elements</h2>
                                 <p class="card-desc">An interactive 3D visualizer of the six Classical Orbital Elements (COEs) in the Earth-Centered Inertial (ECI) frame. Adjust each element to see how it shapes, tilts, and aligns an orbit in space.</p>
-                                <div class="card-math-highlight">COEs: [a, e, i, Ω, ω, ν]<br>ECI reference plane: Equatorial [Î, Ĵ]</div>
                                 <!-- Work in progress. To enable: remove the pill above and make this a link to orbits/orbital-elements.html, as on the other cards. -->
                                 <span class="btn-launch disabled" aria-disabled="true">Launch Tool</span>
                             </div>
@@ -961,7 +948,6 @@
                                 </div>
                                 <h2 class="card-title">Orbit Equation Explorer</h2>
                                 <p class="card-desc">A 3D view of an orbit around Earth. Enter values for the parameters of the orbit equation, or animate each one through its range, to see how each one changes the orbit.</p>
-                                <div class="card-math-highlight">r = a (1 − e²) / (1 + e cos ν)</div>
                                 <a href="orbits/orbit-equation.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                             </div>
                         </div>
@@ -997,7 +983,6 @@
                                 </div>
                                 <h2 class="card-title">Reference Frame Observatory</h2>
                                 <p class="card-desc">An animated 3D view of one Earth and two spacecraft. Switch among the ECI, ECEF, and RIC frames to see what each one holds still, and how each one describes the same motion.</p>
-                                <div class="card-math-highlight">ECI [Î, Ĵ, K̂]<br>ECEF [X̂, Ŷ, Ẑ]<br>RIC [R̂, Î, Ĉ]</div>
                                 <a href="frames/frame-observatory.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                             </div>
 
@@ -1012,7 +997,6 @@
                                 </div>
                                 <h2 class="card-title">Solar vs. Sidereal Day Visualizer</h2>
                                 <p class="card-desc">A view from above the North Pole. Follow one day step by step to see why Earth must turn a little more than 360° before the Sun returns to the same place in the sky.</p>
-                                <div class="card-math-highlight">Sidereal day: 23 h 56 m 04 s (360°)<br>Solar day: 24 h 00 m 00 s (about 361°)</div>
                                 <a href="time/solar-sidereal-day.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                             </div>
                         </div>
@@ -1059,7 +1043,6 @@
 
     <!-- Site Footer -->
     <footer class="site-footer">
-        <p>OTC OW Study Guides and Interactive Tools</p>
         <p class="footer-credit">Developed by Brantley Forrest and Grant Nehls</p>
     </footer>
 
@@ -1156,12 +1139,10 @@
                     cards.forEach(card => {
                         const title = (card.querySelector('.card-title')?.textContent || '').toLowerCase();
                         const desc = (card.querySelector('.card-desc')?.textContent || '').toLowerCase();
-                        const math = (card.querySelector('.card-math-highlight')?.textContent || '').toLowerCase();
                         const tags = (card.getAttribute('data-tags') || '').toLowerCase();
 
                         const matches = title.includes(query) || 
                                         desc.includes(query) || 
-                                        math.includes(query) || 
                                         tags.includes(query);
 
                         if (matches) {

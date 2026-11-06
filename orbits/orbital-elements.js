@@ -2,8 +2,8 @@
 // Classical Orbital Elements (COEs) in the Earth-Centered Inertial (ECI) frame:
 // a (semi-major axis), e (eccentricity), i (inclination),
 // Omega (RAAN), omega (argument of perigee), nu (true anomaly).
-// All six measurements stay on screen with their live values. Selecting an element
-// only emphasizes its measurement and shows its definition in the caption.
+// The view always shows Earth, the orbit, and the satellite. Selecting an element adds only
+// the lines, angle, and labels that measure it, so that one idea is on screen at a time.
 (async function () {
     'use strict';
 
@@ -54,7 +54,16 @@
         nu: '#c4a1ff'
     };
 
+    // Draw order, lowest first. Solid objects are hidden by Earth. Their dim "ghost" copies are
+    // drawn last, without depth testing, so that a part behind Earth is still faintly visible.
+    const ORDER = { planes: 2, wedge: 3, ghost: 6 };
+
     const PRESETS = {
+        generic: {
+            name: 'Generic orbit',
+            a: 20000, e: 0.3, i: 40, raan: 60, argp: 50, nu: 70,
+            desc: 'A mid-sized, moderately elliptical orbit, large enough that each element is easy to see.'
+        },
         iss: {
             name: 'International Space Station',
             a: 6798, e: 0.001, i: 51.6, raan: 75, argp: 40, nu: 60,
@@ -95,13 +104,13 @@
     /* State                                                              */
     /* ------------------------------------------------------------------ */
     const state = {
-        a: PRESETS.iss.a,
-        e: PRESETS.iss.e,
-        i: PRESETS.iss.i,
-        raan: PRESETS.iss.raan,
-        argp: PRESETS.iss.argp,
-        nu: PRESETS.iss.nu,
-        activePreset: 'iss',
+        a: PRESETS.generic.a,
+        e: PRESETS.generic.e,
+        i: PRESETS.generic.i,
+        raan: PRESETS.generic.raan,
+        argp: PRESETS.generic.argp,
+        nu: PRESETS.generic.nu,
+        activePreset: 'generic',
         presetCaption: false,
         selected: null,
         playing: !Kit.prefersReducedMotion(),
@@ -110,7 +119,7 @@
     };
 
     // The camera frames the whole orbit (fit). Zoom multiplies that distance.
-    const HOME_VIEW = { az: -50, el: 26 };
+    const HOME_VIEW = { az: -30, el: 20 };
     const camView = { ...HOME_VIEW, zoom: 1 };
     const MIN_CAMERA_DISTANCE = 1.8;
     const MAX_ZOOM = 3;
@@ -119,7 +128,7 @@
 
     function fitDistance() {
         const apogee = (state.a * (1 + state.e)) / R_E;
-        return Math.max(2.6, apogee * 1.25) / TAN_HALF_FOV;
+        return Math.max(2.6, apogee * 1.15) / TAN_HALF_FOV;
     }
     let camFit = fitDistance();
 
@@ -150,19 +159,13 @@
     scene.add(sunLight);
 
     const earth = window.EarthScene.addEarth(THREE, renderer, scene);
+    earth.atmosphere.renderOrder = 1;
     const layer = new Kit.LabelLayer($('labels'), { wide: true });
 
     const X_AXIS = new THREE.Vector3(1, 0, 0);
     const Y_AXIS = new THREE.Vector3(0, 1, 0);
     const Z_AXIS = new THREE.Vector3(0, 0, 1);
     const ORIGIN = new THREE.Vector3();
-
-    // Geometry here changes after creation, so a stored bounding sphere would cull it wrongly.
-    function addDynamic(obj) {
-        obj.frustumCulled = false;
-        scene.add(obj);
-        return obj;
-    }
 
     function pointGeometry(pointCount) {
         const geo = new THREE.BufferGeometry();
@@ -176,54 +179,98 @@
         return index;
     }
 
-    function segmentLine(color, opacity) {
-        return addDynamic(new THREE.Line(pointGeometry(2), new THREE.LineBasicMaterial({ color, transparent: true, opacity })));
+    // A solid object plus a dim ghost of it. Earth hides the solid part, and the ghost still
+    // shows where that part is. Both share one geometry, so a group can be moved, scaled, and
+    // hidden as one object. Geometry here can change after creation, so nothing is culled.
+    function ghosted(geometry, color, { ghost = 0.3, line = false, doubleSide = false } = {}) {
+        const group = new THREE.Group();
+        const side = doubleSide ? THREE.DoubleSide : THREE.FrontSide;
+        const solidMat = line
+            ? new THREE.LineBasicMaterial({ color, transparent: true })
+            : new THREE.MeshBasicMaterial({ color, side, transparent: true });
+        const ghostMat = line
+            ? new THREE.LineBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false })
+            : new THREE.MeshBasicMaterial({ color, side, transparent: true, depthTest: false, depthWrite: false });
+        const Kind = line ? THREE.Line : THREE.Mesh;
+        const solid = new Kind(geometry, solidMat);
+        const dim = new Kind(geometry, ghostMat);
+        dim.renderOrder = ORDER.ghost;
+        solid.frustumCulled = false;
+        dim.frustumCulled = false;
+        group.add(solid, dim);
+        group.userData = { solidMat, ghostMat, ghost, parts: [solid, dim] };
+        setOpacity(group, 1);
+        scene.add(group);
+        return group;
+    }
+
+    function setOpacity(group, k) {
+        const { solidMat, ghostMat, ghost } = group.userData;
+        solidMat.opacity = k;
+        ghostMat.opacity = ghost * k;
+    }
+
+    function setGeometry(group, geometry) {
+        group.userData.parts.forEach((part) => { part.geometry = geometry; });
+    }
+
+    function segmentLine(color, opacity, ghost = 0.3) {
+        const line = ghosted(pointGeometry(2), color, { line: true, ghost });
+        setOpacity(line, opacity);
+        return line;
     }
 
     function setSegment(line, a, b) {
-        const pos = line.geometry.attributes.position;
+        const pos = line.userData.parts[0].geometry.attributes.position;
         pos.setXYZ(0, a.x, a.y, a.z);
         pos.setXYZ(1, b.x, b.y, b.z);
         pos.needsUpdate = true;
     }
 
-    function sphere(radius, color) {
-        const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(radius, 16, 12),
-            new THREE.MeshBasicMaterial({ color })
-        );
-        scene.add(mesh);
-        return mesh;
+    const SPHERE = new THREE.SphereGeometry(1, 16, 12);
+    function marker(color) {
+        return ghosted(SPHERE, color, { ghost: 0.4 });
     }
 
-    /* ECI axes: the two reference directions of the lesson figure */
+    /* ECI axes: the two reference directions of the lesson figure, kept short and dim */
     const iAxis = new THREE.ArrowHelper(X_AXIS, ORIGIN, 2, COLORS.eci);
     const kAxis = new THREE.ArrowHelper(Z_AXIS, ORIGIN, 2, COLORS.eci);
-    scene.add(iAxis, kAxis);
+    [iAxis, kAxis].forEach((arrow) => {
+        arrow.line.material.transparent = true;
+        arrow.cone.material.transparent = true;
+        scene.add(arrow);
+    });
+    function setAxisOpacity(arrow, k) {
+        arrow.line.material.opacity = k;
+        arrow.cone.material.opacity = k;
+    }
 
-    /* Equatorial plane */
+    /* Equatorial plane: a faint disk and its rim */
     const eqGroup = new THREE.Group();
     scene.add(eqGroup);
-    const eqFill = new THREE.MeshBasicMaterial({ color: 0x3a82f7, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
-    eqGroup.add(new THREE.Mesh(new THREE.CircleGeometry(1, 96), eqFill));
+    const eqFill = new THREE.MeshBasicMaterial({ color: 0x3a82f7, transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false });
+    const eqDisk = new THREE.Mesh(new THREE.CircleGeometry(1, 96), eqFill);
+    eqDisk.renderOrder = ORDER.planes;
+    eqGroup.add(eqDisk);
+    const eqRimMat = new THREE.LineBasicMaterial({ color: 0x3a82f7, transparent: true, opacity: 0.3 });
     {
         const pts = [];
         for (let j = 0; j <= 120; j++) {
             const ang = (j / 120) * TWO_PI;
             pts.push(new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0));
         }
-        eqGroup.add(new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints(pts),
-            new THREE.LineBasicMaterial({ color: 0x3a82f7, transparent: true, opacity: 0.4 })
-        ));
+        eqGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), eqRimMat));
     }
 
     /* Orbital plane, drawn as a triangle fan from Earth's center */
     const ORBIT_PTS = 256;
     const orbDiskGeo = pointGeometry(ORBIT_PTS + 2);
     orbDiskGeo.setIndex(fanIndex(ORBIT_PTS));
-    const orbFill = new THREE.MeshBasicMaterial({ color: COLORS.a, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false });
-    addDynamic(new THREE.Mesh(orbDiskGeo, orbFill));
+    const orbFill = new THREE.MeshBasicMaterial({ color: COLORS.a, transparent: true, opacity: 0.04, side: THREE.DoubleSide, depthWrite: false });
+    const orbDisk = new THREE.Mesh(orbDiskGeo, orbFill);
+    orbDisk.frustumCulled = false;
+    orbDisk.renderOrder = ORDER.planes;
+    scene.add(orbDisk);
 
     /* Orbit, drawn as a thin tube because WebGL lines are only one pixel wide */
     const orbitCurve = new THREE.Curve();
@@ -236,27 +283,18 @@
             .addScaledVector(orbitShape.P, r * Math.cos(th))
             .addScaledVector(orbitShape.Q, r * Math.sin(th));
     };
-    const orbitTube = addDynamic(new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: COLORS.a })));
+    const orbitTube = ghosted(new THREE.BufferGeometry(), COLORS.a, { ghost: 0.28 });
 
-    /* Bars for a and for the center-to-Earth distance that gives e. Both are drawn over
-       Earth, because on low orbits they lie almost entirely inside it. */
-    function createBar(color) {
-        const bar = new THREE.Mesh(
-            new THREE.CylinderGeometry(1, 1, 1, 10),
-            new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true })
-        );
-        bar.renderOrder = 5;
-        scene.add(bar);
-        return bar;
-    }
-    const barA = createBar(COLORS.a);
-    const barE = createBar(COLORS.e);
+    /* Bars for a and for the center-to-Earth distance that gives e */
+    const CYLINDER = new THREE.CylinderGeometry(1, 1, 1, 10);
+    const barA = ghosted(CYLINDER, COLORS.a, { ghost: 0.35 });
+    const barE = ghosted(CYLINDER, COLORS.e, { ghost: 0.35 });
     const barDir = new THREE.Vector3();
 
     function placeBar(bar, from, to, radius) {
         barDir.subVectors(to, from);
         const len = barDir.length();
-        bar.visible = len > 1e-3;
+        bar.visible = bar.visible && len > 1e-3;
         if (!bar.visible) return;
         bar.position.copy(from).addScaledVector(barDir, 0.5);
         bar.quaternion.setFromUnitVectors(Y_AXIS, barDir.normalize());
@@ -264,18 +302,19 @@
     }
 
     /* Reference lines and markers */
-    const nodeSpoke = segmentLine(COLORS.i, 0.8);
-    const perigeeSpoke = segmentLine(COLORS.argp, 0.8);
-    const rLine = segmentLine(0xffffff, 0.85);
-    const rGuide = segmentLine(0x94a3b8, 0.45);
-    const nodeMarker = sphere(0.07, COLORS.i);
-    const perigeeMarker = sphere(0.07, COLORS.argp);
-    const apogeeMarker = sphere(0.07, COLORS.a);
-    const satMarker = sphere(0.1, 0xffffff);
+    const nodeSpoke = segmentLine(COLORS.i, 0.9);
+    const perigeeSpoke = segmentLine(COLORS.argp, 0.9);
+    const rLine = segmentLine(0xffffff, 0.9);
+    const rGuide = segmentLine(0x94a3b8, 0.5);
+    const nodeMarker = marker(COLORS.i);
+    const perigeeMarker = marker(COLORS.argp);
+    const apogeeMarker = marker(COLORS.a);
+    const centerMarker = marker(0x94a3b8);
+    const satMarker = marker(0xffffff);
 
-    /* Angles: a band with an arrowhead, plus a dim copy that shows through Earth, so that
-       no measurement is lost from view. A selected angle also fills with a wedge. */
+    /* Angles: a thin band with an arrowhead, plus a faint wedge that fills the angle. */
     const ARC_RES = 64;
+    const CONE = new THREE.ConeGeometry(0.5, 1.6, 12);
     function createArc(color) {
         const bandGeo = pointGeometry((ARC_RES + 1) * 2);
         const bandIndex = [];
@@ -284,29 +323,26 @@
             bandIndex.push(j, j + 1, j + 2, j + 1, j + 3, j + 2);
         }
         bandGeo.setIndex(bandIndex);
-        addDynamic(new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })));
-
-        const ghost = addDynamic(new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({
-            color, side: THREE.DoubleSide, transparent: true, opacity: 0.3, depthTest: false, depthWrite: false
-        })));
-        ghost.renderOrder = 4;
+        const band = ghosted(bandGeo, color, { ghost: 0.35, doubleSide: true });
 
         const wedgeGeo = pointGeometry(ARC_RES + 2);
         wedgeGeo.setIndex(fanIndex(ARC_RES));
-        const wedge = addDynamic(new THREE.Mesh(wedgeGeo, new THREE.MeshBasicMaterial({
-            color, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false
-        })));
+        const wedge = new THREE.Mesh(wedgeGeo, new THREE.MeshBasicMaterial({
+            color, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false
+        }));
+        wedge.frustumCulled = false;
+        wedge.renderOrder = ORDER.wedge;
+        scene.add(wedge);
 
-        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 12), new THREE.MeshBasicMaterial({ color }));
-        scene.add(tip);
-        return { bandGeo, wedge, tip };
+        const tip = ghosted(CONE, color, { ghost: 0.35 });
+        return { bandGeo: band.userData.parts[0].geometry, band, wedge, tip };
     }
     const arcRAAN = createArc(COLORS.raan);
     const arcInc = createArc(COLORS.i);
     const arcArgP = createArc(COLORS.argp);
     const arcNu = createArc(COLORS.nu);
 
-    /* Labels. Measurements carry a live value and are never dropped. */
+    /* Labels. Only the selected element's measurement is labeled, with its live value. */
     function measureLabel(symbol, color) {
         const lbl = layer.add(`<b style="color:${color}">${symbol}</b><span class="val"></span>`, { rank: 0 });
         lbl.el.classList.add('measure');
@@ -333,6 +369,14 @@
     const labelNode = wordLabel('Ascending node', { rank: 2 });
     const labelPerigee = wordLabel('Perigee', { rank: 2 });
     const labelApogee = wordLabel('Apogee', { rank: 3, optional: true });
+
+    // The axis names carry a plain-language hint only while an element needs it.
+    function setHint(lbl, on) {
+        if (lbl.hintOn === on) return;
+        lbl.hintOn = on;
+        lbl.el.querySelector('.hint').style.display = on ? '' : 'none';
+        lbl.width = 0;
+    }
 
     function setLabelValue(lbl, text) {
         if (lbl.valEl.textContent === text) return;
@@ -401,6 +445,8 @@
     let tubeKey = '';
     const tmpA = new THREE.Vector3();
     const tmpB = new THREE.Vector3();
+    const tmpInEast = new THREE.Vector3();
+    const tmpInPlane = new THREE.Vector3();
 
     function rebuildOrbitGeometry(P, Q, p, e) {
         orbitShape.P.copy(P);
@@ -418,17 +464,22 @@
     }
 
     function rebuildOrbitTube(radius) {
-        orbitTube.geometry.dispose();
+        orbitTube.userData.parts[0].geometry.dispose();
         orbitCurve.updateArcLengths();
-        orbitTube.geometry = new THREE.TubeGeometry(orbitCurve, ORBIT_PTS, radius, 6, true);
+        setGeometry(orbitTube, new THREE.TubeGeometry(orbitCurve, ORBIT_PTS, radius, 6, true));
     }
 
     // Draws an angle from direction u toward direction v (perpendicular unit vectors). At an
     // angle of zero, the arc has no length, but its label still marks where it starts.
-    function drawArc(arc, anchor, center, u, v, radius, span, sizeScale, selected) {
+    function drawArc(arc, anchor, center, u, v, radius, span, sz, shown) {
+        arc.band.visible = shown;
+        arc.wedge.visible = shown;
+        arc.tip.visible = shown && span > 2 * D2R;
+        if (!shown) return;
+
         const band = arc.bandGeo.attributes.position;
         const fan = arc.wedge.geometry.attributes.position;
-        const halfWidth = 0.011 * sizeScale;
+        const halfWidth = 0.1 * sz;
         fan.setXYZ(0, center.x, center.y, center.z);
         for (let j = 0; j <= ARC_RES; j++) {
             const ang = (j / ARC_RES) * span;
@@ -441,18 +492,30 @@
         }
         band.needsUpdate = true;
         fan.needsUpdate = true;
-        arc.wedge.visible = selected;
 
         // Arrowhead at the end of the arc, pointing along the direction of measurement
-        arc.tip.visible = span > 2 * D2R;
         arc.tip.position.copy(tmpA);
         tmpB.set(0, 0, 0).addScaledVector(u, -Math.sin(span)).addScaledVector(v, Math.cos(span)).normalize();
         arc.tip.quaternion.setFromUnitVectors(Y_AXIS, tmpB);
-        arc.tip.scale.setScalar(sizeScale);
+        arc.tip.scale.setScalar(sz);
 
         anchor.copy(center)
             .addScaledVector(u, radius * Math.cos(span / 2))
             .addScaledVector(v, radius * Math.sin(span / 2));
+    }
+
+    // What each selection adds to the base view of Earth, orbit, and satellite.
+    function visibility(sel) {
+        return {
+            barA: sel === 'a' || sel === 'e',
+            barE: sel === 'e',
+            center: sel === 'a' || sel === 'e',
+            perigee: sel === 'a' || sel === 'e' || sel === 'argp' || sel === 'nu',
+            apogee: sel === 'a' || sel === 'e',
+            node: sel === 'i' || sel === 'raan' || sel === 'argp',
+            perigeeSpoke: sel === 'argp' || sel === 'nu',
+            rLine: sel === 'nu'
+        };
     }
 
     function update3DScene() {
@@ -464,16 +527,18 @@
         const ra = aScene * (1 + e);
         const nuRad = nu * D2R;
         const r = p / (1 + e * Math.cos(nuRad));
+        const show = visibility(selected);
 
-        // Markers and arrowheads keep a steady size on screen at any zoom.
-        const sizeScale = (camFit * camView.zoom) / 7;
+        // One unit is about 1/70 of the view's height at any zoom, so that markers, lines, and
+        // arrowheads stay small and steady on screen.
+        const sz = (camFit * camView.zoom) / 100;
 
         const key = [a, e, state.i, state.raan, state.argp].join();
         if (key !== geometryKey) {
             geometryKey = key;
             rebuildOrbitGeometry(P, Q, p, e);
         }
-        const tubeRadius = 0.013 * sizeScale;
+        const tubeRadius = 0.2 * sz;
         const nextTubeKey = `${key}|${tubeRadius.toPrecision(2)}`;
         if (nextTubeKey !== tubeKey) {
             tubeKey = nextTubeKey;
@@ -481,63 +546,81 @@
         }
 
         // Reference sizes, in the proportions of the lesson figure
-        const disk = Math.max(2.4, ra * 1.08);
-        const raanRadius = Math.max(1.7, 0.7 * disk);
-        const argpRadius = Math.max(1.5, 0.5 * disk);
-        const nuRadius = Math.max(1.3, 0.41 * disk);
+        const disk = Math.max(2.1, ra * 1.05);
+        const raanRadius = Math.max(1.6, 0.7 * disk);
+        const argpRadius = Math.max(1.4, 0.5 * disk);
+        const nuRadius = Math.max(1.25, 0.41 * disk);
 
+        // Planes brighten only while the selected element is measured between them.
         eqGroup.scale.set(disk, disk, 1);
-        eqFill.opacity = (selected === 'i' || selected === 'raan') ? 0.2 : 0.07;
-        orbFill.opacity = (selected === 'i' || selected === 'argp' || selected === 'nu') ? 0.2 : 0.06;
+        const eqOn = selected === 'i' || selected === 'raan';
+        eqFill.opacity = eqOn ? 0.14 : 0.05;
+        eqRimMat.opacity = eqOn ? 0.6 : 0.3;
+        orbFill.opacity = (selected === 'i' || selected === 'argp' || selected === 'nu') ? 0.09 : 0.035;
 
-        const iLen = disk * 1.09;
+        // The two reference axes are always present but dim, and brighten when they matter.
+        const iLen = disk * 1.08;
         const kLen = disk * 0.8;
-        iAxis.setLength(iLen, 0.3 * sizeScale, 0.13 * sizeScale);
-        kAxis.setLength(kLen, 0.3 * sizeScale, 0.13 * sizeScale);
+        iAxis.setLength(iLen, 3 * sz, 1.2 * sz);
+        kAxis.setLength(kLen, 3 * sz, 1.2 * sz);
+        setAxisOpacity(iAxis, selected === 'raan' ? 1 : 0.5);
+        setAxisOpacity(kAxis, selected === 'i' ? 1 : 0.5);
         anchors.I.set(iLen, 0, 0);
         anchors.K.set(0, 0, kLen);
 
         // The ascending node lies where the orbit itself crosses the equator heading north.
         const rNode = p / (1 + e * Math.cos(state.argp * D2R));
         anchors.node.copy(n).multiplyScalar(rNode);
+        nodeMarker.visible = show.node;
         nodeMarker.position.copy(anchors.node);
-        nodeMarker.scale.setScalar(sizeScale);
-        setSegment(nodeSpoke, ORIGIN, tmpA.copy(n).multiplyScalar(Math.max(rNode, raanRadius * 1.04)));
+        nodeMarker.scale.setScalar(0.4 * sz);
+        const nodeReach = selected === 'raan' ? raanRadius : selected === 'argp' ? argpRadius : 0;
+        nodeSpoke.visible = show.node;
+        setSegment(nodeSpoke, ORIGIN, tmpA.copy(n).multiplyScalar(Math.max(rNode, nodeReach * 1.04)));
 
-        // Perigee, apogee, and the bars along the major axis
+        // Perigee, apogee, orbit center, and the bars along the major axis
         anchors.perigee.copy(P).multiplyScalar(rp);
         anchors.apogee.copy(P).multiplyScalar(-ra);
         anchors.orbitCenter.copy(P).multiplyScalar(-aScene * e);
+        perigeeMarker.visible = show.perigee;
+        apogeeMarker.visible = show.apogee;
+        centerMarker.visible = show.center;
         perigeeMarker.position.copy(anchors.perigee);
         apogeeMarker.position.copy(anchors.apogee);
-        perigeeMarker.scale.setScalar(sizeScale);
-        apogeeMarker.scale.setScalar(sizeScale);
-        setSegment(perigeeSpoke, ORIGIN, tmpA.copy(P).multiplyScalar(Math.max(rp, argpRadius * 1.04, nuRadius * 1.04)));
+        centerMarker.position.copy(anchors.orbitCenter);
+        perigeeMarker.scale.setScalar(0.4 * sz);
+        apogeeMarker.scale.setScalar(0.4 * sz);
+        centerMarker.scale.setScalar(0.3 * sz);
+        const perigeeReach = selected === 'argp' ? argpRadius : nuRadius;
+        perigeeSpoke.visible = show.perigeeSpoke;
+        setSegment(perigeeSpoke, ORIGIN, tmpA.copy(P).multiplyScalar(Math.max(rp, perigeeReach * 1.04)));
 
-        placeBar(barA, anchors.orbitCenter, anchors.apogee, (selected === 'a' ? 0.034 : 0.018) * sizeScale);
-        placeBar(barE, anchors.orbitCenter, ORIGIN, (selected === 'e' ? 0.034 : 0.018) * sizeScale);
+        // When e is selected, a stays visible but quiet, so that the two bars can be compared.
+        barA.visible = show.barA;
+        barE.visible = show.barE;
+        setOpacity(barA, selected === 'e' ? 0.45 : 1);
+        placeBar(barA, anchors.orbitCenter, anchors.apogee, 0.26 * sz);
+        placeBar(barE, anchors.orbitCenter, ORIGIN, 0.26 * sz);
         anchors.a.copy(anchors.orbitCenter).addScaledVector(P, -aScene * 0.62);
-        // Eccentricity describes the whole ellipse, so its label sits at the ellipse's widest point.
-        anchors.e.copy(anchors.orbitCenter).addScaledVector(Q, -aScene * Math.sqrt(1 - e * e));
+        anchors.e.copy(anchors.orbitCenter).multiplyScalar(0.5);
 
-        // Satellite and position vector
+        // Satellite, and the position vector while the true anomaly is selected
         anchors.sat.set(0, 0, 0)
             .addScaledVector(P, r * Math.cos(nuRad))
             .addScaledVector(Q, r * Math.sin(nuRad));
         satMarker.position.copy(anchors.sat);
-        satMarker.scale.setScalar(sizeScale);
+        satMarker.scale.setScalar(0.55 * sz);
+        rLine.visible = show.rLine;
         setSegment(rLine, ORIGIN, anchors.sat);
-        rGuide.visible = nuRadius > r;
+        rGuide.visible = show.rLine && nuRadius > r;
         if (rGuide.visible) setSegment(rGuide, anchors.sat, tmpA.copy(anchors.sat).setLength(nuRadius * 1.04));
 
         // Angles
-        drawArc(arcRAAN, anchors.raan, ORIGIN, X_AXIS, Y_AXIS, raanRadius, state.raan * D2R, sizeScale, selected === 'raan');
-        drawArc(arcInc, anchors.i, anchors.node, tmpInEast.set(-n.y, n.x, 0), Z_AXIS, Math.max(0.6, 0.22 * disk), state.i * D2R, sizeScale, selected === 'i');
-        drawArc(arcArgP, anchors.argp, ORIGIN, n, tmpInPlane.crossVectors(W, n).normalize(), argpRadius, state.argp * D2R, sizeScale, selected === 'argp');
-        drawArc(arcNu, anchors.nu, ORIGIN, P, Q, nuRadius, nuRad, sizeScale, selected === 'nu');
+        drawArc(arcRAAN, anchors.raan, ORIGIN, X_AXIS, Y_AXIS, raanRadius, state.raan * D2R, sz, selected === 'raan');
+        drawArc(arcInc, anchors.i, anchors.node, tmpInEast.set(-n.y, n.x, 0), Z_AXIS, Math.max(0.8, 0.3 * disk), state.i * D2R, sz, selected === 'i');
+        drawArc(arcArgP, anchors.argp, ORIGIN, n, tmpInPlane.crossVectors(W, n).normalize(), argpRadius, state.argp * D2R, sz, selected === 'argp');
+        drawArc(arcNu, anchors.nu, ORIGIN, P, Q, nuRadius, nuRad, sz, selected === 'nu');
     }
-    const tmpInEast = new THREE.Vector3();
-    const tmpInPlane = new THREE.Vector3();
 
     /* ------------------------------------------------------------------ */
     /* Readouts                                                           */
@@ -606,7 +689,7 @@
             [title, body] = CAPTIONS[sel];
         } else if (state.presetCaption && preset) {
             title = `${preset.name}.`;
-            body = preset.desc;
+            body = `${preset.desc} Select an element to see what it measures.`;
         }
 
         const notes = [];
@@ -684,20 +767,29 @@
     function updateLabels() {
         layer.begin();
         if (state.showLabels) {
-            setLabelValue(measureLabels.a, `${formatNumber(state.a, 0)} km`);
-            setLabelValue(measureLabels.e, state.e.toFixed(3));
-            setLabelValue(measureLabels.i, `${state.i.toFixed(1)}°`);
-            setLabelValue(measureLabels.raan, `${state.raan.toFixed(0)}°`);
-            setLabelValue(measureLabels.argp, `${state.argp.toFixed(0)}°`);
-            setLabelValue(measureLabels.nu, `${state.nu.toFixed(0)}°`);
-            Object.keys(measureLabels).forEach(showMeasure);
+            const sel = state.selected;
+            const show = visibility(sel);
+            if (sel) {
+                const texts = {
+                    a: `${formatNumber(state.a, 0)} km`,
+                    e: state.e.toFixed(3),
+                    i: `${state.i.toFixed(1)}°`,
+                    raan: `${state.raan.toFixed(0)}°`,
+                    argp: `${state.argp.toFixed(0)}°`,
+                    nu: `${state.nu.toFixed(0)}°`
+                };
+                setLabelValue(measureLabels[sel], texts[sel]);
+                showMeasure(sel);
+            }
 
-            showWord(labelSat, anchors.sat);
+            setHint(labelI, sel === 'raan');
+            setHint(labelK, sel === 'i');
             showWord(labelI, anchors.I);
             showWord(labelK, anchors.K);
-            showWord(labelNode, anchors.node);
-            showWord(labelPerigee, anchors.perigee);
-            showWord(labelApogee, anchors.apogee);
+            if (sel === null || sel === 'nu') showWord(labelSat, anchors.sat);
+            if (show.node) showWord(labelNode, anchors.node);
+            if (show.perigee) showWord(labelPerigee, anchors.perigee);
+            if (show.apogee) showWord(labelApogee, anchors.apogee);
         }
         layer.place(viewW, viewH);
     }
@@ -745,16 +837,13 @@
         dirty = true;
     }
 
-    // Selecting emphasizes one measurement. It never removes the others.
+    // Selecting adds one element's measurement to the view and removes the previous one's.
     function setSelected(name) {
         if (state.selected === name) return;
         state.selected = name;
         if (name) state.presetCaption = false;
         document.querySelectorAll('.param').forEach((row) => {
             row.classList.toggle('selected', row.dataset.param === name);
-        });
-        Object.keys(measureLabels).forEach((key) => {
-            measureLabels[key].el.classList.toggle('active', key === name);
         });
         dirty = true;
     }
@@ -864,7 +953,8 @@
     /* ------------------------------------------------------------------ */
     /* Start                                                              */
     /* ------------------------------------------------------------------ */
-    applyPreset('iss');
+    applyPreset('generic');
+    setSelected('a');
     setPlaying(state.playing);
     $('speed-value').textContent = SPEEDS[state.speed].label;
     statusEl.style.display = 'none';
