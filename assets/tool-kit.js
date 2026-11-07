@@ -66,7 +66,8 @@
     //     layer.place(width, height, [overlayBoxes]);
     // Important labels are placed first. Each label takes a free spot beside its point, so
     // labels do not overlap each other or the overlays. An optional label is hidden when no
-    // spot is free. With { wide: true }, a label with no free spot beside its point also tries
+    // spot is free. Set label.center = true to put a label's middle exactly on its point. Set label.fixed = true to keep a label beside its point, outside this search.
+    // With { wide: true }, a label with no free spot beside its point also tries
     // spots farther out, for views with many labels that must all stay on screen.
     class LabelLayer {
         constructor(root, { wide = false } = {}) {
@@ -74,6 +75,8 @@
             this.wide = wide;
             this.labels = [];
             this.shown = [];
+            this.settling = false; // True while a label is still gliding to a new spot
+            this.glideFrame = 0;
             if (document.fonts && document.fonts.ready) {
                 document.fonts.ready.then(() => this.remeasure());
             }
@@ -114,13 +117,34 @@
 
         place(viewWidth, viewHeight, overlays = []) {
             for (const label of this.labels) {
-                if (!label.visible) label.el.style.display = 'none';
+                if (!label.visible) {
+                    label.el.style.display = 'none';
+                    label.wasShown = false;
+                }
             }
+            this.settling = false;
             const taken = overlays.filter(Boolean).slice();
             const clash = (r) => taken.some((o) => r.x < o.x + o.w + 3 && o.x < r.x + r.w + 3 && r.y < o.y + o.h + 2 && o.y < r.y + r.h + 2);
             this.shown.sort((a, b) => a.label.rank - b.label.rank);
             for (const { label, x, y } of this.shown) {
                 const w = label.width, h = label.height;
+                // A centered label is placed with its middle exactly on the point, with no search.
+                if (label.center) {
+                    const r = {
+                        x: Math.min(Math.max(4, x - w / 2), viewWidth - w - 4),
+                        y: Math.min(Math.max(4, y - h / 2), viewHeight - h - 4),
+                        w, h
+                    };
+                    taken.push(r);
+                    label.spot = 0;
+                    label.wasShown = true;
+                    label.ox = label.oy = 0;
+                    label.dx = label.x = r.x;
+                    label.dy = label.y = r.y;
+                    label.el.style.transform = `translate(${r.x.toFixed(1)}px, ${r.y.toFixed(1)}px)`;
+                    if (label.onPlace) label.onPlace(label);
+                    continue;
+                }
                 const spots = [
                     [x + 10, y - h / 2], [x + 10, y - h - 6], [x + 10, y + 6],
                     [x - w - 10, y - h / 2], [x - w - 10, y - h - 6], [x - w - 10, y + 6]
@@ -146,28 +170,69 @@
                     y: Math.min(Math.max(4, spots[i][1]), viewHeight - h - 4),
                     w, h
                 });
-                // Use the usual spot when free, then the previous spot, so that labels do not jump.
-                // A spot from the wider search is not kept, so that a label returns beside its point.
                 const nearSpots = spots.length - (this.wide ? 24 : 0);
-                const previous = label.spot < nearSpots ? label.spot : 0;
                 let chosen = -1;
-                for (const i of [0, previous, ...spots.keys()]) {
-                    const r = at(i);
-                    // Screen edges can push a label back onto its own point, so reject that spot too.
-                    const onPoint = x > r.x - 8 && x < r.x + w + 8 && y > r.y - 2 && y < r.y + h + 2;
-                    if (!onPoint && !clash(r)) { chosen = i; break; }
-                }
-                if (chosen < 0) {
-                    if (label.optional) {
-                        label.el.style.display = 'none';
-                        continue;
+                if (label.fixed) {
+                    // A fixed label stays beside its point, where it was. It does not move to
+                    // avoid other labels, and other labels do not move to avoid it.
+                    chosen = label.spot < spots.length ? label.spot : 0;
+                } else {
+                    // A label keeps its previous spot while that spot is free, so that it does not
+                    // jump as the view turns. A spot from the wider search is tried only after the
+                    // spots beside the point, so that a label returns to its point when it can.
+                    const order = label.spot < nearSpots
+                        ? [label.spot, ...spots.keys()]
+                        : [...Array(nearSpots).keys(), label.spot, ...spots.keys()];
+                    for (const i of order) {
+                        const r = at(i);
+                        // Screen edges can push a label back onto its own point, so reject that spot too.
+                        const onPoint = x > r.x - 8 && x < r.x + w + 8 && y > r.y - 2 && y < r.y + h + 2;
+                        if (!onPoint && !clash(r)) { chosen = i; break; }
                     }
-                    chosen = 0;
+                    if (chosen < 0) {
+                        if (label.optional) {
+                            label.el.style.display = 'none';
+                            label.wasShown = false;
+                            continue;
+                        }
+                        chosen = 0;
+                    }
                 }
-                label.spot = chosen;
                 const r = at(chosen);
-                taken.push(r);
-                label.el.style.transform = `translate(${r.x.toFixed(1)}px, ${r.y.toFixed(1)}px)`;
+                if (!label.fixed) taken.push(r);
+
+                // When a label changes spot, it glides from where it was instead of jumping. The
+                // gap closes a little each frame, and the label stays exactly on its target while
+                // the view moves.
+                let ox = 0, oy = 0;
+                if (label.wasShown) {
+                    if (chosen !== label.spot) {
+                        ox = label.dx - r.x;
+                        oy = label.dy - r.y;
+                    } else {
+                        ox = (label.ox || 0) * 0.8;
+                        oy = (label.oy || 0) * 0.8;
+                    }
+                    if (Math.abs(ox) < 0.3 && Math.abs(oy) < 0.3) ox = oy = 0;
+                }
+                if (ox || oy) this.settling = true;
+                label.ox = ox;
+                label.oy = oy;
+                label.spot = chosen;
+                label.wasShown = true;
+                label.dx = r.x + ox;
+                label.dy = r.y + oy;
+                label.x = label.dx;
+                label.y = label.dy;
+                label.el.style.transform = `translate(${label.dx.toFixed(1)}px, ${label.dy.toFixed(1)}px)`;
+                if (label.onPlace) label.onPlace(label); // For example, to clip it to match its new position
+            }
+            // A tool that draws only when something changes still sees each glide finish.
+            if (this.settling && !this.glideFrame) {
+                this.glideFrame = requestAnimationFrame(() => {
+                    this.glideFrame = 0;
+                    this.place(viewWidth, viewHeight, overlays);
+                });
             }
         }
     }

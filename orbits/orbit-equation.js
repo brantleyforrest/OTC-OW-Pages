@@ -1,4 +1,4 @@
-// Orbit Equation Explorer: r = a (1 - e^2) / (1 + e cos nu), drawn around a 3D Earth.
+// Orbital Equation Explorer: r = a (1 - e^2) / (1 + e cos nu), drawn around a 3D Earth.
 (async function () {
     'use strict';
 
@@ -69,7 +69,7 @@
     const camView = { ...HOME_VIEW };
     const camFit = { cx: 0, radius: 6 };   // Eased toward the target fit, in Earth radii
     let heldFit = null;                    // Keeps one scale throughout an animation of e
-    let showRings = false;                 // Distance rings and partial zoom while a is being changed
+    let aInFocus = false;                  // Partial zoom and the note about the rings while a is being changed
     let aGoal = null;                      // The value the orbit is easing toward after a slider move
     let sliderOwner = null;                // The parameter last set by its slider, which keeps its position
 
@@ -81,8 +81,7 @@
         return {
             r: radiusAt(state.nu),
             rp: a * (1 - e),
-            ra: a * (1 + e),
-            T: TWO_PI * Math.sqrt(a * a * a / MU)
+            ra: a * (1 + e)
         };
     }
 
@@ -227,8 +226,8 @@
     const apogeeDot = makeDot(COLORS.e);
     const centerDot = makeDot(COLORS.a);
 
-    /* Rings at fixed distances from Earth's center, shown while a is being changed, so that
-       the orbit's growth reads against a fixed ruler. */
+    /* Rings at fixed distances from Earth's center, so that the size of the orbit always
+       reads against a fixed ruler. */
     const rings = RING_KM.map((distance) => {
         const tube = makeTube(RING_POINTS, true, 0x94a3b8, RING_OPACITY);
         for (let i = 0; i < RING_POINTS; i++) {
@@ -270,7 +269,7 @@
 
     function currentFit() {
         if (heldFit) return heldFit;
-        if (!showRings) return fitFor(state.a, state.e);
+        if (!aInFocus) return fitFor(state.a, state.e);
         const top = Math.max(state.a, LIMITS.a.sweepMax);
         return fitFor(top * Math.pow(state.a / top, A_ZOOM_SHARE), state.e);
     }
@@ -349,12 +348,13 @@
         centerDot.scale.setScalar(px * 3);
         centerDot.visible = a * e > 1.05;
 
-        // The true anomaly arc, drawn clear of Earth and inside the orbit where there is room.
-        const arcRadius = Math.max(1.28, Math.min(0.5 * rp, 0.32 * camFit.radius));
+        // The true anomaly arc runs along the orbit itself, from perigee to the spacecraft.
+        const semiLatus = a * (1 - e * e);
         for (let i = 0; i < ARC_POINTS; i++) {
             const angle = i / (ARC_POINTS - 1) * nu * D2R;
-            arcTube.xs[i] = arcRadius * Math.cos(angle);
-            arcTube.ys[i] = arcRadius * Math.sin(angle);
+            const dist = semiLatus / (1 + e * Math.cos(angle));
+            arcTube.xs[i] = dist * Math.cos(angle);
+            arcTube.ys[i] = dist * Math.sin(angle);
         }
         writeTube(arcTube, lineWidth * 1.3);
         arcTube.mesh.visible = nu > 0.5;
@@ -367,7 +367,7 @@
 
         // Rings too small to read against the current scale fade out.
         for (const ring of rings) {
-            ring.fade = showRings ? Math.min(1, Math.max(0, (ring.radius / camFit.radius - 0.12) / 0.1)) : 0;
+            ring.fade = Math.min(1, Math.max(0, (ring.radius / camFit.radius - 0.12) / 0.1));
             ring.tube.mesh.visible = ring.fade > 0;
             if (ring.fade > 0) {
                 ring.tube.mesh.material.opacity = RING_OPACITY * ring.fade;
@@ -421,16 +421,13 @@
                 showLabel(labels.apogee, -a * (1 + e), 0, 0);
             }
             if (nu > 8) {
-                const rp = a * (1 - e);
-                const arcRadius = Math.max(1.28, Math.min(0.5 * rp, 0.32 * camFit.radius));
                 const mid = nu / 2 * D2R;
-                showLabel(labels.nu, arcRadius * Math.cos(mid), arcRadius * Math.sin(mid), 0);
+                const dist = a * (1 - e * e) / (1 + e * Math.cos(mid));
+                showLabel(labels.nu, dist * Math.cos(mid), dist * Math.sin(mid), 0);
             }
             for (const axis of axes) showLabel(axis.label, axis.tip.x, axis.tip.y, axis.tip.z);
-            if (showRings) {
-                for (const ring of rings) {
-                    if (ring.fade > 0.5) showLabel(ring.label, 0, -ring.radius, 0);
-                }
+            for (const ring of rings) {
+                if (ring.fade > 0.5) showLabel(ring.label, 0, -ring.radius, 0);
             }
         }
         layer.place(viewW, viewH, [Kit.overlayBox(hud, view)]);
@@ -447,21 +444,8 @@
     /* Number formats */
     const km = (value) => `${Math.round(value).toLocaleString('en-US')} km`;
 
-    function formatPeriod(seconds) {
-        const hours = seconds / 3600;
-        if (hours < 48) {
-            const h = Math.floor(hours);
-            const m = Math.floor((seconds - h * 3600) / 60);
-            return `${h} h ${String(m).padStart(2, '0')} m`;
-        }
-        return `${(hours / 24).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} days`;
-    }
-
-    const formatE = (e) => {
-        const text = e.toFixed(3);
-        return text.endsWith('0') ? e.toFixed(2) : text;
-    };
-    const formatNu = (nu) => (Number.isInteger(nu) ? String(nu) : nu.toFixed(1));
+    const formatE = (e) => e.toFixed(2);
+    const formatNu = (nu) => nu.toFixed(1);
 
     /* The a slider is logarithmic, so that near-Earth orbits have as much room as distant ones */
     const aLogRange = Math.log(LIMITS.a.max / LIMITS.a.min);
@@ -495,12 +479,33 @@
         $('eq-nu').textContent = `${formatNu(nuShown)}°`;
         $('eq-r').textContent = km(values.r);
 
-        $('val-r').textContent = km(values.r);
-        $('val-alt').textContent = km(values.r - R_E);
-        $('val-rp').textContent = km(values.rp);
-        $('val-ra').textContent = km(values.ra);
-        $('val-shape').textContent = e <= 0.001 ? 'Circle' : 'Ellipse';
-        $('val-t').textContent = formatPeriod(values.T);
+        // The other equations, each with the current values
+        const plain = (value) => Math.round(value).toLocaleString('en-US');
+        const write = (texts) => {
+            for (const id of Object.keys(texts)) $(id).textContent = texts[id];
+        };
+        write({
+            'rp-a': plain(a),
+            'rp-e': formatE(e),
+            'res-rp': km(values.rp),
+            'ra-a': plain(a),
+            'ra-e': formatE(e),
+            'res-ra': km(values.ra),
+            'a-ra': plain(values.ra),
+            'a-rp': plain(values.rp),
+            'res-a': km(a),
+            'e-ra1': plain(values.ra),
+            'e-rp1': plain(values.rp),
+            'e-ra2': plain(values.ra),
+            'e-rp2': plain(values.rp),
+            'res-e': formatE(e),
+            'res-shape': e <= 0.001 ? '(Circle)' : '(Ellipse)',
+            'v-r': plain(values.r),
+            'v-a': plain(a),
+            'res-v': `${Math.sqrt(MU * (2 / values.r - 1 / a)).toFixed(2)} km/s`,
+            'vc-r': plain(values.r),
+            'res-vc': `${Math.sqrt(MU / values.r).toFixed(2)} km/s`
+        });
 
         updateHud(values);
     }
@@ -519,7 +524,7 @@
             text = state.e <= 0.001
                 ? 'With e at zero, the orbit is a circle, so r equals a at every ν.'
                 : 'As ν advances, r changes while the orbit stays fixed. The spacecraft moves fastest at perigee and slowest at apogee.';
-        } else if (showRings) {
+        } else if (aInFocus) {
             text = 'The rings mark fixed distances from Earth, so the size of the orbit can be read against them.';
         } else if (state.e <= 0.001) {
             text = 'With e at zero, the orbit is a circle, so r equals a at every ν.';
@@ -550,7 +555,7 @@
         aGoal = null;
         sliderOwner = null;
         heldFit = sweepFit();
-        showRings = key === 'a';
+        aInFocus = key === 'a';
         setPlaying(true);
     }
 
@@ -561,7 +566,7 @@
         if (key !== 'nu') heldFit = state.playing ? sweepFit() : null;
         if (key === 'a') {
             aGoal = null;
-            showRings = true;
+            aInFocus = true;
         }
         dirty = true;
     }
@@ -629,7 +634,7 @@
         aGoal = null;
         sliderOwner = null;
         heldFit = state.playing ? sweepFit() : null;
-        showRings = state.playing && state.sweep === 'a';
+        aInFocus = state.playing && state.sweep === 'a';
         dirty = true;
     });
     $('reset-view').addEventListener('click', () => {

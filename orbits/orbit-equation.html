@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orbit Equation Explorer | OTC OW</title>
+    <title>Orbital Equation Explorer | OTC OW</title>
     <meta name="description" content="An interactive 3D view of the orbit equation. Enter values for the semi-major axis, the eccentricity, and the true anomaly, or animate each one through its range, and watch the orbit around Earth respond.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,88 +21,62 @@
         .sym.e { color: var(--param-e); }
         .sym.nu { color: var(--param-nu); }
 
-        /* The equation, written with symbols and then with the current values */
-        .equation {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-family: var(--font-mono);
-            font-size: 0.95rem;
-            line-height: 1.3;
-            white-space: nowrap;
-        }
-
-        .equation + .equation { margin-top: 0.45rem; }
-
-        .fraction {
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-
-        .fraction > span:first-child {
-            border-bottom: 1px solid var(--text-muted);
-            padding: 0 0.4rem 0.1rem;
-            align-self: stretch;
-        }
-
-        .fraction > span:last-child { padding: 0.1rem 0.4rem 0; }
-        .equation.values { font-size: 0.84rem; }
-
-        .result {
-            margin-top: 0.45rem;
-            font-family: var(--font-mono);
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #ffffff;
-            white-space: nowrap;
-        }
-
         .tool-side .panel { padding: 0.7rem 0.95rem; }
 
-        /* One block for each parameter */
-        .param + .param {
-            margin-top: 0.45rem;
-            padding-top: 0.45rem;
-            border-top: 1px solid var(--border-subtle);
+        /* One block for each parameter. Spare height is shared evenly between the blocks. */
+        .panel.param-panel {
+            display: flex;
+            flex-direction: column;
         }
+
+        .param-list {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .param {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0.4rem 0;
+        }
+
+        .param:first-child { padding-top: 0; }
+        .param:last-child { padding-bottom: 0; }
+        .param + .param { border-top: 1px solid var(--border-subtle); }
 
         .param-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 0.6rem;
+            gap: 0.4rem;
         }
 
-        .param-head label {
+        .param-name {
+            min-width: 0;
             font-size: 0.86rem;
             font-weight: 600;
             color: var(--text-main);
+            white-space: nowrap;
         }
 
-        .param-def {
-            font-size: 0.76rem;
-            line-height: 1.35;
-            color: var(--text-muted);
-            margin: 0.15rem 0 0.3rem;
+        .param-name .sym {
+            display: inline-block;
+            width: 1.1rem;
         }
 
-        .param-entry {
+        .param-value {
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            flex: 0 0 auto;
+            gap: 0.25rem;
         }
 
-        .param-entry input[type="range"] { flex: 1 1 auto; min-width: 0; }
-        .param[data-param="a"] input[type="range"] { accent-color: var(--param-a); }
-        .param[data-param="e"] input[type="range"] { accent-color: var(--param-e); }
-        .param[data-param="nu"] input[type="range"] { accent-color: var(--param-nu); }
-
-        .param-entry input[type="number"] {
-            flex: 0 0 6rem;
-            width: 6rem;
-            padding: 0.26rem 0.4rem;
+        .param-value input[type="number"] {
+            width: 4.9rem;
+            padding: 0.18rem 0.3rem;
             font-family: var(--font-mono);
             font-size: 0.82rem;
             text-align: right;
@@ -112,13 +86,32 @@
             border-radius: 5px;
         }
 
-        .param-entry input[type="number"][aria-invalid="true"] { border-color: var(--badge-amber); }
+        .param-value input[type="number"][aria-invalid="true"] { border-color: var(--badge-amber); }
 
         .param-unit {
-            flex: 0 0 1.5rem;
+            width: 1.5rem;
             font-family: var(--font-mono);
-            font-size: 0.76rem;
+            font-size: 0.74rem;
             color: var(--text-muted);
+        }
+
+        .param-entry {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-top: 0.25rem;
+        }
+
+        .param-entry input[type="range"] { flex: 1 1 auto; min-width: 0; }
+        .param[data-param="a"] input[type="range"] { accent-color: var(--param-a); }
+        .param[data-param="e"] input[type="range"] { accent-color: var(--param-e); }
+        .param[data-param="nu"] input[type="range"] { accent-color: var(--param-nu); }
+
+        .param-def {
+            font-size: 0.76rem;
+            line-height: 1.35;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
         }
 
         .param-range {
@@ -128,7 +121,7 @@
             margin-top: 0.15rem;
         }
 
-        .btn.animate { padding: 0.24rem 0.65rem; font-size: 0.76rem; min-width: 4.8rem; }
+        .btn.animate { padding: 0.2rem 0.5rem; font-size: 0.76rem; min-width: 4.4rem; }
 
         .btn.animate[aria-pressed="true"] {
             background: rgba(36, 76, 140, 0.55);
@@ -136,14 +129,17 @@
             color: #ffffff;
         }
 
-        .term-list { display: grid; gap: 0.3rem; font-size: 0.78rem; line-height: 1.38; color: var(--text-muted); }
-        .term-list b { color: var(--text-main); font-weight: 600; }
-
         .tool-hud.warning { border-color: var(--badge-amber); }
 
+        /* Tablets: both panels fill the height of the row, so that neither leaves a blank space. */
+        @media (min-width: 700px) and (max-width: 1080px) {
+            .tool-side > .col > .panel { flex-grow: 1; }
+        }
+
+        /* The equations column is wide enough to hold each equation on one line at any value. */
         @media (min-width: 1300px) and (min-height: 600px) {
-            .tool-layout { --aside-w: 42rem; }
-            .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .tool-layout { --aside-w: 47rem; }
+            .tool-side { grid-template-columns: 18rem minmax(0, 1fr); }
         }
     </style>
 </head>
@@ -165,7 +161,7 @@
                 <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
-                <h1>Orbit Equation Explorer</h1>
+                <h1>Orbital Equation Explorer</h1>
             </div>
             <div class="nav-links">
                 <a href="../index.html" class="nav-link active">
@@ -234,94 +230,139 @@
 
             <aside class="tool-side">
                 <div class="col">
-                    <div class="panel accent">
-                        <div class="panel-title">The Orbit Equation</div>
-                        <div class="equation">
-                            <span>r =</span>
-                            <span class="fraction">
-                                <span><span class="sym a">a</span> (1 − <span class="sym e">e</span>²)</span>
-                                <span>1 + <span class="sym e">e</span> cos <span class="sym nu">ν</span></span>
-                            </span>
-                        </div>
-                        <div class="equation values">
-                            <span>r =</span>
-                            <span class="fraction">
-                                <span><span class="sym a" id="eq-a"></span> (1 − <span class="sym e" id="eq-e2"></span>²)</span>
-                                <span>1 + <span class="sym e" id="eq-e"></span> × cos <span class="sym nu" id="eq-nu"></span></span>
-                            </span>
-                        </div>
-                        <div class="result">r = <span id="eq-r"></span></div>
-                    </div>
-
-                    <div class="panel">
+                    <div class="panel param-panel">
                         <div class="panel-title">Parameters</div>
+                        <div class="param-list">
+                            <div class="param" data-param="a">
+                                <div class="param-head">
+                                    <label class="param-name" for="a-number"><span class="sym a">a</span>Semi-major axis</label>
+                                    <span class="param-value">
+                                        <input type="number" id="a-number" min="6378" max="500000" step="100">
+                                        <span class="param-unit">km</span>
+                                    </span>
+                                </div>
+                                <div class="param-entry">
+                                    <input type="range" id="a-range" min="0" max="1000" step="1" aria-label="Semi-major axis slider">
+                                    <button class="btn animate" id="a-animate" aria-pressed="false">Animate</button>
+                                </div>
+                                <p class="param-def">Sets the size of the orbit. It is half of the orbit's longest width.</p>
+                                <p class="param-range">Allowed: 6,378 to 500,000. Animation: 10,000 to 60,000.</p>
+                            </div>
 
-                        <div class="param" data-param="a">
-                            <div class="param-head">
-                                <label for="a-number"><span class="sym a">a</span> &nbsp;Semi-major axis</label>
-                                <button class="btn animate" id="a-animate" aria-pressed="false">Animate</button>
+                            <div class="param" data-param="e">
+                                <div class="param-head">
+                                    <label class="param-name" for="e-number"><span class="sym e">e</span>Eccentricity</label>
+                                    <span class="param-value">
+                                        <input type="number" id="e-number" min="0" max="0.99" step="0.01">
+                                        <span class="param-unit"></span>
+                                    </span>
+                                </div>
+                                <div class="param-entry">
+                                    <input type="range" id="e-range" min="0" max="0.99" step="0.01" aria-label="Eccentricity slider">
+                                    <button class="btn animate" id="e-animate" aria-pressed="false">Animate</button>
+                                </div>
+                                <p class="param-def">Sets the shape of the orbit. Zero is a circle, and values closer to 1 are more stretched.</p>
+                                <p class="param-range">Allowed: 0 to 0.99, closed orbits only. Animation: 0 to 0.7.</p>
                             </div>
-                            <p class="param-def">Sets the size of the orbit. It is half of the orbit's longest width.</p>
-                            <div class="param-entry">
-                                <input type="range" id="a-range" min="0" max="1000" step="1" aria-label="Semi-major axis slider">
-                                <input type="number" id="a-number" min="6378" max="500000" step="100">
-                                <span class="param-unit">km</span>
-                            </div>
-                            <p class="param-range">Allowed: 6,378 to 500,000. Animation: 10,000 to 60,000.</p>
-                        </div>
 
-                        <div class="param" data-param="e">
-                            <div class="param-head">
-                                <label for="e-number"><span class="sym e">e</span> &nbsp;Eccentricity</label>
-                                <button class="btn animate" id="e-animate" aria-pressed="false">Animate</button>
+                            <div class="param" data-param="nu">
+                                <div class="param-head">
+                                    <label class="param-name" for="nu-number"><span class="sym nu">ν</span>True anomaly</label>
+                                    <span class="param-value">
+                                        <input type="number" id="nu-number" min="0" max="360" step="1">
+                                        <span class="param-unit">deg</span>
+                                    </span>
+                                </div>
+                                <div class="param-entry">
+                                    <input type="range" id="nu-range" min="0" max="360" step="1" aria-label="True anomaly slider">
+                                    <button class="btn animate" id="nu-animate" aria-pressed="false">Animate</button>
+                                </div>
+                                <p class="param-def">The spacecraft's angle around the orbit, measured at Earth's center from perigee.</p>
+                                <p class="param-range">Allowed: 0 to 360. Animation: one full orbit, repeated.</p>
                             </div>
-                            <p class="param-def">Sets the shape of the orbit. Zero is a circle, and values closer to 1 are more stretched.</p>
-                            <div class="param-entry">
-                                <input type="range" id="e-range" min="0" max="0.99" step="0.01" aria-label="Eccentricity slider">
-                                <input type="number" id="e-number" min="0" max="0.99" step="0.01">
-                                <span class="param-unit"></span>
-                            </div>
-                            <p class="param-range">Allowed: 0 to 0.99, closed orbits only. Animation: 0 to 0.7.</p>
-                        </div>
-
-                        <div class="param" data-param="nu">
-                            <div class="param-head">
-                                <label for="nu-number"><span class="sym nu">ν</span> &nbsp;True anomaly</label>
-                                <button class="btn animate" id="nu-animate" aria-pressed="false">Animate</button>
-                            </div>
-                            <p class="param-def">The spacecraft's angle around the orbit, measured at Earth's center from perigee.</p>
-                            <div class="param-entry">
-                                <input type="range" id="nu-range" min="0" max="360" step="1" aria-label="True anomaly slider">
-                                <input type="number" id="nu-number" min="0" max="360" step="1">
-                                <span class="param-unit">deg</span>
-                            </div>
-                            <p class="param-range">Allowed: 0 to 360. Animation: one full orbit, repeated.</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="col">
-                    <div class="panel">
-                        <div class="panel-title">Live Values</div>
-                        <div class="stat-grid">
-                            <div class="stat-item"><span class="stat-label">Distance, r</span><span class="stat-value" id="val-r"></span></div>
-                            <div class="stat-item"><span class="stat-label">Altitude</span><span class="stat-value" id="val-alt"></span></div>
-                            <div class="stat-item"><span class="stat-label">Perigee distance</span><span class="stat-value" id="val-rp"></span></div>
-                            <div class="stat-item"><span class="stat-label">Apogee distance</span><span class="stat-value" id="val-ra"></span></div>
-                            <div class="stat-item"><span class="stat-label">Orbit shape</span><span class="stat-value" id="val-shape"></span></div>
-                            <div class="stat-item"><span class="stat-label">Period, T</span><span class="stat-value" id="val-t"></span></div>
+                    <div class="panel accent eq-panel">
+                        <div class="panel-title">Equations With the Current Values</div>
+                        <div class="eq-list">
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Orbit equation:</b> distance from Earth's center</span><span class="eq-result" id="eq-r"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">
+                                        <span>r =</span>
+                                        <span class="fraction">
+                                            <span><span class="sym a">a</span> (1 − <span class="sym e">e</span>²)</span>
+                                            <span>1 + <span class="sym e">e</span> cos <span class="sym nu">ν</span></span>
+                                        </span>
+                                    </span>
+                                    <span class="eq-val">
+                                        <span>=</span>
+                                        <span class="fraction">
+                                            <span><span class="sym a" id="eq-a"></span> (1 − <span class="sym e" id="eq-e2"></span>²)</span>
+                                            <span>1 + <span class="sym e" id="eq-e"></span> × cos <span class="sym nu" id="eq-nu"></span></span>
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Perigee:</b> closest point, where <span class="sym nu">ν</span> is 0°</span><span class="eq-result" id="res-rp"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">r<sub>p</sub> = <span class="sym a">a</span> (1 − <span class="sym e">e</span>)</span>
+                                    <span class="eq-val">= <span class="sym a" id="rp-a"></span> (1 − <span class="sym e" id="rp-e"></span>)</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Apogee:</b> farthest point, where <span class="sym nu">ν</span> is 180°</span><span class="eq-result" id="res-ra"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">r<sub>a</sub> = <span class="sym a">a</span> (1 + <span class="sym e">e</span>)</span>
+                                    <span class="eq-val">= <span class="sym a" id="ra-a"></span> (1 + <span class="sym e" id="ra-e"></span>)</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Semi-major axis</b> from apogee and perigee</span><span class="eq-result sym a" id="res-a"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">
+                                        <span><span class="sym a">a</span> =</span>
+                                        <span class="fraction"><span>r<sub>a</sub> + r<sub>p</sub></span><span>2</span></span>
+                                    </span>
+                                    <span class="eq-val">
+                                        <span>=</span>
+                                        <span class="fraction"><span><span id="a-ra"></span> + <span id="a-rp"></span></span><span>2</span></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Eccentricity</b> from apogee and perigee</span><span class="eq-result"><span class="sym e" id="res-e"></span> <span id="res-shape"></span></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">
+                                        <span><span class="sym e">e</span> =</span>
+                                        <span class="fraction"><span>r<sub>a</sub> − r<sub>p</sub></span><span>r<sub>a</sub> + r<sub>p</sub></span></span>
+                                    </span>
+                                    <span class="eq-val">
+                                        <span>=</span>
+                                        <span class="fraction"><span><span id="e-ra1"></span> − <span id="e-rp1"></span></span><span><span id="e-ra2"></span> + <span id="e-rp2"></span></span></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Speed:</b> fastest at perigee, slowest at apogee</span><span class="eq-result" id="res-v"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">v = √(μ (2/r − 1/<span class="sym a">a</span>))</span>
+                                    <span class="eq-val">= √(398,600 (2/<span id="v-r"></span> − 1/<span class="sym a" id="v-a"></span>))</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Circular speed</b> at this distance</span><span class="eq-result" id="res-vc"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">v<sub>circular</sub> = √(μ/r)</span>
+                                    <span class="eq-val">= √(398,600/<span id="vc-r"></span>)</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">Key Terms</div>
-                        <div class="term-list">
-                            <p><b>Distance, r:</b> from Earth's center to the spacecraft.</p>
-                            <p><b>Altitude:</b> r minus Earth's radius, 6,378 km.</p>
-                            <p><b>Perigee:</b> the closest point to Earth, where <span class="sym nu">ν</span> is 0°. Its distance is <span class="sym a">a</span> (1 − <span class="sym e">e</span>).</p>
-                            <p><b>Apogee:</b> the farthest point from Earth, where <span class="sym nu">ν</span> is 180°. Its distance is <span class="sym a">a</span> (1 + <span class="sym e">e</span>).</p>
-                            <p><b>Period, T:</b> the time for one orbit, equal to 2π√(<span class="sym a">a</span>³/μ), where μ is Earth's gravitational parameter, 398,600 km³/s².</p>
-                        </div>
+                        <p class="eq-constants">μ is Earth's gravitational parameter, 398,600 km³/s².</p>
                     </div>
                 </div>
             </aside>

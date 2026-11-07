@@ -403,6 +403,104 @@ body {
     gap: 0.1rem 0.8rem;
 }
 
+/* Live equations: the name and result, then the symbols, then the current values */
+.fraction {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.fraction > span:first-child {
+    border-bottom: 1px solid var(--text-muted);
+    padding: 0 0.4rem 0.1rem;
+    align-self: stretch;
+}
+
+.fraction > span:last-child { padding: 0.1rem 0.4rem 0; }
+
+.panel.eq-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.eq-list {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Spare height is shared evenly, with each row centered between its dividers. */
+.eq-row {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.28rem 0;
+}
+
+.eq-row:first-child { padding-top: 0; }
+.eq-row + .eq-row { border-top: 1px solid var(--border-subtle); }
+
+.eq-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.eq-name {
+    min-width: 0;
+    font-size: 0.74rem;
+    line-height: 1.3;
+    color: var(--text-muted);
+}
+
+.eq-name b { font-weight: 600; color: var(--text-main); }
+
+.eq-result {
+    flex: 0 0 auto;
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+.eq-work {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.05rem 0.35rem;
+    margin-top: 0.1rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    line-height: 1.3;
+    color: var(--text-main);
+}
+
+.eq-work > span { white-space: nowrap; }
+.eq-work sub { font-size: 0.72em; line-height: 0; }
+
+/* The symbols and the current values. The set width lines up the values from row to row. */
+.eq-sym { display: inline-block; min-width: 20ch; }
+
+.eq-sym:has(> .fraction),
+.eq-val:has(> .fraction) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.eq-constants {
+    margin-top: 0.4rem;
+    padding-top: 0.32rem;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--text-dim);
+}
+
 @media (max-width: 1080px), (max-height: 599px) {
     .tool-view { display: block; }
     .tool-canvas-box { height: clamp(340px, 62vh, 640px); height: clamp(340px, 62svh, 640px); }

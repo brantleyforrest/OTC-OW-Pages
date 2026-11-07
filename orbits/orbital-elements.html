@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inertial Frame Orbital Elements | OTC OW</title>
+    <title>Orbital Elements Visualizer | OTC OW</title>
     <meta name="description" content="An interactive 3D visualizer of the six Classical Orbital Elements (COEs) in the Earth-Centered Inertial (ECI) frame: semi-major axis, eccentricity, inclination, RAAN, argument of perigee, and true anomaly.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="../assets/tool-theme.css">
     <style>
         :root {
-            --param-a: #e0b64f;
+            --param-a: #ff8a3d;
             --param-e: #34d399;
             --param-i: #38bdf8;
             --param-raan: #a3e635;
@@ -49,8 +49,65 @@
         }
 
         .tool-label.measure .val { margin-left: 0.35rem; color: #ffffff; }
+        .tool-label.measure .val:empty { display: none; }
 
+        /* The selected label's frame is drawn inside the label, not as an outline around it, so
+           that when Earth covers part of a label it covers that part of the frame too. */
+        .tool-label.measure.active {
+            box-shadow: inset 0 0 0 1px currentColor;
+            background: rgba(6, 11, 20, 0.85);
+        }
+
+        /* Show-elements control */
+        .ctl-show {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .elem-options {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.35rem 0.8rem;
+            margin-bottom: 0.4rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .elem-options .check { font-size: 0.78rem; line-height: 1.35; }
+
+        .ctl-show .segmented button { padding: 0.32rem 0.6rem; font-size: 0.78rem; }
+
+        .param-head .vis {
+            flex: 0 0 auto;
+            width: 14px;
+            height: 14px;
+            margin: 0 0.45rem 0 0;
+            accent-color: var(--row-color);
+            cursor: pointer;
+        }
+
+        .param-head .vis:disabled { cursor: default; opacity: 0.55; }
+        .param-head .param-name { flex: 1 1 auto; }
+
+        .tool-label { z-index: 1; }
         .tool-label.word { color: var(--text-muted); font-size: 0.72rem; }
+
+        /* Names of the two reference axes: larger and brighter than other labels */
+        .tool-label.axis {
+            z-index: 0; /* Behind the other labels */
+            font-size: 1.05rem;
+            padding: 0 0.3rem;
+            border-radius: 3px;
+            color: #ffffff;
+            background: rgba(6, 11, 20, 0.72);
+        }
+
+        .tool-label.axis b { font-weight: 700; color: #93c5fd; }
 
         /* Controls: one row */
         .panel.controls { padding: 0.5rem 0.75rem; }
@@ -175,7 +232,7 @@
             accent-color: var(--row-color);
         }
 
-        .stat-grid { gap: 0.55rem 0.8rem; }
+        .stat-grid { flex: 1 1 auto; align-content: space-between; gap: 0.55rem 0.8rem; }
 
         .vector-box {
             display: grid;
@@ -201,15 +258,30 @@
             color: #ffffff;
         }
 
+
         @media (min-width: 1081px) {
             .tool-layout { --aside-w: 22.5rem; }
         }
 
+        /* Tablets: the two panels sit side by side and use the full width. */
+        @media (min-width: 700px) and (max-width: 1080px) {
+            .tool-side { grid-template-columns: minmax(0, 1fr); }
+            .tool-side > .col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
         /* Short large screens: tighter rows, so that the panels still fit on one screen. */
-        @media (min-width: 1081px) and (min-height: 600px) and (max-height: 700px) {
+        @media (min-width: 1081px) and (min-height: 600px) and (max-height: 780px) {
             .tool-side .panel { padding: 0.55rem 0.85rem; }
             .param { padding: 0.16rem 0.45rem 0.2rem; }
             .stat-grid { gap: 0.35rem 0.8rem; }
+        }
+
+        /* Shortest large screens: a wider side column, so that the options and values take fewer lines. */
+        @media (min-width: 1081px) and (min-height: 600px) and (max-height: 700px) {
+            .tool-layout { --aside-w: 27rem; }
+            .param-list { gap: 0; }
+            .param { padding: 0.05rem 0.45rem; }
+            .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
 
         @media (max-width: 640px) {
@@ -235,7 +307,7 @@
                 <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
-                <h1>Inertial Frame Orbital Elements</h1>
+                <h1>Orbital Elements Visualizer</h1>
             </div>
             <div class="nav-links">
                 <a href="../index.html" class="nav-link active">
@@ -283,7 +355,7 @@
                 <div class="panel controls">
                     <div class="ctl-row">
                         <div class="buttons">
-                            <button class="btn primary" id="play">Pause</button>
+                            <button class="btn primary" id="play">Play</button>
                             <button class="btn" id="reset-view">Reset View</button>
                         </div>
                         <label class="ctl-preset">Example orbit
@@ -304,9 +376,6 @@
                             </div>
                             <input type="range" id="speed" min="0" max="2" step="1" value="1">
                         </div>
-                        <div class="ctl-checks">
-                            <label class="check"><input type="checkbox" id="show-labels" checked>Labels</label>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -316,6 +385,22 @@
                 <div class="col">
                     <div class="panel">
                         <div class="panel-title">The Six Elements</div>
+                        <div class="elem-options">
+                            <div class="ctl-show">
+                                <span id="show-mode-label">Show</span>
+                                <div class="segmented" id="show-mode" role="group" aria-labelledby="show-mode-label">
+                                    <button type="button" data-value="none" aria-pressed="false">None</button>
+                                    <button type="button" data-value="one" aria-pressed="false">One</button>
+                                    <button type="button" data-value="some" aria-pressed="false">Some</button>
+                                    <button type="button" data-value="all" aria-pressed="true">All</button>
+                                </div>
+                            </div>
+                            <div class="ctl-checks">
+                                <label class="check"><input type="checkbox" id="show-labels" autocomplete="off" checked>Labels</label>
+                                <label class="check"><input type="checkbox" id="show-values" autocomplete="off">Values</label>
+                                <label class="check"><input type="checkbox" id="show-fill" autocomplete="off">Angle fill</label>
+                            </div>
+                        </div>
                         <div class="param-list">
                             <div class="param" data-param="a">
                                 <div class="param-head">
@@ -366,9 +451,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="col">
                     <div class="panel">
                         <div class="panel-title">Resulting Orbit</div>
                         <div class="stat-grid">
