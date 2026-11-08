@@ -16,24 +16,6 @@
             --extra: #f87171;
         }
 
-        .stage {
-            position: relative;
-            flex: 1 1 auto;
-            min-height: 0;
-            border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            overflow: hidden;
-            background: #03060c;
-        }
-
-        .stage canvas {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
         .scale-note { min-height: 2.7em; }
 
         /* The canvas draws this key at larger sizes. */
@@ -237,17 +219,8 @@
             .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
-        @media (max-width: 1080px), (max-height: 599px) {
-            .stage { height: clamp(340px, 62vh, 640px); height: clamp(340px, 62svh, 640px); flex: none; }
-        }
-
-
         @media (max-width: 690px) {
             .phone-key { display: block; }
-        }
-
-        @media (max-width: 640px) {
-            .stage { height: clamp(300px, 104vw, 62svh); }
         }
     </style>
 </head>
@@ -305,7 +278,7 @@
             <div class="col tool-stage-col">
                 <p class="tool-intro">A view from above the North Pole. Earth spins while it moves along its orbit, so a marked point on Earth faces a distant star again before it faces the Sun again.</p>
 
-                <div class="stage" id="stage">
+                <div class="tool-canvas-box" id="stage">
                     <canvas id="view" aria-label="Animated view of Earth rotating as it moves along its orbit around the Sun"></canvas>
                 </div>
 

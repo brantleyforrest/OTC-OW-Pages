@@ -33,7 +33,8 @@ Put a style or helper in these shared files only if more than one tool needs it.
 ## Layout
 
 - **Large screens:** the view and controls stay on screen and fill the window height, with the panels beside them.
-- **Tablets and phones:** everything stacks. On phones, the status box moves below the view.
+- **Tablets:** everything stacks.
+- **Phones held upright:** the design rules below apply. The status box moves below the view.
 - **Two side columns:** add a second `.col` inside `.tool-side`, then add this rule to the page's styles:
 
 ```css
@@ -42,6 +43,16 @@ Put a style or helper in these shared files only if more than one tool needs it.
     .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 ```
+
+## Phone Design Rules
+
+These rules apply to phones held upright: `(max-width: 640px) and (orientation: portrait)`.
+
+- **The main element is always on screen.** The view, usually the 3D scene, stays pinned at the top. Only the content below it scrolls, so a reader can move a control and watch the result. Put the view in `.tool-canvas-box` to get this, and do not set its height in the page's styles.
+- **The top bar shows only the back button and the tool name.** Do not show the site name or the links to other pages while a tool is open.
+- **Dragging on the view moves the view.** Set `touch-action: none` on the canvas of any tool that can be rotated or zoomed.
+- **Controls stay reachable while typing.** The view shrinks while a number field has focus, so that the field is not hidden between the view and the keyboard.
+- **Phone changes never affect wider screens.** Any screen wider than it is tall keeps the large-screen design. Keep phone-only rules inside the media query above, and compare the layout before and after at the large-screen test sizes.
 
 ## Rules That Prevent Known Problems
 

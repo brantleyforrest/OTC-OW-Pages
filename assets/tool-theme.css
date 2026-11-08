@@ -697,3 +697,64 @@ footer.site-footer {
     .tool-main { padding: 0.25rem 1rem 1rem; }
     .ctl-grow { flex-basis: 100%; }
 }
+
+/* Phones held upright: the view stays on screen and only the content below it scrolls.
+   The navigation becomes the back button and the tool name. Screens wider than they are
+   tall never use these rules. See _template/README.md. */
+@media (max-width: 640px) and (orientation: portrait) {
+    :root {
+        --nav-h: 2.75rem;
+        --tool-view-h: min(48svh, 100vw);
+    }
+
+    /* While a number is being typed, the view shrinks to leave room above the keyboard. */
+    :root:has(input[type="number"]:focus) { --tool-view-h: 24svh; }
+
+    html { scroll-padding-top: calc(var(--nav-h) + var(--tool-view-h) + 0.5rem); }
+
+    .top-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: var(--deep-space);
+    }
+
+    .nav-brand, .nav-links { display: none; }
+
+    .nav-inner {
+        flex-wrap: nowrap;
+        height: var(--nav-h);
+        min-height: 0;
+        padding: 0 1rem 0 0;
+    }
+
+    .tool-heading {
+        order: 0;
+        flex: 1 1 auto;
+        gap: 0;
+        padding: 0;
+    }
+
+    .back-link {
+        justify-content: center;
+        width: var(--nav-h);
+        height: var(--nav-h);
+    }
+
+    .back-link svg { width: 20px; height: 20px; }
+    .tool-heading h1 { white-space: nowrap; font-size: 1.05rem; }
+
+    .tool-canvas-box {
+        position: fixed;
+        top: var(--nav-h);
+        left: 0;
+        z-index: 50;
+        width: 100%;
+        height: var(--tool-view-h);
+        border-width: 0 0 1px;
+        border-radius: 0;
+    }
+
+    .tool-main { padding: calc(var(--nav-h) + var(--tool-view-h) + 0.5rem) 1rem 1rem; }
+}
