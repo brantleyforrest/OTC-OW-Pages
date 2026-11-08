@@ -786,6 +786,210 @@
                 padding: 2rem 1rem;
             }
         }
+
+        /* Phones: each tool is one compact row, and the whole row opens the tool. The touch
+           conditions keep laptops and desktops out, however small the window. */
+        @media (max-width: 640px) and (orientation: portrait),
+               (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+            .nav-link {
+                min-height: 44px;
+            }
+
+            #view-tools header.hero {
+                padding: 0.75rem 1rem 0.6rem;
+            }
+
+            #view-tools .hero h1 {
+                font-size: 1.4rem;
+            }
+
+            .search-toolbar {
+                margin-bottom: 0.75rem;
+            }
+
+            /* Below 16px, iPhones zoom the page when the field is selected. */
+            .search-input {
+                padding: 0.65rem 2.85rem 0.65rem 2.75rem;
+                font-size: 1rem;
+            }
+
+            .search-input:placeholder-shown {
+                text-overflow: ellipsis;
+            }
+
+            .search-icon {
+                left: 0.9rem;
+            }
+
+            .search-clear-btn {
+                right: 0.3rem;
+                width: 40px;
+                height: 40px;
+                background: none;
+            }
+
+            .search-results-section {
+                margin-bottom: 1rem;
+            }
+
+            .search-results-header {
+                margin-bottom: 0.6rem;
+                padding-bottom: 0.5rem;
+            }
+
+            .lesson-group {
+                margin-bottom: 0.75rem;
+            }
+
+            .lesson-summary {
+                gap: 0.5rem;
+                min-height: 44px;
+                padding: 0.5rem 0.75rem;
+            }
+
+            .lesson-meta {
+                gap: 0.15rem 0.5rem;
+            }
+
+            .lesson-tag {
+                font-size: 0.66rem;
+            }
+
+            .lesson-title {
+                font-size: 0.98rem;
+                line-height: 1.3;
+            }
+
+            .lesson-count {
+                display: none;
+            }
+
+            .lesson-content {
+                padding: 0.5rem;
+            }
+
+            .tool-grid {
+                gap: 0.5rem;
+            }
+
+            .tool-card {
+                display: grid;
+                grid-template-columns: 40px minmax(0, 1fr) 20px;
+                grid-template-rows: repeat(3, auto);
+                column-gap: 0.7rem;
+                align-items: center;
+                padding: 0.7rem 0.75rem;
+            }
+
+            .tool-card:active {
+                background: var(--surface-hover);
+                border-color: var(--border-accent);
+            }
+
+            .tool-card .card-top {
+                display: contents;
+            }
+
+            .tool-card .card-icon {
+                grid-column: 1;
+                grid-row: 1 / -1;
+                width: 40px;
+                height: 40px;
+            }
+
+            .tool-card .card-top > :not(.card-icon) {
+                grid-column: 2;
+                grid-row: 3;
+                justify-self: start;
+                max-width: 100%;
+                margin: 0.3rem 0 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tool-card .card-title {
+                grid-column: 2;
+                grid-row: 1;
+                margin-bottom: 0.1rem;
+                font-size: 0.98rem;
+                line-height: 1.3;
+            }
+
+            .tool-card .card-desc {
+                grid-column: 2;
+                grid-row: 2;
+                display: -webkit-box;
+                margin-bottom: 0;
+                overflow: hidden;
+                font-size: 0.8rem;
+                line-height: 1.4;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 2;
+                line-clamp: 2;
+            }
+
+            /* The link's tap area covers the whole card. Its arrow stays as the visible cue. */
+            .tool-card .btn-launch,
+            .tool-card .btn-launch:hover {
+                grid-column: 3;
+                grid-row: 1 / -1;
+                align-self: center;
+                justify-self: center;
+                padding: 0;
+                font-size: 0;
+                color: var(--text-muted);
+                background: none;
+                box-shadow: none;
+            }
+
+            .tool-card .btn-launch::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+            }
+        }
+
+        /* Rotated phones: height is scarce, so lessons sit side by side and the nav bar shrinks.
+           The page title stays available to screen readers, and the Tools tab shows it on screen. */
+        @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+            .nav-inner {
+                height: 48px;
+            }
+
+            #view-tools header.hero {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                overflow: hidden;
+                clip-path: inset(50%);
+            }
+
+            #view-tools main.content {
+                padding-top: 0.6rem;
+                padding-bottom: 1.5rem;
+            }
+
+            #lessons-container {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                align-items: start;
+                gap: 0.75rem;
+            }
+
+            .lesson-group {
+                margin-bottom: 0;
+            }
+
+            .tool-card .card-desc {
+                -webkit-line-clamp: 1;
+                line-clamp: 1;
+            }
+
+            footer.site-footer {
+                padding: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1146,7 +1350,6 @@
                         if (matches) {
                             matchesCount++;
                             const clone = card.cloneNode(true);
-                            clone.style.display = 'flex';
 
                             // Show origin lesson badge on card in dedicated search results
                             const cardTop = clone.querySelector('.card-top');

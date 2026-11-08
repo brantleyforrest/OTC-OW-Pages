@@ -284,8 +284,9 @@
             .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 640px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
             .tool-hud { font-size: 0.8rem; min-height: 0; }
+            .tool-side > .col { display: flex; }
         }
     </style>
 </head>
