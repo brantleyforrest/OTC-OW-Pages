@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ground Track Visualizer | OTC OW</title>
+    <meta name="description" content="A split view of an orbit in 3D and its ground track on a world map. Adjust the six orbital elements to see how each one changes the path traced across Earth's surface.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <style>
+        :root {
+            --param-a: #ff8a3d;
+            --param-e: #34d399;
+            --param-i: #38bdf8;
+            --param-raan: #a3e635;
+            --param-argp: #f472b6;
+            --param-nu: #c4a1ff;
+            --descending: #bae6fd;
+            --track: #ffe08a;
+        }
+
+        /* Caption: below the view, so that nothing covers the drawing */
+        .tool-hud {
+            position: static;
+            max-width: none;
+            margin-top: 0.5rem;
+            padding: 0;
+            min-height: 2.7em;
+            background: none;
+            border: 0;
+            border-radius: 0;
+            font-size: 0.84rem;
+            line-height: 1.35;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .tool-hud b { font-weight: 600; color: #ffffff; }
+        .hud-note { color: #fbbf24; }
+
+        /* The split view. The box picks the arrangement from its own shape: side by side when
+           it is wide, and stacked when it is not. */
+        .tool-canvas-box { container-type: size; }
+
+        .split {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pane {
+            position: relative;
+            flex: 1 1 0;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .pane + .pane { border-top: 1px solid var(--border-subtle); }
+
+        @container (min-aspect-ratio: 3/2) {
+            .split { flex-direction: row; }
+
+            .pane + .pane {
+                flex: 0 0 auto;
+                height: 100%;
+                aspect-ratio: 2 / 1;
+                max-width: 64%;
+                border-top: 0;
+                border-left: 1px solid var(--border-subtle);
+            }
+        }
+
+        .pane-title {
+            position: absolute;
+            top: 0.4rem;
+            left: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            padding: 0 0.3rem;
+            border-radius: 3px;
+            background: rgba(6, 11, 20, 0.72);
+            font-size: 0.74rem;
+            font-weight: 600;
+            line-height: 1.5;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* On the map, the opposite corner keeps the title off the latitude labels. */
+        #map-pane .pane-title {
+            left: auto;
+            right: 0.5rem;
+            max-width: calc(100% - 1rem);
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .legend {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .legend i {
+            display: block;
+            width: 1rem;
+            height: 2px;
+            background: var(--track);
+        }
+
+        .legend.next i { opacity: 0.45; }
+
+        /* Each marked point differs in shape as well as color. */
+        .legend b {
+            display: block;
+            width: 0.55rem;
+            height: 0.55rem;
+            border-radius: 50%;
+            background: var(--param-argp);
+        }
+
+        .legend.apogee b {
+            border-radius: 1px;
+            transform: rotate(45deg);
+            background: var(--param-a);
+        }
+
+        .legend.ascending b,
+        .legend.descending b {
+            width: 0.65rem;
+            height: 0.58rem;
+            border-radius: 0;
+        }
+
+        .legend.ascending b {
+            background: var(--param-i);
+            clip-path: polygon(50% 0, 100% 100%, 0 100%);
+        }
+
+        .legend.descending b {
+            background: var(--descending);
+            clip-path: polygon(0 0, 100% 0, 50% 100%);
+        }
+
+        /* The legend stays on one line, so that it never covers the satellite. */
+        @container (max-width: 500px) {
+            .pane-title-text { display: none; }
+        }
+
+        @container (max-width: 420px) {
+            .legend.line { display: none; }
+        }
+
+        /* Labels on the map */
+        .tool-label.measure {
+            font-family: var(--font-mono);
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 0 0.25rem;
+            border-radius: 3px;
+            background: rgba(6, 11, 20, 0.72);
+        }
+
+        .tool-label.measure .val { color: #ffffff; }
+
+        /* Controls: one row */
+        .panel.controls { padding: 0.5rem 0.75rem; }
+
+        .ctl-track {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .ctl-track .segmented button { padding: 0.32rem 0.6rem; font-size: 0.78rem; }
+        .ctl-grow.off { opacity: 0.45; }
+
+        .ctl-preset {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .ctl-preset select {
+            padding: 0.34rem 0.5rem;
+            font-family: inherit;
+            font-size: 0.82rem;
+            color: var(--text-main);
+            background: var(--surface-hover);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+        }
+
+        .ctl-preset select:focus { outline: none; border-color: var(--accent-blue); }
+
+        /* The strips below the view. */
+        .tool-stage-col > .panel { flex-shrink: 0; }
+        .panel.elements { padding: 0.3rem 0.4rem; }
+        .panel.readouts { padding: 0.45rem 0.85rem; }
+
+        .param-list {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 0.1rem 0.3rem;
+        }
+
+        .param {
+            padding: 0.2rem 0.45rem 0.25rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .param:hover { background: rgba(255, 255, 255, 0.03); }
+        .param.selected { background: rgba(58, 130, 247, 0.16); }
+
+        .param[data-param="a"] { --row-color: var(--param-a); }
+        .param[data-param="e"] { --row-color: var(--param-e); }
+        .param[data-param="i"] { --row-color: var(--param-i); }
+        .param[data-param="raan"] { --row-color: var(--param-raan); }
+        .param[data-param="argp"] { --row-color: var(--param-argp); }
+        .param[data-param="nu"] { --row-color: var(--param-nu); }
+
+        .param-name {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 500;
+            line-height: 1.35;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .param-name .sym {
+            display: inline-block;
+            width: 1.15rem;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--row-color);
+        }
+
+        .param-input {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .param-input input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--row-color); }
+
+        .param-value {
+            display: flex;
+            align-items: center;
+            flex: 0 0 auto;
+        }
+
+        .param-value input[type="number"] {
+            width: 3.7rem;
+            padding: 0.1rem 0.2rem;
+            font-family: var(--font-mono);
+            font-size: 0.84rem;
+            text-align: right;
+            color: #ffffff;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .param-value input[type="number"]::-webkit-outer-spin-button,
+        .param-value input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .param-value input[type="number"]:hover { border-color: var(--border-subtle); }
+
+        .param-value input[type="number"]:focus {
+            outline: none;
+            background: #060b14;
+            border-color: var(--accent-blue);
+        }
+
+        .param-unit {
+            width: 1.15rem;
+            padding-left: 0.15rem;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            color: var(--text-muted);
+        }
+
+        /* The period calculation, in the same row as the readouts it replaces */
+        .stat-grid[hidden] { display: none; }
+        .eq-cell { grid-column: span 2; min-width: 0; }
+        .eq-cell .eq-name b { color: var(--text-main); }
+        .eq-cell .eq-sym { min-width: 0; }
+        .sym-phase { color: var(--param-a); }
+        .sym-node { color: var(--param-i); }
+
+        @media (min-width: 641px) {
+            .param-list, .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            #stats-period { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .eq-cell { grid-column: span 1; }
+        }
+
+        /* Large screens: no side column, so that the two views share the full width. Each
+           strip below them is a single row. */
+        @media (min-width: 1081px) and (min-height: 600px) {
+            .tool-layout { grid-template-columns: minmax(0, 1fr); }
+            .param-list, .stat-grid, #stats-period { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+            .eq-cell { grid-column: span 2; }
+        }
+
+        @media (max-width: 640px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+            .tool-hud { font-size: 0.8rem; min-height: 0; }
+            .param-list { grid-template-columns: minmax(0, 1fr); }
+            .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .eq-cell { grid-column: span 2; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Ground Track Visualizer</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../study-guides.html" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <div class="col tool-stage-col">
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view">
+                        <div class="split">
+                            <div class="pane" id="orbit-pane">
+                                <canvas id="scene" aria-label="A 3D view of Earth, the orbit, and the satellite, with the ground track drawn on Earth's surface."></canvas>
+                                <div class="pane-title">Orbit in space</div>
+                                <div class="tool-hint" id="view-hint">Drag to rotate. Scroll or pinch to zoom.</div>
+                            </div>
+                            <div class="pane" id="map-pane">
+                                <canvas id="map" aria-label="A world map showing the ground track, perigee, apogee, and both nodes along it, and the point directly below the satellite."></canvas>
+                                <div class="tool-labels" id="map-labels" aria-hidden="true"></div>
+                                <div class="pane-title" id="map-title">
+                                    <span class="pane-title-text">Ground track</span>
+                                    <span class="legend line"><i></i>Past</span>
+                                    <span class="legend line next"><i></i>Ahead</span>
+                                    <span class="legend"><b></b>Perigee</span>
+                                    <span class="legend apogee"><b></b>Apogee</span>
+                                    <span class="legend ascending"><b></b>Asc. node</span>
+                                    <span class="legend descending"><b></b>Desc. node</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tool-status" id="status" style="display: none;"></div>
+                    </div>
+                    <div class="tool-hud" id="hud" aria-live="polite"></div>
+                </div>
+
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play">Play</button>
+                            <button class="btn" id="reset-view">Reset View</button>
+                        </div>
+                        <label class="ctl-preset">Example orbit
+                            <select id="preset">
+                                <option value="iss">Space Station</option>
+                                <option value="gps">GPS</option>
+                                <option value="molniya">Molniya</option>
+                                <option value="geo">Geostationary</option>
+                                <option value="geoInclined">Inclined Geosynchronous</option>
+                                <option value="sso">Sun-Synchronous</option>
+                                <option value="" hidden>Custom</option>
+                            </select>
+                        </label>
+                        <div class="ctl-track">
+                            <span id="track-mode-label">Track</span>
+                            <div class="segmented" id="track-mode" role="group" aria-labelledby="track-mode-label">
+                                <button type="button" data-value="one" aria-pressed="false">One period</button>
+                                <button type="button" data-value="many" aria-pressed="true">Several orbits</button>
+                            </div>
+                        </div>
+                        <div class="ctl-grow" id="orbits-control">
+                            <div class="control-label">
+                                <label for="orbits">Past orbits shown</label>
+                                <span class="control-value" id="orbits-value">3</span>
+                            </div>
+                            <input type="range" id="orbits" min="1" max="16" step="1" value="3">
+                        </div>
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="speed">Animation speed</label>
+                                <span class="control-value" id="speed-value">Normal</span>
+                            </div>
+                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel elements">
+                    <div class="param-list">
+                        <div class="param" data-param="a">
+                            <label class="param-name" for="a-number"><span class="sym">a</span>Semi-major axis</label>
+                            <div class="param-input">
+                                <input type="range" id="a-range" min="6500" max="45000" step="50" aria-label="Semi-major axis slider">
+                                <span class="param-value"><input type="number" id="a-number" min="6500" max="45000" step="1"><span class="param-unit">km</span></span>
+                            </div>
+                        </div>
+
+                        <div class="param" data-param="e">
+                            <label class="param-name" for="e-number"><span class="sym">e</span>Eccentricity</label>
+                            <div class="param-input">
+                                <input type="range" id="e-range" min="0" max="0.85" step="0.01" aria-label="Eccentricity slider">
+                                <span class="param-value"><input type="number" id="e-number" min="0" max="0.85" step="0.001"><span class="param-unit"></span></span>
+                            </div>
+                        </div>
+
+                        <div class="param" data-param="i">
+                            <label class="param-name" for="i-number"><span class="sym">i</span>Inclination</label>
+                            <div class="param-input">
+                                <input type="range" id="i-range" min="0" max="180" step="0.5" aria-label="Inclination slider">
+                                <span class="param-value"><input type="number" id="i-number" min="0" max="180" step="0.1"><span class="param-unit">°</span></span>
+                            </div>
+                        </div>
+
+                        <div class="param" data-param="raan">
+                            <label class="param-name" for="raan-number"><span class="sym">Ω</span>RAAN</label>
+                            <div class="param-input">
+                                <input type="range" id="raan-range" min="0" max="359" step="1" aria-label="RAAN slider">
+                                <span class="param-value"><input type="number" id="raan-number" step="1"><span class="param-unit">°</span></span>
+                            </div>
+                        </div>
+
+                        <div class="param" data-param="argp">
+                            <label class="param-name" for="argp-number"><span class="sym">ω</span>Argument of perigee</label>
+                            <div class="param-input">
+                                <input type="range" id="argp-range" min="0" max="359" step="1" aria-label="Argument of perigee slider">
+                                <span class="param-value"><input type="number" id="argp-number" step="1"><span class="param-unit">°</span></span>
+                            </div>
+                        </div>
+
+                        <div class="param" data-param="nu">
+                            <label class="param-name" for="nu-number"><span class="sym">ν</span>True anomaly</label>
+                            <div class="param-input">
+                                <input type="range" id="nu-range" min="0" max="359" step="1" aria-label="True anomaly slider">
+                                <span class="param-value"><input type="number" id="nu-number" step="1"><span class="param-unit">°</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel readouts">
+                    <div class="stat-grid" id="stats-orbits">
+                        <div class="stat-item"><span class="stat-label">Period, T</span><span class="stat-value" id="val-period"></span></div>
+                        <div class="stat-item"><span class="stat-label">Phase differential, Δλ</span><span class="stat-value" id="val-shift"></span></div>
+                        <div class="stat-item"><span class="stat-label">Highest latitude reached</span><span class="stat-value" id="val-max-lat"></span></div>
+                        <div class="stat-item"><span class="stat-label">Satellite latitude</span><span class="stat-value" id="val-lat"></span></div>
+                        <div class="stat-item"><span class="stat-label">Satellite longitude</span><span class="stat-value" id="val-lon"></span></div>
+                        <div class="stat-item"><span class="stat-label">Satellite altitude</span><span class="stat-value" id="val-alt"></span></div>
+                    </div>
+                    <div class="stat-grid" id="stats-period" hidden>
+                        <div class="eq-cell">
+                            <div class="eq-head"><span class="eq-name"><b>Phase differential:</b> the gap between two crossings</span><span class="eq-result sym-phase" id="res-dl"></span></div>
+                            <div class="eq-work">
+                                <span class="eq-sym"><span class="sym-phase">Δλ</span> = <span class="sym-node">λ₁</span> − <span class="sym-node">λ₂</span></span>
+                                <span class="eq-val" id="work-dl"></span>
+                            </div>
+                        </div>
+                        <div class="eq-cell">
+                            <div class="eq-head"><span class="eq-name"><b>Period:</b> the gap divided by Earth’s turn rate</span><span class="eq-result" id="res-t"></span></div>
+                            <div class="eq-work">
+                                <span class="eq-sym">T = <span class="sym-phase">Δλ</span> ÷ ω<sub>⊕</sub></span>
+                                <span class="eq-val" id="work-t"></span>
+                            </div>
+                        </div>
+                        <div class="stat-item"><span class="stat-label">Time since first crossing</span><span class="stat-value" id="val-elapsed"></span></div>
+                        <div class="stat-item"><span class="stat-label">Satellite position</span><span class="stat-value" id="val-pos"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+    <script src="../assets/tool-kit.js"></script>
+    <script src="../assets/earth-land.js"></script>
+    <script src="../assets/earth-scene.js"></script>
+    <script src="ground-track.js"></script>
+</body>
+</html>
