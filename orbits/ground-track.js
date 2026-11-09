@@ -133,7 +133,6 @@
         theta: 0,              // Earth's rotation: the Prime Meridian's angle east of the vernal equinox (rad)
         pastOrbits: 3,
         onePeriod: false,      // Shows one orbit, from one ascending node to the next
-        thetaNode: 0,          // Earth's rotation at the start of the period shown (rad)
         activePreset: 'iss',
         presetCaption: false,
         selected: null,        // The element described in the caption
@@ -361,11 +360,6 @@
         return { start, elapsed };
     }
 
-    // Holds the period on show in place, with the satellite where it is now.
-    function anchorPeriod() {
-        state.thetaNode = state.theta - OMEGA_E * lastNode().elapsed;
-    }
-
     // Each sample is the unit vector, in Earth-fixed axes, toward the point below the satellite.
     // Samples are evenly spaced in eccentric anomaly, which keeps them close together near perigee
     // without a Kepler solve for each one. The current position is the sample at index trackNow.
@@ -386,7 +380,7 @@
         const M0 = E0 - e * Math.sin(E0);
 
         // One period runs from one ascending node to the next. When the satellite reaches the
-        // next node, the same period plays again, so Earth turns back to where it started.
+        // next node, the view moves on to the pass that starts there, and Earth keeps turning.
         let start = E0 - state.pastOrbits * TWO_PI;
         let end = E0 + TWO_PI;
         if (state.onePeriod) {
@@ -394,7 +388,6 @@
             start = node.start;
             end = start + TWO_PI;
             periodElapsed = node.elapsed;
-            state.theta = state.thetaNode + OMEGA_E * periodElapsed;
         }
 
         const groundPoint = (E, target, index) => {
@@ -1007,6 +1000,12 @@
         } else {
             state.activePreset = null;
             $('preset').value = '';
+            // In one period, the first crossing stays put while the orbit changes shape.
+            if (state.onePeriod) {
+                const thetaAtNode = state.theta - OMEGA_E * lastNode().elapsed;
+                state[name] = value;
+                state.theta = thetaAtNode + OMEGA_E * lastNode().elapsed;
+            }
         }
         state[name] = value;
         writeInputs(name);
@@ -1047,7 +1046,6 @@
             writeInputs(name);
         });
         state.theta = 0;
-        anchorPeriod();
         state.activePreset = key;
         $('preset').value = key;
         dirty = true;
@@ -1060,12 +1058,9 @@
         dirty = true;
     }
 
-    Kit.bindSegmented($('track-mode'), (mode) => {
+    const selectTrackMode = Kit.bindSegmented($('track-mode'), (mode) => {
         const one = mode === 'one';
-        if (one && !state.onePeriod) {
-            anchorPeriod();
-            faceNode();
-        }
+        if (one && !state.onePeriod) faceNode();
         state.onePeriod = one;
         $('orbits').disabled = one;
         $('orbits-control').classList.toggle('off', one);
@@ -1159,6 +1154,7 @@
     /* Start                                                              */
     /* ------------------------------------------------------------------ */
     applyPreset('iss');
+    selectTrackMode('one');
     setPlaying(state.playing);
     $('speed-value').textContent = SPEEDS[state.speed].label;
     statusEl.style.display = 'none';

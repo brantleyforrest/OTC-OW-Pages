@@ -430,16 +430,16 @@
                         <div class="ctl-track">
                             <span id="track-mode-label">Track</span>
                             <div class="segmented" id="track-mode" role="group" aria-labelledby="track-mode-label">
-                                <button type="button" data-value="one" aria-pressed="false">One period</button>
-                                <button type="button" data-value="many" aria-pressed="true">Several orbits</button>
+                                <button type="button" data-value="one" aria-pressed="true">One period</button>
+                                <button type="button" data-value="many" aria-pressed="false">Several orbits</button>
                             </div>
                         </div>
-                        <div class="ctl-grow" id="orbits-control">
+                        <div class="ctl-grow off" id="orbits-control">
                             <div class="control-label">
                                 <label for="orbits">Past orbits shown</label>
                                 <span class="control-value" id="orbits-value">3</span>
                             </div>
-                            <input type="range" id="orbits" min="1" max="16" step="1" value="3">
+                            <input type="range" id="orbits" min="1" max="16" step="1" value="3" disabled>
                         </div>
                         <div class="ctl-grow">
                             <div class="control-label">
@@ -504,7 +504,7 @@
                 </div>
 
                 <div class="panel readouts">
-                    <div class="stat-grid" id="stats-orbits">
+                    <div class="stat-grid" id="stats-orbits" hidden>
                         <div class="stat-item"><span class="stat-label">Period, T</span><span class="stat-value" id="val-period"></span></div>
                         <div class="stat-item"><span class="stat-label">Phase differential, Δλ</span><span class="stat-value" id="val-shift"></span></div>
                         <div class="stat-item"><span class="stat-label">Highest latitude reached</span><span class="stat-value" id="val-max-lat"></span></div>
@@ -512,7 +512,7 @@
                         <div class="stat-item"><span class="stat-label">Satellite longitude</span><span class="stat-value" id="val-lon"></span></div>
                         <div class="stat-item"><span class="stat-label">Satellite altitude</span><span class="stat-value" id="val-alt"></span></div>
                     </div>
-                    <div class="stat-grid" id="stats-period" hidden>
+                    <div class="stat-grid" id="stats-period">
                         <div class="eq-cell">
                             <div class="eq-head"><span class="eq-name"><b>Phase differential:</b> the gap between two crossings</span><span class="eq-result sym-phase" id="res-dl"></span></div>
                             <div class="eq-work">
