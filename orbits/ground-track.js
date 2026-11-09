@@ -771,7 +771,7 @@
         g.globalAlpha = 1;
     }
 
-    /* Map labels, used only for one period, where there are few enough to read */
+    /* Map labels. Each one names a single pass of its point, so that they stay few enough to read. */
     const mapLayer = new Kit.LabelLayer($('map-labels'));
     function mapLabel(symbol, color, options) {
         const label = mapLayer.add(`<b style="color:${color}">${symbol}</b><span class="val"></span>`, options);
@@ -781,12 +781,20 @@
     }
     const labelDelta = mapLabel('Δλ', COLORS.phase, { rank: 0 });
     labelDelta.center = true;
-    const labelFirst = mapLabel('λ₁', COLORS.node, { rank: 1 });
+    const labelFirst = mapLabel('Asc. node λ₁', COLORS.node, { rank: 1 });
+    let firstLabelWest = false;
     const labelNext = mapLabel('λ₂', COLORS.node, { rank: 1 });
     labelNext.spot = 3; // West of its point, so that the two crossings' labels stay apart
     const labelPerigee = mapLabel('Perigee', COLORS.perigee, { rank: 2, optional: true });
     const labelApogee = mapLabel('Apogee', COLORS.apogee, { rank: 2, optional: true });
+    const labelAscending = mapLabel('Asc. node', COLORS.node, { rank: 2, optional: true });
     const labelDescending = mapLabel('Desc. node', COLORS.descending, { rank: 2, optional: true });
+
+    // Names the most recent pass behind the satellite, the last one drawn at full strength.
+    function labelPass(label, set) {
+        const k = Math.max(set.past - 1, 0);
+        mapLayer.show(label, mapX(longitudeOf(set.points, k)), mapY(latitudeOf(set.points, k)));
+    }
 
     function placeMapLabels() {
         mapLayer.begin();
@@ -799,14 +807,22 @@
             mapLayer.show(labelDelta, mapX(wrapLongitude(first - Math.min(span, 360) / 2)), equator - 20);
             mapLayer.show(labelFirst, mapX(first), equator);
             mapLayer.show(labelNext, mapX(longitudeAt(trackEnd)), equator);
-            if (!isCircular()) {
-                mapLayer.show(labelPerigee, mapX(longitudeOf(perigees.points, 0)), mapY(latitudeOf(perigees.points, 0)));
-                mapLayer.show(labelApogee, mapX(longitudeOf(apogees.points, 0)), mapY(latitudeOf(apogees.points, 0)));
+
+            // λ₁'s label moves to the west side when it would cover a descending node just east.
+            const toDescending = mapX(longitudeOf(descents.points, 0)) - mapX(first);
+            const west = toDescending > 0 && toDescending < labelFirst.width + 24;
+            if (west !== firstLabelWest) {
+                firstLabelWest = west;
+                labelFirst.spot = west ? 3 : 0;
             }
-            if (!isEquatorial()) {
-                mapLayer.show(labelDescending, mapX(longitudeOf(descents.points, 0)), mapY(latitudeOf(descents.points, 0)));
-            }
+        } else if (!isEquatorial()) {
+            labelPass(labelAscending, ascents);
         }
+        if (!isCircular()) {
+            labelPass(labelPerigee, perigees);
+            labelPass(labelApogee, apogees);
+        }
+        if (!isEquatorial()) labelPass(labelDescending, descents);
         mapLayer.place(mapW, mapH, [Kit.overlayBox($('map-title'), mapPane)]);
     }
 
