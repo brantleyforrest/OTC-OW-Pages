@@ -57,6 +57,7 @@
     };
     const AHEAD_OPACITY = 0.45;
     const E_MAX = 0.85;           // Largest eccentricity offered
+    const CIRCULAR_E = 0.02;      // Below this, an orbit counts as circular: no perigee or apogee
     const EARTH_DEG_PER_HOUR = OMEGA_E * R2D * 3600;
 
     const POINTS_PER_ORBIT = 240; // Enough that the track looks smooth at the largest eccentricity
@@ -113,7 +114,7 @@
     const PERIOD_BODY = 'During one orbit Earth turns east beneath the satellite, so the next pass crosses the equator farther west. The orange slice is the part of Earth that turned past the orbit. Earth turns 15.04° each hour, so the ruler on the equator reads that slice as the period.';
     const CAPTIONS = {
         a: ['Semi-major axis (a): sets the period.', 'A longer period gives Earth more time to turn during each orbit, so the phase differential grows.'],
-        e: ['Eccentricity (e): stretches the track.', 'The satellite moves fastest at perigee and slowest at apogee, so the track stretches out near perigee and bunches up near apogee.'],
+        e: ['Eccentricity (e): stretches the track.', 'The satellite moves fastest at perigee and slowest at apogee, so the track stretches out near perigee and bunches up near apogee. Below 0.02 the orbit is nearly a circle, so neither is marked.'],
         i: ['Inclination (i): sets how far north and south the track reaches.', 'The track’s highest latitude equals i, or 180° − i when the orbit is retrograde.'],
         raan: ['Right Ascension of the Ascending Node (Ω, RAAN): slides the track.', 'Turning the orbit about Earth’s axis moves the whole track east or west without changing its shape.'],
         argp: ['Argument of perigee (ω): sets where perigee is.', 'It moves the fast and slow parts of the track along the orbit, and sets which hemisphere holds apogee.'],
@@ -345,7 +346,7 @@
         return (next + 360) % 360;
     }
 
-    const isCircular = () => state.e < 1e-4;
+    const isCircular = () => state.e < CIRCULAR_E;
     const isEquatorial = () => state.i < 0.05 || state.i > 179.95;
     const periodSeconds = () => TWO_PI / meanMotion(state.a);
 
@@ -894,6 +895,7 @@
             $('val-alt').textContent = `${formatNumber(r - R_E, 0)} km`;
         }
 
+        $('map-title').classList.toggle('circular', isCircular());
         updateCaption(a * (1 - e) - R_E);
     }
 
@@ -913,7 +915,6 @@
 
         const notes = [];
         if (hp < 0) notes.push('This orbit passes through Earth: its perigee is below the surface.');
-        if (isCircular()) notes.push('A circle has no closest or farthest point, so perigee and apogee are not marked.');
         if (isEquatorial()) {
             notes.push(state.onePeriod
                 ? 'At this inclination the orbit does not cross the equator, so λ₁ and λ₂ are where it would.'

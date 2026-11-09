@@ -148,6 +148,8 @@
             clip-path: polygon(0 0, 100% 0, 50% 100%);
         }
 
+        #map-title.circular .apsis { display: none; }
+
         /* The legend stays on one line, so that it never covers the satellite. */
         @container (max-width: 500px) {
             .pane-title-text { display: none; }
@@ -398,8 +400,8 @@
                                     <span class="pane-title-text">Ground track</span>
                                     <span class="legend line"><i></i>Past</span>
                                     <span class="legend line next"><i></i>Ahead</span>
-                                    <span class="legend"><b></b>Perigee</span>
-                                    <span class="legend apogee"><b></b>Apogee</span>
+                                    <span class="legend apsis"><b></b>Perigee</span>
+                                    <span class="legend apsis apogee"><b></b>Apogee</span>
                                     <span class="legend ascending"><b></b>Asc. node</span>
                                     <span class="legend descending"><b></b>Desc. node</span>
                                 </div>
