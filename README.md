@@ -25,12 +25,15 @@ The web portal is established at `index.html`. The following tools are available
 * **[Solar vs. Sidereal Day Visualizer](time/solar-sidereal-day.html):** A view from above the North Pole showing why a solar day is longer than a sidereal day.
 * **[Orbital Equation Explorer](orbits/orbit-equation.html):** A 3D view of an orbit around Earth, with each parameter of the orbit equation set by hand or animated through its range.
 * **[Ground Track Visualizer](orbits/ground-track.html):** A split view of an orbit in 3D and its ground track on a world map.
+* **[Sun-Synchronous Orbit](orbits/sun-synchronous.html):** A 3D view of a year of orbit motion, comparing a sun-synchronous orbit with a polar orbit.
+
+The Study tab links to **[Test 1 Practice](practice/test-1-practice.html)**, which has generated practice problems with answer checking and a step-by-step walkthrough that builds each orbit in 3D.
 
 ---
 
 ## Technical Architecture
 
-* **Framework-Free:** Built using clean, native client-side web technologies (HTML5, responsive CSS, WebGL/Canvas, and vanilla JavaScript). The 3D tool loads Three.js from a CDN, so it needs an internet connection.
+* **Framework-Free:** Built using clean, native client-side web technologies (HTML5, responsive CSS, WebGL/Canvas, and vanilla JavaScript). The 3D tool loads Three.js from a CDN, so it needs an internet connection. Test 1 Practice also loads KaTeX from a CDN to render its math.
 * **Fast & Self-Contained:** Runs entirely in any standard modern web browser without requiring node build pipelines, backend servers, or external logins.
 * **Local Execution:** To run locally, simply clone the repository and open `index.html` in a web browser:
   ```bash

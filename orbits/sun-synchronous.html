@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sun-Synchronous Orbit | OTC OW</title>
+    <meta name="description" content="A 3D view of a sun-synchronous orbit turning with the Sun over a year, compared with a polar orbit that stays fixed in space.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <style>
+        :root {
+            --sso: #e3b85a;
+            --polar: #60a5fa;
+        }
+
+        .key-sso { color: var(--sso); font-weight: 600; }
+        .key-polar { color: var(--polar); font-weight: 600; }
+        .stat-value.sso { color: var(--sso); }
+        .stat-value.polar { color: var(--polar); }
+        .term + .term { margin-top: 0.3rem; }
+        .term b { font-weight: 600; color: var(--text-main); }
+
+        @media (min-width: 1300px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 40rem; }
+            .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Sun-Synchronous Orbit</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../study-guides.html" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <div class="col tool-stage-col">
+                <p class="tool-intro">One year of orbit-plane motion. The sun-synchronous orbit keeps the same angle to the Sun, while a polar orbit stays fixed in space.</p>
+
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view">
+                        <canvas id="scene" aria-label="Earth with the Sun circling once a year. A gold sun-synchronous orbit turns with the Sun, and a blue polar orbit stays fixed in space."></canvas>
+                        <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                        <div class="tool-hint" id="view-hint" style="display: none;">Drag to rotate the view. Scroll or pinch to zoom.</div>
+                        <div class="tool-status" id="status" style="display: none;"></div>
+                    </div>
+                    <div class="tool-hud" id="hud"></div>
+                </div>
+
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play">Pause</button>
+                            <button class="btn" id="restart">Restart</button>
+                            <button class="btn" id="reset-view">Reset View</button>
+                        </div>
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="speed">Speed</label>
+                                <span class="control-value" id="speed-value"></span>
+                            </div>
+                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                        </div>
+                    </div>
+                    <div class="ctl-row">
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="altitude">Altitude</label>
+                                <span class="control-value" id="altitude-value"></span>
+                            </div>
+                            <input type="range" id="altitude" min="300" max="2000" step="50" value="700">
+                        </div>
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="show-polar" checked>Polar Orbit</label>
+                            <label class="check"><input type="checkbox" id="show-labels" checked>Labels</label>
+                        </div>
+                    </div>
+                    <div class="ctl-row">
+                        <div class="ctl-grow">
+                            <div class="panel-title" style="margin-bottom: 0.2rem;">Local Time at the Node</div>
+                            <div class="segmented" id="node-time" role="group" aria-label="Choose the local time at the ascending node">
+                                <button data-value="dawn" aria-pressed="true">Dawn-Dusk</button>
+                                <button data-value="morning" aria-pressed="false">Morning</button>
+                                <button data-value="afternoon" aria-pressed="false">Afternoon</button>
+                            </div>
+                        </div>
+                        <div class="ctl-grow">
+                            <div class="panel-title" style="margin-bottom: 0.2rem;">View</div>
+                            <div class="segmented" id="frame" role="group" aria-label="Choose what the camera follows">
+                                <button data-value="inertial" aria-pressed="true">Fixed Stars</button>
+                                <button data-value="sun" aria-pressed="false">Follow Sun</button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="ctl-caption" id="node-time-caption"></p>
+                </div>
+            </div>
+
+            <aside class="tool-side">
+                <div class="col">
+                    <div class="panel accent">
+                        <div class="panel-title">What to Notice</div>
+                        <p class="panel-text">Earth's equatorial bulge slowly turns a tilted orbit's plane. Just past 90° of inclination, that turn is eastward at about 1° per day, the same rate the Sun appears to move. The orbit then keeps the same local time all year.</p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Live Values</div>
+                        <div class="stat-grid">
+                            <div class="stat-item"><span class="stat-label">Date</span><span class="stat-value" id="date">Mar 20</span></div>
+                            <div class="stat-item"><span class="stat-label">Sun right ascension</span><span class="stat-value" id="sun-ra">0.0°</span></div>
+                            <div class="stat-item"><span class="stat-label">Sun-synchronous RAAN</span><span class="stat-value sso" id="sso-raan">0.0°</span></div>
+                            <div class="stat-item"><span class="stat-label">Polar RAAN</span><span class="stat-value polar" id="polar-raan">0.0°</span></div>
+                            <div class="stat-item"><span class="stat-label">Sun-synchronous node time</span><span class="stat-value sso" id="sso-time">18:00</span></div>
+                            <div class="stat-item"><span class="stat-label">Polar node time</span><span class="stat-value polar" id="polar-time">18:00</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="panel eq-panel">
+                        <div class="panel-title">Finding the Inclination</div>
+                        <div class="eq-list">
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Node drift needed</b></span><span class="eq-result" id="eq-rate"></span></div>
+                                <div class="eq-work"><span>Ω̇ = 360° / 365.2422 days</span></div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Mean motion</b></span><span class="eq-result" id="eq-n"></span></div>
+                                <div class="eq-work"><span class="eq-sym">n = √(μ / a³)</span><span class="eq-val" id="eq-a"></span></div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Required inclination</b></span><span class="eq-result" id="eq-i"></span></div>
+                                <div class="eq-work"><span>cos i = −Ω̇ / (1.5 J₂ n (Rₑ/a)²)</span><span class="eq-val" id="eq-cos"></span></div>
+                            </div>
+                        </div>
+                        <p class="eq-constants">J₂ = 1.0826 × 10⁻³, Rₑ = 6,378 km, μ = 398,600 km³/s². Circular orbit.</p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Key Terms</div>
+                        <p class="panel-text muted term"><b>RAAN (Ω):</b> the direction of the ascending node, measured along the equator from a fixed point in space.</p>
+                        <p class="panel-text muted term"><b>Node time:</b> the local solar time on the ground below the ascending node.</p>
+                        <p class="panel-text muted term"><b>Scale:</b> the orbit is drawn larger than scale, the satellites and Earth's spin are slowed, and the Sun is at its mean position on the equator.</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+    </main>
+
+
+    <script src="../assets/tool-kit.js"></script>
+    <script src="../assets/earth-land.js"></script>
+    <script src="../assets/earth-scene.js"></script>
+    <script src="sun-synchronous.js"></script>
+</body>
+</html>

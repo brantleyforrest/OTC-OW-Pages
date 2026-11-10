@@ -65,6 +65,7 @@ Upright phones match `(max-width: 640px) and (orientation: portrait)`. Rotated p
 - **Do not set a full-height minimum on each side column.** Stacked columns then add blank space. `.tool-side` already has the minimum height.
 - **Keep text short.** These tools build intuition. Give the idea, and leave fine detail to the lesson. Shorten text rather than hiding it in tabs or a scrolling box.
 - **Respect the page's fixed height.** Controls should stay compact, because each line they add takes height from the view.
+- **Write division with a slash.** Use `/`, never `÷`, on every page and in every document.
 
 ## Before You Finish
 

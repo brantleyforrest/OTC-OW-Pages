@@ -218,6 +218,8 @@
             width: 100%;
         }
 
+        .portal-card + .portal-card { margin-top: 1.25rem; }
+
         .portal-card::before {
             content: '';
             position: absolute;
@@ -684,8 +686,8 @@
             white-space: nowrap;
         }
 
-        .tool-card .btn-launch.disabled,
-        .tool-card .btn-launch.disabled:hover {
+        .btn-launch.disabled,
+        .btn-launch.disabled:hover {
             background: none;
             border: 1px solid var(--border-subtle);
             box-shadow: none;
@@ -1119,6 +1121,20 @@
                         <a href="orbits/ground-track.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                     </div>
 
+                    <div class="tool-card" data-tags="sun synchronous sso j2 nodal precession node drift raan ltan local time ascending node dawn dusk polar inclination altitude sun 3d orbit">
+                        <div class="card-top">
+                            <div class="card-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="4"></circle>
+                                    <ellipse cx="12" cy="12" rx="4" ry="10.5" transform="rotate(35 12 12)"></ellipse>
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 class="card-title">Sun-Synchronous Orbit</h2>
+                        <p class="card-desc">A 3D view of a year of orbit motion. Watch a sun-synchronous orbit turn with the Sun while a polar orbit stays fixed in space, and see how altitude sets the required inclination.</p>
+                        <a href="orbits/sun-synchronous.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                    </div>
+
                     <div class="tool-card" data-tags="orbit equation two-body 2-body kepler ellipse eccentricity semi-major axis true anomaly perigee apogee 3d inertial">
                         <div class="card-top">
                             <div class="card-icon">
@@ -1174,6 +1190,24 @@
         </header>
 
         <main class="content">
+            <div class="portal-card">
+                <div class="portal-card-icon gold">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                </div>
+
+                <h2>Test 1 Practice</h2>
+                <p class="desc">
+                    Practice mode builds each orbit in 3D as it walks through the steps. Test mode accepts answers only, then shows the solution.
+                </p>
+
+                <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
+                    <span class="btn-launch disabled" aria-disabled="true">Work in Progress</span>
+                </div>
+            </div>
+
             <div class="portal-card">
                 <div class="portal-card-icon gold">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

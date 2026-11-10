@@ -899,7 +899,7 @@
             $('res-dl').textContent = `${shift.toFixed(1)}° W`;
             $('work-dl').textContent = `= ${signed(first)} − ${subtrahend}${fullTurns ? ` + ${fullTurns * 360}°` : ''}`;
             $('res-t').textContent = formatPeriod(period);
-            $('work-t').textContent = `= ${shift.toFixed(1)}° ÷ ${EARTH_DEG_PER_HOUR.toFixed(2)}°/h = ${(period / 3600).toFixed(2)} h`;
+            $('work-t').textContent = `= ${shift.toFixed(1)}° / (${EARTH_DEG_PER_HOUR.toFixed(2)}°/h) = ${(period / 3600).toFixed(2)} h`;
             $('val-elapsed').textContent = `${(periodElapsed / 3600).toFixed(2)} h`;
             $('val-pos').textContent = `${lat}, ${lon}`;
         } else {
