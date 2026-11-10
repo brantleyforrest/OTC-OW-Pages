@@ -1080,7 +1080,10 @@
     function updateStepButtons() {
         const n = stepList().length;
         btnBack.disabled = state.step <= 0;
-        btnNext.disabled = state.step >= n && !state.anim;
+        // On the last step, Next becomes Done and greys out.
+        const last = state.step >= n;
+        btnNext.disabled = last && !state.anim;
+        btnNext.textContent = last ? 'Done' : 'Next';
     }
 
     // Slider changes are applied once per frame, because the equations are slow to redraw.
