@@ -103,7 +103,7 @@
     const CAPTIONS = {
         a: ['Semi-major axis (a): the orbit’s size.', 'Half the orbit’s longest width, shown by the orange bar from the orbit’s center to apogee, its farthest point from Earth. It sets the orbit’s energy and period. Range: a > 6,378 km.'],
         e: ['Eccentricity (e): the orbit’s shape.', 'How stretched the orbit is, from 0 (a circle) toward 1. It equals the green bar, the distance from the orbit’s center to Earth’s center, divided by a. Range: 0 ≤ e < 1.'],
-        i: ['Inclination (i): the orbit’s tilt.', 'The angle between the orbital plane (gold) and the equatorial plane (blue), shown from the equator up to the orbit’s northernmost point. Below 90° the satellite moves eastward (prograde), at 90° over the poles (polar), and above 90° westward (retrograde). Range: 0° ≤ i ≤ 180°.'],
+        i: ['Inclination (i): the orbit’s tilt.', 'The angle from north (K̂) to the angular momentum vector (ĥ), which stands perpendicular to the orbital plane. It is also the tilt between the orbital plane (gold) and the equatorial plane (blue). Below 90° the satellite moves eastward (prograde), at 90° over the poles (polar), and above 90° westward (retrograde). Range: 0° ≤ i ≤ 180°.'],
         raan: ['Right Ascension of the Ascending Node (Ω, RAAN): the orbit’s twist.', 'The angle east along the equator from the vernal equinox (Î), a fixed direction in space, to the ascending node, where the satellite crosses the equator heading north. Range: 0° ≤ Ω < 360°.'],
         argp: ['Argument of perigee (ω): perigee’s location.', 'The angle in the orbital plane, in the direction of motion, from the ascending node to perigee, the orbit’s closest point to Earth. Range: 0° ≤ ω < 360°.'],
         nu: ['True anomaly (ν): the satellite’s location.', 'The angle in the direction of motion from perigee to the satellite. It is the only element that changes over time. Range: 0° ≤ ν < 360°.']
@@ -257,10 +257,10 @@
        arrowheads, and dim until an element uses them */
     const AXIS_CONE = new THREE.ConeGeometry(0.5, 1.6, 12);
     const AXIS_SHAFT = new THREE.CylinderGeometry(1, 1, 1, 8);
-    function createAxis(dir) {
+    function createAxis(dir, color = COLORS.eci) {
         const group = new THREE.Group();
         group.quaternion.setFromUnitVectors(Y_AXIS, dir);
-        const mat = new THREE.MeshBasicMaterial({ color: COLORS.eci, transparent: true });
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true });
         const shaft = new THREE.Mesh(AXIS_SHAFT, mat);
         const head = new THREE.Mesh(AXIS_CONE, mat);
         group.add(shaft, head);
@@ -282,6 +282,9 @@
     }
     const iAxis = createAxis(X_AXIS);
     const kAxis = createAxis(Z_AXIS);
+    // The angular momentum vector h, perpendicular to the orbital plane. It is drawn only while
+    // inclination is shown, because inclination is measured from K to h.
+    const hAxis = createAxis(Z_AXIS, COLORS.orbit);
 
     /* Equatorial plane: a faint disk and its rim */
     const eqGroup = new THREE.Group();
@@ -347,7 +350,6 @@
     const perigeeMarker = marker(COLORS.argp);
     const apogeeMarker = marker(COLORS.a);
     const centerMarker = marker(0x94a3b8);
-    const apexMarker = marker(COLORS.i);
     const satMarker = marker(0xffffff);
 
     /* Angles: a band that follows its path, with an arrowhead on the point it measures to, plus a
@@ -384,9 +386,6 @@
         const tip = ghosted(CONE, color, { ghost: 0.35 });
         return { bandGeo: band.userData.parts[0].geometry, band, wedge, tip };
     }
-    // The two sides of the inclination angle, drawn from the node
-    const incLegA = segmentLine(COLORS.i, 0.9);
-    const incLegB = segmentLine(COLORS.i, 0.9);
     // The orbit's longest width, from perigee to apogee
     const majorAxis = segmentLine(COLORS.a, 0.4);
     const arcRAAN = createArc(COLORS.raan);
@@ -419,6 +418,8 @@
     labelI.el.classList.add('axis');
     const labelK = wordLabel(`<b>K̂</b>`, { rank: 1 });
     labelK.el.classList.add('axis');
+    const labelH = wordLabel(`<b style="color:${COLORS.orbit}">ĥ</b>`, { rank: 1 });
+    labelH.el.classList.add('axis');
     const labelSat = wordLabel('Satellite', { rank: 1 });
     const labelNode = wordLabel('Ascending node', { rank: 2 });
     const labelPerigee = wordLabel('Perigee', { rank: 2 });
@@ -479,7 +480,7 @@
         sat: new THREE.Vector3(), orbitCenter: new THREE.Vector3(),
         a: new THREE.Vector3(), e: new THREE.Vector3(), i: new THREE.Vector3(),
         raan: new THREE.Vector3(), argp: new THREE.Vector3(), nu: new THREE.Vector3(),
-        apex: new THREE.Vector3()
+        H: new THREE.Vector3()
     };
 
     /* ------------------------------------------------------------------ */
@@ -535,8 +536,6 @@
     const tmpA = new THREE.Vector3();
     const tmpB = new THREE.Vector3();
     const tmpInEast = new THREE.Vector3();
-    const tmpInPlane = new THREE.Vector3();
-    const tmpApex = new THREE.Vector3();
 
     function rebuildOrbitGeometry(P, Q, p, e) {
         orbitShape.P.copy(P);
@@ -629,7 +628,7 @@
             node: has('raan') || has('argp'),
             perigeeSpoke: has('argp') || has('nu'),
             rLine: has('nu'),
-            incLegs: has('i')
+            hVector: has('i')
         };
     }
 
@@ -689,6 +688,13 @@
         anchors.I.set(iLen, 0, 0);
         anchors.K.set(0, 0, kLen);
 
+        // The angular momentum vector, as long as K, pointing along W
+        hAxis.visible = show.hVector;
+        hAxis.quaternion.setFromUnitVectors(Y_AXIS, W);
+        setAxis(hAxis, kLen, sz);
+        setAxisOpacity(hAxis, 1);
+        anchors.H.copy(W).multiplyScalar(kLen);
+
         // The ascending node lies where the orbit itself crosses the equator heading north.
         const rNode = p / (1 + e * Math.cos(state.argp * D2R));
         anchors.node.copy(n).multiplyScalar(rNode);
@@ -736,26 +742,12 @@
         rLine.visible = show.rLine && state.showFill;
         setSegment(rLine, ORIGIN, anchors.sat);
 
-        // Inclination: measured at Earth's center, from the equator up to the orbit's highest
-        // point, which lies a quarter turn past the node. The arc ends on the orbit itself, as in
-        // the usual textbook figure. Its sides are a line in the equatorial plane and a line to
-        // that highest point.
+        // Inclination: measured at Earth's center, from K (north) to the angular momentum vector
+        // h. The two lie in a plane whose normal is the line of nodes n, and the arc turns about n
+        // from K toward h. It is drawn well inside the arrow tips so that both arrows stay clear.
         tmpInEast.set(-n.y, n.x, 0);
         const incRad = state.i * D2R;
-        tmpApex.copy(tmpInEast).multiplyScalar(Math.cos(incRad)).addScaledVector(Z_AXIS, Math.sin(incRad));
-        const rApex = p / (1 + e * Math.sin(state.argp * D2R));
-        anchors.apex.copy(tmpApex).multiplyScalar(rApex);
-        apexMarker.visible = show.incLegs;
-        apexMarker.position.copy(anchors.apex);
-        apexMarker.scale.setScalar(0.4 * sz);
-        // The line up to the orbit's highest point goes with the angle fill. The line along the
-        // equator stays, because it is where the arc starts.
-        incLegA.visible = show.incLegs;
-        incLegB.visible = show.incLegs && state.showFill;
-        if (show.incLegs) {
-            setSegment(incLegA, ORIGIN, tmpA.copy(tmpInEast).multiplyScalar(rApex));
-            setSegment(incLegB, ORIGIN, anchors.apex);
-        }
+        const incRadius = kLen * 0.6;
 
         // Angles
         // Each arc runs along the path it measures along, and ends on the point it measures to:
@@ -768,8 +760,8 @@
         const raanRad = state.raan * D2R, argpRad = state.argp * D2R;
         drawArc(arcRAAN, anchors.raan, (t, out) => out.set(Math.cos(raanRad * t) * rNode, Math.sin(raanRad * t) * rNode, 0),
             Z_AXIS, raanRad, sz, has('raan'), bold('raan'));
-        drawArc(arcInc, anchors.i, (t, out) => out.copy(tmpInEast).multiplyScalar(Math.cos(incRad * t) * rApex).addScaledVector(Z_AXIS, Math.sin(incRad * t) * rApex),
-            tmpInPlane.crossVectors(tmpInEast, Z_AXIS).normalize(), incRad, sz, has('i'), bold('i'));
+        drawArc(arcInc, anchors.i, (t, out) => out.copy(Z_AXIS).multiplyScalar(Math.cos(incRad * t) * incRadius).addScaledVector(tmpInEast, -Math.sin(incRad * t) * incRadius),
+            n, incRad, sz, has('i'), bold('i'));
         drawArc(arcArgP, anchors.argp, (t, out) => orbitPoint(-argpRad * (1 - t), out), W, argpRad, sz, has('argp'), bold('argp'));
         drawArc(arcNu, anchors.nu, (t, out) => orbitPoint(nuRad * t, out), W, nuRad, sz, has('nu'), bold('nu'));
 
@@ -944,6 +936,7 @@
     // Places an axis name just past the tip of its arrow, in the direction the arrow points on
     // screen, whichever way the view is turned.
     const tipScreen = new THREE.Vector3();
+    const tmpDirH = new THREE.Vector3();
     function showAxisName(lbl, tip, direction) {
         lbl.center = true;
         lbl.cover = coverRadius(tip);
@@ -1022,6 +1015,7 @@
 
             showAxisName(labelI, anchors.I, X_AXIS);
             showAxisName(labelK, anchors.K, Z_AXIS);
+            if (show.hVector) showAxisName(labelH, anchors.H, tmpDirH.copy(anchors.H).normalize());
             if (shown.size === 0 || shown.has('nu')) showWord(labelSat, anchors.sat);
             if (show.node) showWord(labelNode, anchors.node);
             if (show.perigee) showWord(labelPerigee, anchors.perigee);
