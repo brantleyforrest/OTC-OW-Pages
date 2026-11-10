@@ -1,6 +1,8 @@
 // The 3D view for R-V vector problems. It starts with only Earth, the reference axes, and the
 // given vectors. Each walkthrough step animates in what that step finds, moves the camera to
 // frame it, and dims what came before. The orbit itself is drawn once its shape is known.
+// With the moveSatellite option, the satellite also moves along with the steps: it flies the
+// orbit once as the orbit is drawn, and travels the angles that end at perigee and at itself.
 (function (global) {
     'use strict';
 
@@ -16,6 +18,7 @@
     const FADE_TIME = 0.3;      // Time constant for brightening and dimming, in seconds
     const UNDO_SECONDS = 0.4;   // Going back to an earlier step removes a part this quickly
     const DIMMED = 0.3;
+    const LAP_SECONDS = 4.2;        // With moveSatellite, one trip around the orbit takes this long
 
     // A part appears at its `from` stage and takes `seconds` to build, starting after the part
     // named by `after` has finished. It is bright at its `focus` stages, `dimmed` at the others,
@@ -58,7 +61,9 @@
         }
     }
 
-    function create(THREE, dom, constants) {
+    function create(THREE, dom, constants, options = {}) {
+        const Motion = global.SatelliteMotion;
+        const moving = Boolean(options.moveSatellite && Motion);
         const R_E = constants.R_EARTH;
         const D2R = Math.PI / 180;
         const R2D = 180 / Math.PI;
@@ -281,8 +286,9 @@
 
         // Draws an angle or a stretch of the orbit from its start, with a glow while it is in
         // focus. The tubes are rebuilt only when the path or the zoom changes.
-        function drawArc(arc, part, key, pointAt, sz, anchor) {
-            const k = smooth(part.grow);
+        // `drawn`, if given, is how much of the path to draw, in place of how far the part has built.
+        function drawArc(arc, part, key, pointAt, sz, anchor, drawn = null) {
+            const k = drawn === null ? smooth(part.grow) : (part.on ? drawn : 0);
             const shown = k > 0.002 && part.level > 0.01;
             arc.tube.visible = shown;
             arc.glow.visible = shown;
@@ -430,6 +436,9 @@
         let viewW = 1, viewH = 1;
         let flight = null;      // The camera move in progress
         let manual = false;     // True once the reader has turned or zoomed the view in this step
+        let motion = null;      // With moveSatellite: where the satellite is on its orbit
+        let legStart = 0;       // The tau where the current step's travel begins
+        const satPoint = new THREE.Vector3();
         const camView = { az: 25, el: 22, zoom: 1, x: 0, y: 0, z: 0 };
         const CAMERA_KEYS = Object.keys(camView);
 
@@ -519,6 +528,16 @@
             const thetaI = Math.atan2(X_AXIS.dot(Q), X_AXIS.dot(P));
             data.defaultPoint = n ? data.nodePoint : data.orbitPoint(thetaI, new THREE.Vector3());
             data.aAnchor =data.center.clone().lerp(data.barEnd, 0.62);
+
+            // The satellite's place on the orbit is timed in orbits, with 0 where the problem puts
+            // it. Kepler's equation turns time into the angle from perigee.
+            data.meanSat = Motion ? Motion.meanFromTrue(thetaSat, e) : 0;
+            data.angleAt = (tau) => Motion.trueFromMean(data.meanSat + TWO_PI * tau, e);
+            // The tau nearest `near` where the satellite is at angle theta from perigee
+            data.tauAt = (theta, near) => {
+                const base = (Motion.meanFromTrue(theta, e) - data.meanSat) / TWO_PI;
+                return base + Math.round(near - base);
+            };
             data.wholeOrbit = sampleOrbit(0, TWO_PI, 48);
 
             // The orbit is drawn starting from the satellite, in the direction of travel.
@@ -556,6 +575,10 @@
                 part.grow = PARTS[name].from === 'given' ? 1 : 0;
             }
             applyStage();
+            if (moving) {
+                motion = Motion.create(LAP_SECONDS);
+                motion.reset(0);
+            }
             for (const [, part] of partEntries) part.level = part.goalLevel;
             Object.assign(camView, stageGoal('given'));
             tubeKey = '';
@@ -576,6 +599,50 @@
             }
         }
 
+        // Where the satellite goes at each step. It rests where the problem puts it, except while
+        // a step follows it along the orbit.
+        function planMotion() {
+            const d = data;
+            const S = d.S;
+            const tau = motion.tau;
+            const home = Math.round(tau);
+            const afterDelay = { wait: () => stageClock >= BUILD_DELAY };
+            const travel = (from, to) => {
+                legStart = from;
+                motion.plan([{ to: from }, afterDelay, { to }]);
+            };
+            const turn = (x) => x - Math.floor(x);
+            switch (stage) {
+                case 'e':
+                    // Once around, drawing the orbit behind it
+                    return travel(home, home + 1);
+                case 'argp': {
+                    // From the ascending node (or +I) forward to perigee
+                    if (!parts.arcArgp.on) break;
+                    const start = d.tauAt(-d.argp, tau);
+                    return travel(start, start + turn((Motion.meanFromTrue(0, d.e) - Motion.meanFromTrue(-d.argp, d.e)) / TWO_PI));
+                }
+                case 'nu': {
+                    // From perigee forward to where the problem puts the satellite
+                    if (!parts.arcNu.on) break;
+                    const start = d.tauAt(0, tau);
+                    return travel(start, start + turn(d.meanSat / TWO_PI));
+                }
+                default:
+                    break;
+            }
+            motion.plan([{ to: home }]);
+        }
+
+        // How much of a path to draw while the satellite travels it: the angle the satellite has
+        // covered, out of the path's whole angle.
+        function drawnTo(name, sweep, curve) {
+            if (!moving || stage !== name || !curve) return null;
+            const covered = data.angleAt(motion.tau) - data.angleAt(legStart);
+            const t = motion.tau <= legStart ? 0 : Math.max(0, Math.min(1, covered / sweep));
+            return Motion.lengthFraction(curve, t);
+        }
+
         function flyTo(goal, seconds) {
             const from = { ...camView };
             flight = { from, to: { ...goal, az: nearestAngle(from.az, goal.az) }, clock: 0, seconds };
@@ -589,6 +656,7 @@
             }
             if (flight) Object.assign(camView, flight.to);
             flight = null;
+            if (motion) motion.finish();
             dirty = true;
         }
 
@@ -598,6 +666,7 @@
             manual = false;
             if (!data) return;
             applyStage();
+            if (moving) planMotion();
             flyTo(stageGoal(stage), CAMERA_SECONDS);
             if (Kit.prefersReducedMotion()) finishNow();
         }
@@ -625,6 +694,7 @@
                     dirty = true;
                 }
             }
+            if (motion && motion.advance(seconds, Kit.prefersReducedMotion())) dirty = true;
             if (flight) {
                 flight.clock += seconds;
                 const k = smooth(Math.min(1, flight.clock / flight.seconds));
@@ -760,7 +830,8 @@
         function updateOrbit(sz, zoomKey) {
             const d = data;
             const part = parts.orbit;
-            const k = smooth(part.grow);
+            const follow = drawnTo('e', TWO_PI, d.orbitCurve);
+            const k = follow === null ? smooth(part.grow) : follow;
             const shown = k > 0.001 && part.level > 0.01;
             orbitTube.visible = shown;
             orbitFan.mesh.visible = shown;
@@ -777,7 +848,8 @@
             setOpacity(orbitTube, part.level);
             orbitFan.geometry.setDrawRange(0, 3 * drawn);
             orbitFan.fill.opacity = 0.11 * part.level;
-            if (k < 1) placeMarker(markerPen, 1, d.orbitCurve.getPointAt(k, tmp), 0.42 * sz);
+            // A moving satellite draws the orbit itself.
+            if (k < 1 && follow === null) placeMarker(markerPen, 1, d.orbitCurve.getPointAt(k, tmp), 0.42 * sz);
         }
 
         // Sweeps the wedge open from +I to the ascending node as the part builds.
@@ -816,7 +888,7 @@
             placeArrow(axisK, parts.axisK, ORIGIN, d.kTip, sz, 0.85);
             placeArrow(arrowR, parts.r, ORIGIN, d.r, sz, 1.2);
             placeArrow(arrowV, parts.v, d.r, d.vTip, sz, 1.2);
-            placeMarker(markerSat, 1, d.r, 0.55 * sz);
+            placeMarker(markerSat, 1, motion ? d.orbitPoint(d.angleAt(motion.tau), satPoint) : d.r, 0.55 * sz);
 
             // A square corner where the two vectors meet
             const markSize = 2.6 * sz;
@@ -854,9 +926,11 @@
                 .addScaledVector(sideways, Math.sin(iRad * t) * radial), sz, anchors.i);
 
             updateRaanWedge(sz);
-            drawArc(arcArgp, parts.arcArgp, arcKey('argp'), (t, out) => d.orbitPoint(-d.argp * (1 - t), out), sz, anchors.argp);
+            drawArc(arcArgp, parts.arcArgp, arcKey('argp'), (t, out) => d.orbitPoint(-d.argp * (1 - t), out), sz, anchors.argp,
+                drawnTo('argp', d.argp, arcArgp.curve));
             const nuRad = S.nu * D2R;
-            drawArc(arcNu, parts.arcNu, arcKey('nu'), (t, out) => d.orbitPoint(nuRad * t, out), sz, anchors.nu);
+            drawArc(arcNu, parts.arcNu, arcKey('nu'), (t, out) => d.orbitPoint(nuRad * t, out), sz, anchors.nu,
+                drawnTo('nu', nuRad, arcNu.curve));
         }
 
         /* Camera and labels ------------------------------------------------ */

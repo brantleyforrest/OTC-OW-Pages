@@ -1,5 +1,5 @@
-// Test 1 Practice, work in progress: the R-V problems and the orbital maneuver problems on one
-// page, with the same two modes, answer form, and walkthrough as Test 1 Practice.
+// Test 1 Practice, work in progress: two sections on one page, the R-V problems and the orbital
+// maneuver problems, with the same two modes, answer form, and walkthrough as Test 1 Practice.
 // Practice mode shows the view from the start and lets the student walk through the steps.
 // Test mode shows only the problem and the answer form until the answers are graded.
 // Problem types supply the numbers and the worked steps. See rv-coe-problems.js and
@@ -23,11 +23,17 @@
         test: 'Enter your answers and submit. The view and the walkthrough open after grading.'
     };
 
-    const TOPICS = ['rv', ...Maneuvers.types];
+    // The page has two sections. Each section has its own problems, and a link can open either
+    // one (#rv or #maneuvers).
+    const SECTIONS = {
+        rv: { tag: 'Section 1: R-V to COEs' },
+        maneuvers: { tag: 'Section 2: Orbital Maneuvers' }
+    };
 
     const state = {
         mode: 'practice',
-        topic: 'mixed',
+        section: location.hash === '#maneuvers' ? 'maneuvers' : 'rv',
+        maneuverType: 'mixed',  // In the maneuvers section: one kind of maneuver, or any of them
         problem: null,
         submitted: false,
         blankWarned: false,
@@ -76,9 +82,11 @@
         };
     }
 
-    function generate(topic) {
-        const chosen = topic === 'mixed' ? TOPICS[Math.floor(Math.random() * TOPICS.length)] : topic;
-        return chosen === 'rv' ? rvProblem() : maneuverProblem(chosen);
+    function generate() {
+        if (state.section === 'rv') return rvProblem();
+        const types = Maneuvers.types;
+        const type = state.maneuverType === 'mixed' ? types[Math.floor(Math.random() * types.length)] : state.maneuverType;
+        return maneuverProblem(type);
     }
 
     /* ------------------------------------------------------------------ */
@@ -319,12 +327,13 @@
     }
 
     function newProblem() {
-        state.problem = generate(state.topic);
+        state.problem = generate();
         state.submitted = false;
         state.blankWarned = false;
         state.active = -1;
         state.visited = new Set();
 
+        $('section-tag').textContent = SECTIONS[state.section].tag;
         $('problem-title').textContent = state.problem.title;
         $('problem-prompt').innerHTML = state.problem.prompt;
         $('given').innerHTML = state.problem.statement;
@@ -336,8 +345,22 @@
         viz.setStage('given', state.problem.overviewCaption);
     }
 
-    Kit.bindSegmented($('topic'), (topic) => {
-        state.topic = topic;
+    function showSection() {
+        $('topic').hidden = state.section !== 'maneuvers';
+        for (const button of $('section').querySelectorAll('button')) {
+            button.setAttribute('aria-pressed', String(button.dataset.value === state.section));
+        }
+    }
+
+    Kit.bindSegmented($('section'), (section) => {
+        state.section = section;
+        history.replaceState(null, '', `#${section}`);
+        showSection();
+        newProblem();
+    });
+
+    Kit.bindSegmented($('topic'), (type) => {
+        state.maneuverType = type;
         newProblem();
     });
 
@@ -398,7 +421,7 @@
                     hint: $('view-hint'),
                     reset: $('reset-view'),
                     showStatus
-                }, v.constants);
+                }, v.constants, { moveSatellite: true });
             }
             if (!views.rv.live && !views.maneuver.live) return;
             statusEl.style.display = 'none';
@@ -440,5 +463,6 @@
     /* Start                                                              */
     /* ------------------------------------------------------------------ */
     $('mode-caption').textContent = MODE_CAPTIONS[state.mode];
+    showSection();
     newProblem();
 })();

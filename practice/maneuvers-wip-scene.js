@@ -1,12 +1,14 @@
 // The 3D view for orbital maneuver problems on the Test 1 Practice work-in-progress page. It is
 // drawn the same way as the R-V view (rv-coe-scene.js). It starts with only Earth, the reference
 // axes, and the given orbits. Each walkthrough step animates in what that step finds, moves the
-// camera to frame it, and dims what came before. Computed values are labeled only after the
-// student's answers are graded.
+// camera to frame it, and dims what came before. The satellite moves along with the steps: it
+// coasts to each burn, flies the transfer, and leaves on the new orbit. Computed values are
+// labeled only after the student's answers are graded.
 (function (global) {
     'use strict';
 
     const Kit = global.ToolKit;
+    const Motion = global.SatelliteMotion;
     const { math } = global.PracticeMath;
 
     const CAMERA_SECONDS = 1.7;
@@ -15,6 +17,8 @@
     const FADE_TIME = 0.3;      // Time constant for brightening and dimming, in seconds
     const UNDO_SECONDS = 0.4;   // Going back to an earlier step removes a part this quickly
     const DIMMED = 0.3;
+    const TRANSFER_SECONDS = 2.6;   // The satellite takes this long to fly the transfer
+    const PLANE_LAP_SECONDS = 12;   // and this long to go once around a plane change's orbit
 
     const smooth = (t) => t * t * (3 - 2 * t);
     const nearestAngle = (from, to) => from + ((((to - from) % 360) + 540) % 360) - 180;
@@ -543,6 +547,21 @@
             const a = (R1 + R2) / 2, eSigned = (R2 - R1) / (R1 + R2), p = a * (1 - eSigned * eSigned);
             const transferAt = (u, out = new THREE.Vector3()) => orbitPoint(p / (1 + eSigned * Math.cos(u * D2R)), iTransfer, 0, u, out);
 
+            // The satellite's path, timed in units of the transfer time. It goes once around the
+            // first orbit to the first burn, flies the transfer, then stays on the second orbit.
+            // Periods scale with the 3/2 power of the size, and the transfer is half its own period.
+            const T1 = 2 * Math.pow(R1 / a, 1.5), T2 = 2 * Math.pow(R2 / a, 1.5);
+            const e = Math.abs(eSigned), raise = eSigned > 0;
+            const transferU = (t) => {
+                const M = Math.PI * (raise ? t : 1 + t);
+                return Motion.trueFromMean(M, e) * R2D - (raise ? 0 : 180);
+            };
+            const satAt = (tau, out) => {
+                if (tau < T1) return orbitPoint(R1, i1, 0, (360 * tau) / T1 - 360, out);
+                if (tau <= T1 + 1) return transferAt(transferU(tau - T1), out);
+                return orbitPoint(R2, i2, 0, 180 + (360 * (tau - T1 - 1)) / T2, out);
+            };
+
             // At each burn, the faster velocity is drawn half as long as the radius there, and the
             // slower one in proportion. The two burns are not drawn to the same scale.
             const velocities = (R, u, incBefore, vBefore, incAfter, vAfter) => {
@@ -563,6 +582,8 @@
                 ...frame(Math.max(R1, R2), 0.55),
                 ring1: ring(R1, i1, 0),
                 ring2: ring(R2, i2, 0),
+                T1, T2, transferU, satAt,
+                motionRate: TRANSFER_SECONDS,
                 transferHalf: (t, out) => transferAt(t * 180, out),
                 transferOther: (t, out) => transferAt(180 + t * 180, out),
                 thetaPath: combined ? turnArc(high.P, high.before, high.after, 0.42 * Math.min(high.before.length(), high.after.length())) : null,
@@ -574,6 +595,7 @@
                 rings: ringSample(R1, i1, 0).concat(ringSample(R2, i2, 0)),
                 transferPoints: Array.from({ length: 13 }, (_, k) => transferAt(k * 15))
             };
+            d.transferCurve = new PathCurve(d.transferHalf);
             const W = planeNormal(iTransfer, 0);
             d.above = aboveView(W);
             d.home = homeView(W, -70);
@@ -606,8 +628,17 @@
                 ? Bhat.clone().addScaledVector(T1.clone().add(T2).normalize(), 0.9).normalize()
                 : Bhat.clone().addScaledVector(Z_AXIS, 0.35).addScaledVector(new THREE.Vector3().crossVectors(Z_AXIS, Bhat).normalize(), -0.25).normalize();
 
+            // The satellite's path, timed in laps. It coasts on the first orbit to the burn, then
+            // continues on the second.
+            const tauBurn = coast / 360;
+            const satAt = (tau, out) => (tau < tauBurn
+                ? orbitPoint(r, plane1.inc, plane1.raan, source.u_sc + 360 * tau, out)
+                : orbitPoint(r, plane2.inc, plane2.raan, source.u_sc + 360 * tau, out));
+
             const d = {
                 family: 'plane',
+                tauBurn, satAt,
+                motionRate: PLANE_LAP_SECONDS,
                 plan: planePlan(),
                 source, polar, r, plane1, plane2, sat, B, V1tip, V2tip, coast, burnDir,
                 ...view,
@@ -643,6 +674,8 @@
         let flight = null;      // The camera move in progress
         let manual = false;     // True once the reader has turned or zoomed the view in this step
         let answersShown = false;
+        let motion = null;      // Where the satellite is, and where the current step moves it
+        const satPoint = new THREE.Vector3();
         const camView = { az: 25, el: 22, zoom: 1, x: 0, y: 0, z: 0 };
         const CAMERA_KEYS = Object.keys(camView);
         const NONE = { on: false, grow: 0, level: 0 };
@@ -675,7 +708,13 @@
             manual = false;
             flight = null;
             answersShown = false;
+            motion = Motion.create(data.motionRate);
+            // A transfer starts a quarter turn before the first burn. A plane change starts where
+            // the problem puts the satellite.
+            motion.reset(data.family === 'transfer' ? 0.75 * data.T1 : 0);
             applyStage();
+            planMotion();
+            if (Kit.prefersReducedMotion()) motion.finish();
             for (const [, p] of partEntries) p.level = p.goalLevel;
             Object.assign(camView, stageGoal('given'));
             setWord(labels.burn, data.burnWord || '');
@@ -701,6 +740,35 @@
             }
         }
 
+        // Where the satellite goes at each step.
+        function planMotion() {
+            const d = data;
+            const afterDelay = { wait: () => stageClock >= BUILD_DELAY };
+            if (d.family === 'transfer') {
+                const atBurn1 = d.T1, atBurn2 = d.T1 + 1;
+                switch (stage) {
+                    // Going around the first orbit, which has the first burn on it
+                    case 'given': return motion.plan([{ to: atBurn1 }], [0, d.T1]);
+                    case 'atx':
+                    case 'burn1': return motion.plan([{ to: atBurn1 }]);
+                    case 'burn2':
+                    case 'dvtotal': return motion.plan([{ to: atBurn2 }]);
+                    // Flies the transfer again, timed against the clock
+                    case 'tof': return motion.plan([{ to: atBurn1 }, afterDelay, { to: atBurn2 }]);
+                    default: return motion.plan([{ to: atBurn2 }], [atBurn2, atBurn2 + d.T2]);
+                }
+            }
+            const burn = d.tauBurn;
+            switch (stage) {
+                case 'angle': return motion.plan([{ to: burn }]);
+                // After the burn, the satellite leaves along the new orbit.
+                case 'dv': return motion.plan([{ to: burn }, { wait: () => part('dv').grow >= 1 }, { to: burn + 25 / 360 }]);
+                // Coasts from where the problem starts to the burn, then keeps going on the new orbit.
+                case 'location': return motion.plan([{ to: 0 }, afterDelay, { to: burn }], [burn, burn + 1]);
+                default: return motion.plan([{ to: 0 }]);
+            }
+        }
+
         function flyTo(goal, seconds) {
             const from = { ...camView };
             flight = { from, to: { ...goal, az: nearestAngle(from.az, goal.az) }, clock: 0, seconds };
@@ -714,6 +782,7 @@
             }
             if (flight) Object.assign(camView, flight.to);
             flight = null;
+            if (motion) motion.finish();
             dirty = true;
         }
 
@@ -723,6 +792,7 @@
             manual = false;
             if (!data) return;
             applyStage();
+            planMotion();
             flyTo(stageGoal(stage), CAMERA_SECONDS);
             if (Kit.prefersReducedMotion()) finishNow();
         }
@@ -750,6 +820,7 @@
                     dirty = true;
                 }
             }
+            if (motion.advance(seconds, Kit.prefersReducedMotion())) dirty = true;
             if (flight) {
                 flight.clock += seconds;
                 const k = smooth(Math.min(1, flight.clock / flight.seconds));
@@ -834,9 +905,11 @@
         }
 
         /* Scene update ----------------------------------------------------- */
-        function drawPart(t, name, key, pointAt, sz, anchor, opacityScale = 1) {
+        // `drawn`, if given, is how much of the path to draw, in place of how far the part has built.
+        function drawPart(t, name, key, pointAt, sz, anchor, opacityScale = 1, drawn = null) {
             const p = part(name);
-            drawTube(t, p.on ? smooth(p.grow) : 0, p.level * opacityScale, key, pointAt, sz, anchor);
+            const k = !p.on ? 0 : (drawn === null ? smooth(p.grow) : drawn);
+            drawTube(t, k, p.level * opacityScale, key, pointAt, sz, anchor);
         }
 
         function updateTransfer(sz, key) {
@@ -864,15 +937,21 @@
             placeArrow(arrowDv2, part('dv2'), b2.dvFrom, b2.dvEnd, sz, 1.25);
 
             if (d.thetaPath) drawPart(thetaArc, 'theta', key('theta'), d.thetaPath, sz, anchors.theta);
-            drawPart(tofArc, 'tofArc', key('tof'), d.transferHalf, sz, anchors.tof);
-            placeMarker(markerSat, 1, d.P1, 0.55 * sz);
+            // While the satellite flies the transfer against the clock, the arc ends at the satellite.
+            let tofDrawn = null;
+            if (stage === 'tof') {
+                const t = Math.max(0, Math.min(1, motion.tau - d.T1));
+                tofDrawn = Motion.lengthFraction(d.transferCurve, d.transferU(t) / 180);
+            }
+            drawPart(tofArc, 'tofArc', key('tof'), d.transferHalf, sz, anchors.tof, 1, tofDrawn);
+            placeMarker(markerSat, 1, d.satAt(motion.tau, satPoint), 0.55 * sz);
         }
 
         function updatePlane(sz, key) {
             const d = data;
             drawPart(orbit1Tube, 'orbit1', key('orbit1'), d.ring1, sz);
             drawPart(orbit2Tube, 'orbit2', key('orbit2'), d.ring2, sz);
-            placeMarker(markerSat, 1, d.sat, 0.55 * sz);
+            placeMarker(markerSat, 1, d.satAt(motion.tau, satPoint), 0.55 * sz);
 
             growBar(rBarPlane, part('rBar'), ORIGIN, d.sat, 0.1 * sz);
             placeArrow(arrowVSat, part('vSat'), d.sat, d.vSatTip, sz, 1.1);
@@ -883,7 +962,9 @@
             placeArrow(arrowAfter2, part('vel'), d.B, d.V2tip, sz);
             placeArrow(arrowDv1, part('dv'), d.V1tip, d.V2tip, sz, 1.25);
             drawPart(thetaArc, 'theta', key('theta'), d.thetaPath, sz, anchors.theta);
-            drawPart(coastArc, 'coastArc', key('coast'), d.coastPath, sz, anchors.du);
+            // While the satellite coasts to the burn, the arc ends at the satellite.
+            const coastDrawn = stage === 'location' && d.tauBurn > 0 ? Math.max(0, Math.min(1, motion.tau / d.tauBurn)) : null;
+            drawPart(coastArc, 'coastArc', key('coast'), d.coastPath, sz, anchors.du, 1, coastDrawn);
         }
 
         function updateScene() {

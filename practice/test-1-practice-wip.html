@@ -105,7 +105,35 @@
         .mode-row .segmented { flex: 1 1 12rem; }
         .mode-caption { margin-top: 0.4rem; }
 
-        /* Topic: which kind of problem is generated */
+        /* Section: R-V problems or maneuver problems. Each has its own kinds of problem. */
+        .sections { margin-bottom: 0.6rem; }
+        .sections button {
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.1rem;
+            padding: 0.45rem 0.5rem;
+            font-size: 0.86rem;
+            font-weight: 600;
+        }
+        .section-num {
+            font-size: 0.66rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+        .section-tag {
+            margin-bottom: 0.2rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted, #94a3b8);
+        }
+
+        /* Topic: which kind of maneuver is generated */
         .topics { flex-wrap: wrap; margin-bottom: 0.5rem; }
         .topics button { flex: 1 1 auto; padding: 0.3rem 0.5rem; font-size: 0.76rem; }
 
@@ -453,9 +481,12 @@
             <aside class="tool-side">
                 <div class="col">
                     <div class="panel">
-                        <div class="segmented topics" id="topic" role="group" aria-label="Choose a kind of problem">
+                        <div class="segmented sections" id="section" role="group" aria-label="Choose a section">
+                            <button type="button" data-value="rv" aria-pressed="true"><span class="section-num">Section 1</span>R-V to COEs</button>
+                            <button type="button" data-value="maneuvers" aria-pressed="false"><span class="section-num">Section 2</span>Orbital Maneuvers</button>
+                        </div>
+                        <div class="segmented topics" id="topic" role="group" aria-label="Choose a kind of maneuver" hidden>
                             <button type="button" data-value="mixed" aria-pressed="true">Mixed</button>
-                            <button type="button" data-value="rv" aria-pressed="false">R-V to COEs</button>
                             <button type="button" data-value="hohmann" aria-pressed="false">Hohmann</button>
                             <button type="button" data-value="inclination" aria-pressed="false">Inclination</button>
                             <button type="button" data-value="polar_raan" aria-pressed="false">Polar RAAN</button>
@@ -472,6 +503,7 @@
                     </div>
 
                     <div class="panel accent">
+                        <div class="section-tag" id="section-tag"></div>
                         <div class="panel-title" id="problem-title"></div>
                         <p class="panel-text" id="problem-prompt"></p>
                         <div class="given" id="given"></div>
@@ -503,6 +535,7 @@
     <script src="../assets/earth-scene.js"></script>
     <script src="answer-check.js"></script>
     <script src="practice-math.js"></script>
+    <script src="satellite-motion.js"></script>
     <script src="rv-coe-problems.js"></script>
     <script src="rv-coe-scene.js"></script>
     <script src="maneuvers-problems.js"></script>
