@@ -29,7 +29,6 @@ The web portal is established at `index.html`. The following tools are available
 
 The Study tab links to:
 * **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems in two sections, classical orbital elements from state vectors and orbital maneuvers (Hohmann transfers, simple plane changes, and combined plane changes), with answer checking and a 3D walkthrough in which the satellite moves along with the steps.
-* **[Orbital Maneuvers Practice](practice/maneuvers-practice.html):** Practice mode and test mode for Hohmann transfers, simple plane changes, and combined plane changes with classroom-style 5-column math solutions. This page is a work in progress, so its Study tab link is locked.
 
 ---
 
