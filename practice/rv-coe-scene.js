@@ -37,8 +37,7 @@
         arcI: { from: 'i', focus: ['i'], seconds: 1.6, after: 'equator' },
         curlEarth: { from: 'raan', until: 'raan', focus: ['raan'], seconds: 1.2 },
         node: { from: 'raan', focus: ['raan', 'argp'], seconds: 0.5 },
-        northHalf: { from: 'raan', until: 'raan', focus: ['raan'], seconds: 1.3, after: 'node' },
-        arcRaan: { from: 'raan', focus: ['raan'], seconds: 1.9, after: 'northHalf' },
+        arcRaan: { from: 'raan', focus: ['raan'], seconds: 1.9, after: 'node' },
         arcArgp: { from: 'argp', focus: ['argp'], seconds: 2 },
         arcNu: { from: 'nu', focus: ['nu'], seconds: 2 }
     };
@@ -50,7 +49,7 @@
     function partExists(name, S) {
         switch (name) {
             case 'majorAxis': case 'apsides': return !S.circular;
-            case 'node': case 'northHalf': case 'curlEarth': return !S.equatorial;
+            case 'node': case 'curlEarth': return !S.equatorial;
             case 'arcI': return S.i > 0.5;
             case 'arcRaan': return !S.raanUndefined && S.raan > 0.5;
             case 'arcArgp': return !S.argpUndefined && S.argp > 0.5;
@@ -373,7 +372,6 @@
         const raanEdge = createBar(COLORS.raan);
         const arcArgp = createArc(COLORS.argp);
         const arcNu = createArc(COLORS.nu);
-        const northHalf = createArc(COLORS.raan, { arrowhead: false });
         const curlOrbit = createArc(COLORS.hand);
         const curlEarth = createArc(COLORS.hand);
 
@@ -638,14 +636,15 @@
 
         /* Where the camera goes at each step ------------------------------- */
 
-        // The camera setting that looks along `direction` and fits these points and Earth.
-        function fit(direction, points) {
+        // The camera setting that looks along `direction` and fits these points and Earth. With
+        // `tight`, only the points are fitted, so the view centers on them.
+        function fit(direction, points, tight = false) {
             const az = Math.atan2(direction.y, direction.x) * R2D;
             const el = Math.max(-MAX_TILT, Math.min(MAX_TILT, Math.asin(Math.max(-1, Math.min(1, direction.z))) * R2D));
             const dir = fromAngles(az, el);
             const right = new THREE.Vector3().crossVectors(Z_AXIS, dir).normalize();
             const up = new THREE.Vector3().crossVectors(dir, right);
-            const all = points.concat([
+            const all = tight ? points : points.concat([
                 right.clone().multiplyScalar(EARTH_EDGE), right.clone().multiplyScalar(-EARTH_EDGE),
                 up.clone().multiplyScalar(EARTH_EDGE), up.clone().multiplyScalar(-EARTH_EDGE)
             ]);
@@ -689,20 +688,29 @@
             return along.addScaledVector(thumbUp, 0.45).addScaledVector(across, 0.3).addScaledVector(Z_AXIS, 0.12).normalize();
         }
 
-        // An undefined angle defaults to 0°, which puts its reference point at the ascending node.
-        // An equatorial orbit has no node, so the reference point is along +I. Both RAAN and any
-        // undefined angle look at that spot.
-        function nodeFraming(above, equatorEdges) {
+        // The view for an angle that is undefined or 0°. The angle has no arc, so the camera goes to
+        // the point where the angle ends, which is also where it starts. It looks at that point
+        // from outside Earth, a little above, with the Earth's surface beneath it.
+        function endpointView(point, above) {
+            const outward = point.clone().normalize().add(above.clone().multiplyScalar(0.8)).normalize();
+            const dir = fromAngles(Math.atan2(outward.y, outward.x) * R2D, Math.asin(Math.max(-1, Math.min(1, outward.z))) * R2D);
+            const right = new THREE.Vector3().crossVectors(Z_AXIS, dir).normalize();
+            const up = new THREE.Vector3().crossVectors(dir, right);
+            const half = Math.max(1.8, point.length() * 0.4);
+            const around = [right, up].flatMap((axis) => [point.clone().addScaledVector(axis, half), point.clone().addScaledVector(axis, -half)]);
+            return fit(dir, around, true);
+        }
+
+        // RAAN's arc is drawn on the equator from +I to the ascending node.
+        function raanView(above) {
             const d = data;
-            const S = d.S;
-            if (S.equatorial) return fit(above, [d.iTip, d.defaultPoint, ...equatorEdges]);
+            if (d.S.equatorial || d.S.raan < 0.5) return endpointView(d.S.equatorial ? d.defaultPoint : d.nodePoint, above);
             const swept = [];
             for (let k = 0; k <= 12; k++) {
-                const angle = (k / 12) * S.raan * D2R;
+                const angle = (k / 12) * d.S.raan * D2R;
                 swept.push(new THREE.Vector3(Math.cos(angle) * d.arcRadiusRaan, Math.sin(angle) * d.arcRadiusRaan, 0));
             }
-            const northSide = sampleOrbit(d.thetaNode, d.thetaNode + Math.PI, 16);
-            return fit(fromAngles(S.raan / 2, 64), [d.iTip, d.nodePoint, d.kTip, ...swept, ...northSide]);
+            return fit(fromAngles(d.S.raan / 2, 64), [d.iTip, d.nodePoint, d.kTip, ...swept]);
         }
 
         function stageGoal(name) {
@@ -725,13 +733,14 @@
                 case 'i':
                     return tiltView();
                 case 'raan':
-                    return nodeFraming(above, equatorEdges);
+                    return raanView(above);
                 case 'argp':
-                    if (S.argpUndefined) return nodeFraming(above, equatorEdges);
-                    if (S.argp < 0.5) return fit(above, d.wholeOrbit);
+                    // The angle ends at perigee, which a circle places at the node (or +I)
+                    if (S.argpUndefined || S.argp < 0.5) return endpointView(d.perigee, above);
                     return fit(above, [...sampleOrbit(-d.argp, 0, 16), d.defaultPoint, d.perigee]);
                 case 'nu':
-                    if (S.nu < 0.5) return fit(above, d.wholeOrbit);
+                    // The angle ends at the satellite
+                    if (S.nu < 0.5) return endpointView(d.r, above);
                     return fit(above, [...sampleOrbit(0, S.nu * D2R, 16), d.r, d.vTip, d.perigee]);
                 default:
                     return fit(above, d.wholeOrbit);
@@ -848,7 +857,6 @@
             drawArc(arcArgp, parts.arcArgp, arcKey('argp'), (t, out) => d.orbitPoint(-d.argp * (1 - t), out), sz, anchors.argp);
             const nuRad = S.nu * D2R;
             drawArc(arcNu, parts.arcNu, arcKey('nu'), (t, out) => d.orbitPoint(nuRad * t, out), sz, anchors.nu);
-            drawArc(northHalf, parts.northHalf, arcKey('north'), (t, out) => d.orbitPoint(d.thetaNode + t * Math.PI, out), sz, null);
         }
 
         /* Camera and labels ------------------------------------------------ */
@@ -923,7 +931,8 @@
                 project(labels.thumb, onPole ? d.earthCurlCenter : d.hTip, onPole ? 1 : parts.thumb.level);
             }
             if (built('node')) project(labels.node, d.nodePoint, parts.node.level);
-            if (built('apsides')) {
+            // The apsides are named only once the eccentricity step asks for them.
+            if (built('apsides') && stageOrder(stage) >= stageOrder('e')) {
                 project(labels.perigee, d.perigee, parts.apsides.level);
                 project(labels.apogee, d.apogee, parts.apsides.level);
             }

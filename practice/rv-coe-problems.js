@@ -498,7 +498,7 @@
             key: 'raan',
             title: prose('RAAN, $\\Omega$'),
             result: angleResult(S.answers.raan),
-            caption: prose(`<b>RAAN.</b> The bright half of the orbit is north of the equator and begins at the ascending node. $\\Omega$ is measured eastward from $${I_HAT}$ to that node.`),
+            caption: prose(`<b>RAAN.</b> The orbit crosses the equator going north at the ascending node. $\\Omega$ is measured eastward from $${I_HAT}$ to that node.`),
             methods: [{
                 name: 'Right-hand rule',
                 value: reading.value,
