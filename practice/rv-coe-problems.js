@@ -1,6 +1,7 @@
 // R-V vector problems for Test 1 Practice. Each problem gives a position and a velocity with at
 // most three nonzero components in total and at most two in either vector. The orbit is either
-// circular, or the satellite is at perigee or apogee. All six elements are asked for, and an
+// circular, or the satellite is at perigee or apogee. Every angle is a multiple of 45 degrees, so
+// a vector with two components has equal components. All six elements are asked for, and an
 // undefined element counts as 0 degrees.
 //
 // The walkthrough calculates only size and shape. It reads the four angles by inspection and the
@@ -134,8 +135,11 @@
         return out;
     };
 
-    function splitAngle() {
-        return pick([30, 45, 60, between(20, 70)]) / R2D;
+    // Two equal components point halfway between two axes, which keeps every angle on 45 degrees.
+    function equalParts(axes, part) {
+        const out = [0, 0, 0];
+        for (const axis of axes) out[axis] = randomSign() * part;
+        return out;
     }
 
     // The nonzero components of position and velocity, as [in r, in v]. The velocity is always
@@ -156,26 +160,19 @@
 
         if (pattern === '2-1') {
             const vAxis = pick([0, 1, 2]);
-            const [first, second] = [0, 1, 2].filter((axis) => axis !== vAxis);
-            const size = randomRadius(), angle = splitAngle();
-            const r = [0, 0, 0];
-            r[first] = randomSign() * snapRadius(size * Math.cos(angle));
-            r[second] = randomSign() * snapRadius(size * Math.sin(angle));
+            const axes = [0, 1, 2].filter((axis) => axis !== vAxis);
+            const r = equalParts(axes, snapRadius(randomRadius() * Math.SQRT1_2));
             const speed = speedFor(kind, length(r));
             if (!speed) return null;
             return { kind, r, v: vectorAlong(vAxis, randomSign() * snapSpeed(speed)) };
         }
 
         const rAxis = pick([0, 1, 2]);
-        const [first, second] = [0, 1, 2].filter((axis) => axis !== rAxis);
+        const axes = [0, 1, 2].filter((axis) => axis !== rAxis);
         const R = randomRadius();
         const speed = speedFor(kind, R);
         if (!speed) return null;
-        const angle = splitAngle();
-        const v = [0, 0, 0];
-        v[first] = randomSign() * snapSpeed(speed * Math.cos(angle));
-        v[second] = randomSign() * snapSpeed(speed * Math.sin(angle));
-        return { kind, r: vectorAlong(rAxis, randomSign() * R), v };
+        return { kind, r: vectorAlong(rAxis, randomSign() * R), v: equalParts(axes, snapSpeed(speed * Math.SQRT1_2)) };
     }
 
     const nonzeroCount = (p) => p.filter((c) => c !== 0).length;
@@ -273,12 +270,6 @@
     }
 
     const CURL = `Curl your right fingers from $${R_V}$ toward $${V_V}$.`;
-
-    // The size of a horizontal part, as a symbol and a number.
-    function horizontalPart(letter, x, y) {
-        if (x !== 0 && y !== 0) return { tex: `${letter}_{\\text{horizontal}}`, value: Math.hypot(x, y) };
-        return { tex: `|${letter}_${x !== 0 ? 'x' : 'y'}|`, value: Math.abs(x !== 0 ? x : y) };
-    }
 
     const circularSpeedCalc = (S) => calc(`${V_CIRC} = ${sqrt(frac('\\mu', 'r'))}`,
         [sqrt(frac(MU_TEXT, radiusText(S.R)))], `${fixed(S.vCirc, 4)}${KM_S}`);
@@ -419,24 +410,23 @@
             };
         }
 
-        const side = rz === 0 ? horizontalPart('v', vx, vy) : horizontalPart('r', rx, ry);
-        const upLetter = rz === 0 ? '|v_z|' : '|r_z|';
-        const up = Math.abs(rz === 0 ? vz : rz);
-        const upText = rz === 0 ? fixed(up, 3) : fixed(up, 0);
-        const sideText = rz === 0 ? fixed(side.value, 3) : fixed(side.value, 0);
-        const theta = Math.atan2(up, side.value) * R2D;
-        const value = eastward ? theta : 180 - theta;
+        // The vertical part and the one horizontal part of whichever vector is tilted
+        const letter = rz === 0 ? 'v' : 'r';
+        const [x, y, z] = rz === 0 ? S.v : S.r;
+        const sideAxis = x !== 0 ? 'x' : 'y';
+        const tilt = Math.atan2(Math.abs(z), Math.abs(x !== 0 ? x : y)) * R2D;
+        const value = eastward ? tilt : 180 - tilt;
         const why = rz === 0
             ? `The satellite is on the equator, so the climb of $${V_V}$ out of the equator is the tilt of the orbit.`
             : `$v_z = 0$, so the satellite is at the ${rz > 0 ? 'top' : 'bottom'} of its orbit. Its latitude there equals the tilt of the orbit.`;
+        const halfway = rz === 0 ? `halfway between level and straight ${vz > 0 ? 'north' : 'south'}` : 'halfway between the equator and the pole';
         return {
             value,
             html: rule(`${CURL} Your thumb leans ${eastward ? 'north, so the satellite moves east and the orbit is prograde' : 'south, so the satellite moves west and the orbit is retrograde'}.`)
                 + rule(why)
-                + calc(`\\tan\\theta = ${frac(upLetter, side.tex)}`, [frac(upText, sideText)], sig(up / side.value, 4))
-                + calc(`\\theta = \\arctan(${sig(up / side.value, 4)})`, [], deg(theta))
+                + rule(`$|${letter}_z|$ and $|${letter}_${sideAxis}|$ are equal, so $${letter === 'v' ? V_V : R_V}$ is ${halfway}.`, 'The tilt is $45°$')
                 + rule(eastward ? 'Prograde, so the tilt is the inclination.' : 'Retrograde, so subtract the tilt from 180°.',
-                    eastward ? `$i = \\theta = ${deg(value)}$` : `$i = 180° - \\theta = ${deg(value)}$`)
+                    eastward ? `$i = ${deg(value)}$` : `$i = 180° - 45° = ${deg(value)}$`)
         };
     }
 
@@ -474,17 +464,14 @@
             };
         }
 
-        const digits = letter === 'r' ? 0 : 3;
-        const theta = Math.atan2(Math.abs(y), Math.abs(x)) * R2D;
-        const [value, between, formula] = x > 0 && y > 0 ? [theta, `$+${I_HAT}$ and $+${J_HAT}$`, '\\theta']
-            : x < 0 && y > 0 ? [180 - theta, `$+${J_HAT}$ and $${MINUS}${I_HAT}$`, '180° - \\theta']
-                : x < 0 ? [180 + theta, `$${MINUS}${I_HAT}$ and $${MINUS}${J_HAT}$`, '180° + \\theta']
-                    : [360 - theta, `$${MINUS}${J_HAT}$ and $+${I_HAT}$`, '360° - \\theta'];
+        const tilt = Math.atan2(Math.abs(y), Math.abs(x)) * R2D;
+        const [value, halfway] = x > 0 && y > 0 ? [tilt, `$+${I_HAT}$ at $0°$ and $+${J_HAT}$ at $90°$`]
+            : x < 0 && y > 0 ? [180 - tilt, `$+${J_HAT}$ at $90°$ and $${MINUS}${I_HAT}$ at $180°$`]
+                : x < 0 ? [180 + tilt, `$${MINUS}${I_HAT}$ at $180°$ and $${MINUS}${J_HAT}$ at $270°$`]
+                    : [360 - tilt, `$${MINUS}${J_HAT}$ at $270°$ and $+${I_HAT}$ at $360°$`];
         return {
             value,
-            html: calc(`\\tan\\theta = ${frac(`|${letter}_y|`, `|${letter}_x|`)}`, [frac(fixed(Math.abs(y), digits), fixed(Math.abs(x), digits))], sig(Math.abs(y) / Math.abs(x), 4))
-                + calc(`\\theta = \\arctan(${sig(Math.abs(y) / Math.abs(x), 4)})`, [], deg(theta))
-                + rule(`The ascending node lies between ${between}.`, `$\\Omega = ${formula} = ${deg(value)}$`)
+            html: rule(`$|${letter}_x|$ and $|${letter}_y|$ are equal, so the ascending node is halfway between ${halfway}.`, `$\\Omega = ${deg(value)}$`)
         };
     }
 
