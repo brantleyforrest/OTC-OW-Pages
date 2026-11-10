@@ -8,6 +8,7 @@
     'use strict';
 
     const Kit = global.ToolKit;
+    const { math } = global.PracticeMath;
     const D2R = Math.PI / 180;
     const R2D = 180 / Math.PI;
     const TWO_PI = 2 * Math.PI;
@@ -35,22 +36,23 @@
             if (showStatus) showStatus('WebGL is not available in this browser.');
             return null;
         }
-        renderer.setClearColor(0x060b14);
+        renderer.setClearColor(0x03060c);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+        const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 900);
         camera.up.set(0, 0, 1);
 
         // Lighting
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.8);
         sunLight.position.set(12, 6, 8);
         scene.add(sunLight);
 
         // Earth & Stars from shared assets
-        const earth = window.EarthScene ? window.EarthScene.addEarth(THREE, renderer, scene) : null;
-        const stars = window.EarthScene ? window.EarthScene.addStars(THREE, scene) : null;
+        const earth = window.EarthScene.addEarth(THREE, renderer, scene);
+        earth.atmosphere.renderOrder = 1;
+        const stars = window.EarthScene.addStars(THREE, scene);
 
         // Label Layer
         const labelLayer = new Kit.LabelLayer(labels, { wide: true });
@@ -62,8 +64,6 @@
         // Camera interaction state
         const homeView = { az: 35, el: 28, dist: 5.5, targetX: 0, targetY: 0, targetZ: 0 };
         const cam = { ...homeView };
-        let isDragging = false;
-        let lastX = 0, lastY = 0;
 
         // Animation state
         const anim = {
@@ -75,78 +75,92 @@
         };
 
         /* ------------------------------------------------------------------ */
-        /* Mesh Helpers                                                       */
+        /* Mesh Helpers: tubes, arrows, and point markers, as in the R-V view  */
         /* ------------------------------------------------------------------ */
-        function createThickLine(points, colorHex, opacity = 1.0, dashed = false) {
-            const geom = new THREE.BufferGeometry().setFromPoints(points);
-            let mat;
-            if (dashed) {
-                mat = new THREE.LineDashedMaterial({
-                    color: colorHex,
-                    dashSize: 0.15,
-                    gapSize: 0.08,
-                    linewidth: 2,
-                    transparent: opacity < 1,
-                    opacity
-                });
-            } else {
-                mat = new THREE.LineBasicMaterial({
-                    color: colorHex,
-                    linewidth: 2,
-                    transparent: opacity < 1,
-                    opacity
-                });
-            }
-            const line = new THREE.Line(geom, mat);
-            if (dashed) line.computeLineDistances();
-            return line;
-        }
+        const Y_AXIS = new THREE.Vector3(0, 1, 0);
+        const GHOST_ORDER = 6;
+        const sizers = [];      // Called each frame with the size unit, for parts that scale with zoom
+        let sz = 0.05;
 
-        function createVectorArrow(origin, vector, colorHex, headLen = 0.2, headWidth = 0.1) {
-            const len = vector.length();
-            if (len < 1e-4) return new THREE.Group();
-            const dir = vector.clone().normalize();
-            const arrow = new THREE.ArrowHelper(dir, origin, len, colorHex, Math.min(headLen, len * 0.4), Math.min(headWidth, len * 0.25));
-            return arrow;
-        }
-
-        function createPulsingMarker(radius = 0.07, colorHex = 0xf87171) {
+        // A solid object plus a dim ghost of it, drawn without depth testing, so that a part
+        // behind or inside Earth is still faintly visible.
+        function ghosted(geometry, color, ghost = 0.35) {
             const group = new THREE.Group();
-            const sphere = new THREE.Mesh(
-                new THREE.SphereGeometry(radius, 16, 12),
-                new THREE.MeshBasicMaterial({ color: colorHex })
-            );
-            const ringGeom = new THREE.RingGeometry(radius * 1.4, radius * 2.1, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
-            const ring = new THREE.Mesh(ringGeom, ringMat);
-            group.add(sphere);
-            group.add(ring);
-            group.userData = { ring, ringMat, baseRadius: radius };
+            const solidMat = new THREE.MeshBasicMaterial({ color, transparent: true });
+            const ghostMat = new THREE.MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false });
+            const solid = new THREE.Mesh(geometry, solidMat);
+            const dim = new THREE.Mesh(geometry, ghostMat);
+            dim.renderOrder = GHOST_ORDER;
+            solid.frustumCulled = false;
+            dim.frustumCulled = false;
+            group.add(solid, dim);
+            group.userData = { solidMat, ghostMat, ghost, parts: [solid, dim] };
+            setOpacity(group, 1);
             return group;
         }
 
-        function createSpacecraftModel() {
-            const sc = new THREE.Group();
-            // Satellite body
-            const body = new THREE.Mesh(
-                new THREE.BoxGeometry(0.08, 0.08, 0.1),
-                new THREE.MeshLambertMaterial({ color: 0xe2e8f0 })
-            );
-            // Solar panels
-            const panelGeom = new THREE.BoxGeometry(0.24, 0.06, 0.01);
-            const panelMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-            const panelLeft = new THREE.Mesh(panelGeom, panelMat);
-            panelLeft.position.set(-0.16, 0, 0);
-            const panelRight = new THREE.Mesh(panelGeom, panelMat);
-            panelRight.position.set(0.16, 0, 0);
-
-            // Glow point
-            const beacon = new THREE.PointLight(0x60a5fa, 0.8, 1.2);
-            sc.add(body, panelLeft, panelRight, beacon);
-            return sc;
+        function setOpacity(group, k) {
+            const { solidMat, ghostMat, ghost } = group.userData;
+            solidMat.opacity = k;
+            ghostMat.opacity = ghost * k;
         }
 
-        const spacecraft = createSpacecraftModel();
+        function setGeometry(group, geometry) {
+            group.userData.parts[0].geometry.dispose();
+            group.userData.parts.forEach((part) => { part.geometry = geometry; });
+        }
+
+        const SHAFT = new THREE.CylinderGeometry(1, 1, 1, 10);
+        const HEAD = new THREE.ConeGeometry(0.5, 1.6, 14);
+        const SPHERE = new THREE.SphereGeometry(1, 16, 12);
+        const SHARED = new Set([SHAFT, HEAD, SPHERE]);
+
+        // A tube along a path. It is rebuilt when the zoom changes, so that it keeps its look.
+        function createPath(points, colorHex, opacity = 1.0, dashed = false) {
+            const curve = new THREE.CatmullRomCurve3(points);
+            const radius = dashed ? 0.14 : 0.2;
+            const tube = ghosted(new THREE.BufferGeometry(), colorHex, 0.28);
+            let key = null;
+            sizers.push((unit, unitKey) => {
+                if (key === unitKey) return;
+                key = unitKey;
+                setGeometry(tube, new THREE.TubeGeometry(curve, Math.max(24, points.length * 2), radius * unit, 6, false));
+            });
+            setOpacity(tube, dashed ? Math.min(opacity, 0.7) : opacity);
+            return tube;
+        }
+
+        function createArrow(origin, vector, colorHex) {
+            const len = vector.length();
+            const group = new THREE.Group();
+            if (len < 1e-4) return group;
+            const shaft = ghosted(SHAFT, colorHex);
+            const head = ghosted(HEAD, colorHex);
+            group.add(shaft, head);
+            const dir = vector.clone().normalize();
+            sizers.push((unit) => {
+                const thick = 1.2 * 1.2;
+                const headLen = Math.min(3.4 * unit * thick, len * 0.45);
+                const shaftLen = len - headLen;
+                group.position.copy(origin);
+                group.quaternion.setFromUnitVectors(Y_AXIS, dir);
+                shaft.scale.set(0.16 * unit * thick, shaftLen, 0.16 * unit * thick);
+                shaft.position.y = shaftLen / 2;
+                head.scale.setScalar(headLen / 1.6);
+                head.position.y = shaftLen + headLen / 2;
+            });
+            return group;
+        }
+
+        // A point. It keeps the same size on screen at any zoom.
+        function createMarker(colorHex, size = 0.46) {
+            const marker = ghosted(SPHERE, colorHex, 0.4);
+            marker.userData.size = size;
+            sizers.push((unit) => marker.scale.setScalar(size * unit));
+            return marker;
+        }
+
+        const spacecraft = createMarker(0xffffff, 0.55);
         scene.add(spacecraft);
 
         /* ------------------------------------------------------------------ */
@@ -155,16 +169,29 @@
         let activeElements = [];
         let labelRefs = [];
 
+        function measureLabel(tex, color, rank) {
+            const label = labelLayer.add(`<span style="color:${color}">${math(tex)}</span>`, { rank });
+            label.el.classList.add('measure');
+            return label;
+        }
+
+        function wordLabel(text, rank = 1) {
+            const label = labelLayer.add(text, { rank });
+            label.el.classList.add('word');
+            return label;
+        }
+
         function clearActive() {
             activeElements.forEach((obj) => {
                 maneuverGroup.remove(obj);
-                if (obj.geometry) obj.geometry.dispose();
-                if (obj.material) {
-                    if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
-                    else obj.material.dispose();
-                }
+                obj.traverse((child) => {
+                    if (child.geometry && !SHARED.has(child.geometry)) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
             });
             activeElements = [];
+            sizers.length = 0;
+            sizers.push((unit) => spacecraft.scale.setScalar(0.55 * unit));
             labelLayer.labels.forEach((lbl) => {
                 lbl.el.style.display = 'none';
                 lbl.el.remove();
@@ -215,7 +242,7 @@
             for (let deg = 0; deg <= 360; deg += 3) {
                 pts1.push(getOrbitPoint(R1_n, inc, raan, deg));
             }
-            const line1 = createThickLine(pts1, COLORS.orbit1);
+            const line1 = createPath(pts1, COLORS.orbit1);
             maneuverGroup.add(line1);
             activeElements.push(line1);
 
@@ -224,7 +251,7 @@
             for (let deg = 0; deg <= 360; deg += 3) {
                 pts2.push(getOrbitPoint(R2_n, inc, raan, deg));
             }
-            const line2 = createThickLine(pts2, COLORS.orbit2);
+            const line2 = createPath(pts2, COLORS.orbit2);
             maneuverGroup.add(line2);
             activeElements.push(line2);
 
@@ -243,13 +270,13 @@
                 const u_effective = isRaise ? nu_deg : (180 - nu_deg);
                 ptsTx.push(getOrbitPoint(r_tx, inc, raan, u_effective));
             }
-            const lineTx = createThickLine(ptsTx, COLORS.transfer, 1.0, true);
+            const lineTx = createPath(ptsTx, COLORS.transfer, 1.0, true);
             maneuverGroup.add(lineTx);
             activeElements.push(lineTx);
 
             // 4. Burn 1 Marker & Delta-V Vector Arrow
             const burn1Pos = getOrbitPoint(R1_n, inc, raan, 0);
-            const burn1Marker = createPulsingMarker(0.065, 0xf87171);
+            const burn1Marker = createMarker(0xf87171);
             burn1Marker.position.copy(burn1Pos);
             maneuverGroup.add(burn1Marker);
             activeElements.push(burn1Marker);
@@ -257,13 +284,13 @@
             const tan1 = getOrbitTangent(inc, raan, 0);
             const dv1Dir = isRaise ? tan1.clone() : tan1.clone().negate();
             const dv1Len = Math.min(1.2, Math.max(0.4, data.dv1 * 0.45));
-            const arrow1 = createVectorArrow(burn1Pos, dv1Dir.multiplyScalar(dv1Len), 0xf87171, 0.22, 0.12);
+            const arrow1 = createArrow(burn1Pos, dv1Dir.multiplyScalar(dv1Len), 0xf87171, 0.22, 0.12);
             maneuverGroup.add(arrow1);
             activeElements.push(arrow1);
 
             // 5. Burn 2 Marker & Delta-V Vector Arrow
             const burn2Pos = getOrbitPoint(R2_n, inc, raan, 180);
-            const burn2Marker = createPulsingMarker(0.065, 0xf87171);
+            const burn2Marker = createMarker(0xf87171);
             burn2Marker.position.copy(burn2Pos);
             maneuverGroup.add(burn2Marker);
             activeElements.push(burn2Marker);
@@ -271,15 +298,15 @@
             const tan2 = getOrbitTangent(inc, raan, 180);
             const dv2Dir = isRaise ? tan2.clone() : tan2.clone().negate();
             const dv2Len = Math.min(1.2, Math.max(0.4, data.dv2 * 0.45));
-            const arrow2 = createVectorArrow(burn2Pos, dv2Dir.multiplyScalar(dv2Len), 0xf87171, 0.22, 0.12);
+            const arrow2 = createArrow(burn2Pos, dv2Dir.multiplyScalar(dv2Len), 0xf87171, 0.22, 0.12);
             maneuverGroup.add(arrow2);
             activeElements.push(arrow2);
 
             // 6. Labels
-            const lblR1 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit1}">R₁ = ${Math.round(data.R1)} km</span>`, { rank: 1 });
-            const lblR2 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit2}">R₂ = ${Math.round(data.R2)} km</span>`, { rank: 1 });
-            const lblB1 = labelLayer.add(`<span class="measure" style="color:${COLORS.burn}">ΔV₁ = ${data.dv1.toFixed(3)} km/s</span>`, { rank: 0 });
-            const lblB2 = labelLayer.add(`<span class="measure" style="color:${COLORS.burn}">ΔV₂ = ${data.dv2.toFixed(3)} km/s</span>`, { rank: 0 });
+            const lblR1 = measureLabel(`R_1 = ${Math.round(data.R1)}\\ \\text{km}`, COLORS.orbit1, 1);
+            const lblR2 = measureLabel(`R_2 = ${Math.round(data.R2)}\\ \\text{km}`, COLORS.orbit2, 1);
+            const lblB1 = measureLabel(`\\Delta V_1 = ${data.dv1.toFixed(3)}\\ \\text{km/s}`, COLORS.burn, 0);
+            const lblB2 = measureLabel(`\\Delta V_2 = ${data.dv2.toFixed(3)}\\ \\text{km/s}`, COLORS.burn, 0);
 
             labelRefs.push(
                 { pos: burn1Pos.clone().multiplyScalar(1.08), label: lblB1, answer: true },
@@ -339,7 +366,7 @@
             for (let deg = 0; deg <= 360; deg += 4) {
                 ptsEq.push(getOrbitPoint(r_n * 1.02, 0, 0, deg));
             }
-            const lineEq = createThickLine(ptsEq, '#475569', 0.45, true);
+            const lineEq = createPath(ptsEq, '#475569', 0.45, true);
             maneuverGroup.add(lineEq);
             activeElements.push(lineEq);
 
@@ -348,7 +375,7 @@
             for (let deg = 0; deg <= 360; deg += 3) {
                 pts1.push(getOrbitPoint(r_n, i1, raan, deg));
             }
-            const line1 = createThickLine(pts1, COLORS.orbit1);
+            const line1 = createPath(pts1, COLORS.orbit1);
             maneuverGroup.add(line1);
             activeElements.push(line1);
 
@@ -357,21 +384,21 @@
             for (let deg = 0; deg <= 360; deg += 3) {
                 pts2.push(getOrbitPoint(r_n, i2, raan, deg));
             }
-            const line2 = createThickLine(pts2, COLORS.orbit2);
+            const line2 = createPath(pts2, COLORS.orbit2);
             maneuverGroup.add(line2);
             activeElements.push(line2);
 
             // 4. Line of Nodes (glowing line connecting Ascending and Descending nodes)
             const nodeAsc = getOrbitPoint(r_n * 1.15, 0, raan, 0);
             const nodeDesc = getOrbitPoint(r_n * 1.15, 0, raan, 180);
-            const lineNode = createThickLine([nodeDesc, nodeAsc], COLORS.node, 0.9, true);
+            const lineNode = createPath([nodeDesc, nodeAsc], COLORS.node, 0.9, true);
             maneuverGroup.add(lineNode);
             activeElements.push(lineNode);
 
             // 5. Burn Marker at the next node, as in the walkthrough
             const burnU = data.u_burn;
             const burnPos = getOrbitPoint(r_n, i1, raan, burnU);
-            const mBurn = createPulsingMarker(0.065, 0xf87171);
+            const mBurn = createMarker(0xf87171);
             mBurn.position.copy(burnPos);
             maneuverGroup.add(mBurn);
             activeElements.push(mBurn);
@@ -381,31 +408,28 @@
             const v2_vec = getOrbitTangent(i2, raan, burnU).multiplyScalar(1.2);
             const dv_vec = v2_vec.clone().sub(v1_vec);
 
-            const arrowV1 = createVectorArrow(burnPos, v1_vec, 0x38bdf8, 0.18, 0.09);
-            const arrowV2 = createVectorArrow(burnPos, v2_vec, 0x34d399, 0.18, 0.09);
+            const arrowV1 = createArrow(burnPos, v1_vec, 0x38bdf8, 0.18, 0.09);
+            const arrowV2 = createArrow(burnPos, v2_vec, 0x34d399, 0.18, 0.09);
             // Delta-V connects tip of V1 to tip of V2
             const v1_tip = burnPos.clone().add(v1_vec);
-            const arrowDV = createVectorArrow(v1_tip, dv_vec, 0xf87171, 0.22, 0.11);
+            const arrowDV = createArrow(v1_tip, dv_vec, 0xf87171, 0.22, 0.11);
 
             maneuverGroup.add(arrowV1, arrowV2, arrowDV);
             activeElements.push(arrowV1, arrowV2, arrowDV);
 
             // 6. Current Spacecraft Marker
             const currentPos = getOrbitPoint(r_n, i1, raan, u_sc);
-            const currentMarker = new THREE.Mesh(
-                new THREE.SphereGeometry(0.055, 16, 16),
-                new THREE.MeshBasicMaterial({ color: 0xffffff })
-            );
+            const currentMarker = createMarker(0x94a3b8, 0.4);
             currentMarker.position.copy(currentPos);
             maneuverGroup.add(currentMarker);
             activeElements.push(currentMarker);
 
             // 7. Labels
-            const lblI1 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit1}">i₁ = ${data.i1.toFixed(1)}°</span>`, { rank: 1 });
-            const lblI2 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit2}">i₂ = ${data.i2.toFixed(1)}°</span>`, { rank: 1 });
-            const lblDV = labelLayer.add(`<span class="measure" style="color:${COLORS.burn}">ΔV = ${data.dv.toFixed(3)} km/s</span>`, { rank: 0 });
-            const lblNode = labelLayer.add(`<span class="measure" style="color:${COLORS.node}">Node Line (Burn)</span>`, { rank: 1 });
-            const lblCurr = labelLayer.add(`<span class="measure" style="color:#ffffff">Spacecraft (u = ${Math.round(u_sc)}°)</span>`, { rank: 0 });
+            const lblI1 = measureLabel(`i_1 = ${data.i1.toFixed(1)}^\\circ`, COLORS.orbit1, 1);
+            const lblI2 = measureLabel(`i_2 = ${data.i2.toFixed(1)}^\\circ`, COLORS.orbit2, 1);
+            const lblDV = measureLabel(`\\Delta V = ${data.dv.toFixed(3)}\\ \\text{km/s}`, COLORS.burn, 0);
+            const lblNode = wordLabel(`Node Line (Burn)`, 1);
+            const lblCurr = wordLabel(`Spacecraft (u = ${Math.round(u_sc)}°)`, 0);
 
             labelRefs.push(
                 { pos: getOrbitPoint(r_n, i1, raan, 90), label: lblI1 },
@@ -454,7 +478,7 @@
             // 1. Highlight Earth's Polar Axis (Z axis)
             const poleNorth = new THREE.Vector3(0, 0, r_n * 1.3);
             const poleSouth = new THREE.Vector3(0, 0, -r_n * 1.3);
-            const poleLine = createThickLine([poleSouth, poleNorth], COLORS.node, 0.85, true);
+            const poleLine = createPath([poleSouth, poleNorth], COLORS.node, 0.85, true);
             maneuverGroup.add(poleLine);
             activeElements.push(poleLine);
 
@@ -463,7 +487,7 @@
             for (let deg = 0; deg <= 360; deg += 3) {
                 pts1.push(getOrbitPoint(r_n, 90, raan1, deg));
             }
-            const line1 = createThickLine(pts1, COLORS.orbit1);
+            const line1 = createPath(pts1, COLORS.orbit1);
             maneuverGroup.add(line1);
             activeElements.push(line1);
 
@@ -472,7 +496,7 @@
             for (let deg = 0; deg <= 360; deg += 3) {
                 pts2.push(getOrbitPoint(r_n, 90, raan2, deg));
             }
-            const line2 = createThickLine(pts2, COLORS.orbit2);
+            const line2 = createPath(pts2, COLORS.orbit2);
             maneuverGroup.add(line2);
             activeElements.push(line2);
 
@@ -480,7 +504,7 @@
             const burnU = data.u_burn;
             const burnPos = getOrbitPoint(r_n, 90, raan1, burnU);
             const poleSign = burnPos.z >= 0 ? 1 : -1;
-            const mBurn = createPulsingMarker(0.065, 0xf87171);
+            const mBurn = createMarker(0xf87171);
             mBurn.position.copy(burnPos);
             maneuverGroup.add(mBurn);
             activeElements.push(mBurn);
@@ -490,30 +514,27 @@
             const v2_vec = getOrbitTangent(90, raan2, burnU).multiplyScalar(1.2);
             const dv_vec = v2_vec.clone().sub(v1_vec);
 
-            const arrowV1 = createVectorArrow(burnPos, v1_vec, 0x38bdf8, 0.18, 0.09);
-            const arrowV2 = createVectorArrow(burnPos, v2_vec, 0x34d399, 0.18, 0.09);
+            const arrowV1 = createArrow(burnPos, v1_vec, 0x38bdf8, 0.18, 0.09);
+            const arrowV2 = createArrow(burnPos, v2_vec, 0x34d399, 0.18, 0.09);
             const v1_tip = burnPos.clone().add(v1_vec);
-            const arrowDV = createVectorArrow(v1_tip, dv_vec, 0xf87171, 0.22, 0.11);
+            const arrowDV = createArrow(v1_tip, dv_vec, 0xf87171, 0.22, 0.11);
 
             maneuverGroup.add(arrowV1, arrowV2, arrowDV);
             activeElements.push(arrowV1, arrowV2, arrowDV);
 
             // 5. Current Spacecraft Marker
             const currentPos = getOrbitPoint(r_n, 90, raan1, u_sc);
-            const currentMarker = new THREE.Mesh(
-                new THREE.SphereGeometry(0.055, 16, 16),
-                new THREE.MeshBasicMaterial({ color: 0xffffff })
-            );
+            const currentMarker = createMarker(0x94a3b8, 0.4);
             currentMarker.position.copy(currentPos);
             maneuverGroup.add(currentMarker);
             activeElements.push(currentMarker);
 
             // 6. Labels
-            const lblR1 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit1}">Ω₁ = ${data.raan1.toFixed(1)}°</span>`, { rank: 1 });
-            const lblR2 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit2}">Ω₂ = ${data.raan2.toFixed(1)}°</span>`, { rank: 1 });
-            const lblDV = labelLayer.add(`<span class="measure" style="color:${COLORS.burn}">ΔV = ${data.dv.toFixed(3)} km/s</span>`, { rank: 0 });
-            const lblPole = labelLayer.add(`<span class="measure" style="color:${COLORS.node}">${data.next_pole} (Burn Point)</span>`, { rank: 0 });
-            const lblCurr = labelLayer.add(`<span class="measure" style="color:#ffffff">Spacecraft (u = ${Math.round(u_sc)}°)</span>`, { rank: 0 });
+            const lblR1 = measureLabel(`\\Omega_1 = ${data.raan1.toFixed(1)}^\\circ`, COLORS.orbit1, 1);
+            const lblR2 = measureLabel(`\\Omega_2 = ${data.raan2.toFixed(1)}^\\circ`, COLORS.orbit2, 1);
+            const lblDV = measureLabel(`\\Delta V = ${data.dv.toFixed(3)}\\ \\text{km/s}`, COLORS.burn, 0);
+            const lblPole = wordLabel(`${data.next_pole} (Burn Point)`, 0);
+            const lblCurr = wordLabel(`Spacecraft (u = ${Math.round(u_sc)}°)`, 0);
 
             labelRefs.push(
                 { pos: getOrbitPoint(r_n, 90, raan1, 0), label: lblR1 },
@@ -567,7 +588,7 @@
             const transferRadius = (u) => p / (1 + (isRaise ? e : -e) * Math.cos(u * D2R));
 
             const addLine = (points, color, opacity, dashed) => {
-                const line = createThickLine(points, color, opacity, dashed);
+                const line = createPath(points, color, opacity, dashed);
                 maneuverGroup.add(line);
                 activeElements.push(line);
             };
@@ -589,7 +610,7 @@
             const burn1Pos = getOrbitPoint(R1_n, i1, raan, 0);
             const burn2Pos = getOrbitPoint(R2_n, i2, raan, 180);
             [burn1Pos, burn2Pos].forEach((pos) => {
-                const marker = createPulsingMarker(0.065, 0xf87171);
+                const marker = createMarker(0xf87171);
                 marker.position.copy(pos);
                 maneuverGroup.add(marker);
                 activeElements.push(marker);
@@ -600,7 +621,7 @@
             const plainDir = getOrbitTangent(incTransfer, raan, isRaise ? 0 : 180);
             if (!isRaise) plainDir.negate();
             const plainLen = Math.min(1.2, Math.max(0.4, (isRaise ? data.dv1 : data.dv2) * 0.45));
-            const plainArrow = createVectorArrow(plainPos, plainDir.multiplyScalar(plainLen), 0xf87171, 0.22, 0.12);
+            const plainArrow = createArrow(plainPos, plainDir.multiplyScalar(plainLen), 0xf87171, 0.22, 0.12);
             maneuverGroup.add(plainArrow);
             activeElements.push(plainArrow);
 
@@ -613,9 +634,9 @@
             const dvCombined = vFinal.clone().sub(vInitial);
             const vInitialTip = highPos.clone().add(vInitial);
             const triangle = [
-                createVectorArrow(highPos, vInitial, 0x38bdf8, 0.18, 0.09),
-                createVectorArrow(highPos, vFinal, 0x34d399, 0.18, 0.09),
-                createVectorArrow(vInitialTip, dvCombined, 0xf87171, 0.22, 0.11)
+                createArrow(highPos, vInitial, 0x38bdf8, 0.18, 0.09),
+                createArrow(highPos, vFinal, 0x34d399, 0.18, 0.09),
+                createArrow(vInitialTip, dvCombined, 0xf87171, 0.22, 0.11)
             ];
             triangle.forEach((arrow) => {
                 maneuverGroup.add(arrow);
@@ -623,11 +644,11 @@
             });
 
             // 5. Labels
-            const lblR1 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit1}">R₁ = ${Math.round(data.R1)} km, i₁ = ${i1.toFixed(1)}°</span>`, { rank: 1 });
-            const lblR2 = labelLayer.add(`<span class="measure" style="color:${COLORS.orbit2}">R₂ = ${Math.round(data.R2)} km, i₂ = ${i2.toFixed(1)}°</span>`, { rank: 1 });
-            const lblHigh = labelLayer.add(`<span class="measure" style="color:${COLORS.node}">Combined Burn</span>`, { rank: 1 });
-            const lblB1 = labelLayer.add(`<span class="measure" style="color:${COLORS.burn}">ΔV₁ = ${data.dv1.toFixed(3)} km/s</span>`, { rank: 0 });
-            const lblB2 = labelLayer.add(`<span class="measure" style="color:${COLORS.burn}">ΔV₂ = ${data.dv2.toFixed(3)} km/s</span>`, { rank: 0 });
+            const lblR1 = measureLabel(`R_1 = ${Math.round(data.R1)}\\ \\text{km}, i_1 = ${i1.toFixed(1)}^\\circ`, COLORS.orbit1, 1);
+            const lblR2 = measureLabel(`R_2 = ${Math.round(data.R2)}\\ \\text{km}, i_2 = ${i2.toFixed(1)}^\\circ`, COLORS.orbit2, 1);
+            const lblHigh = wordLabel(`Combined Burn`, 1);
+            const lblB1 = measureLabel(`\\Delta V_1 = ${data.dv1.toFixed(3)}\\ \\text{km/s}`, COLORS.burn, 0);
+            const lblB2 = measureLabel(`\\Delta V_2 = ${data.dv2.toFixed(3)}\\ \\text{km/s}`, COLORS.burn, 0);
 
             labelRefs.push(
                 { pos: getOrbitPoint(R1_n, i1, raan, 70), label: lblR1 },
@@ -708,39 +729,44 @@
             camera.lookAt(cam.targetX, cam.targetY, cam.targetZ);
         }
 
+        canvas.style.touchAction = 'none';
+        canvas.style.cursor = 'grab';
+        const pointers = new Map();
+        let pinchStart = 0, pinchDist = 1;
+
         canvas.addEventListener('pointerdown', (e) => {
-            isDragging = true;
-            lastX = e.clientX;
-            lastY = e.clientY;
             canvas.setPointerCapture(e.pointerId);
-            if (hint) hint.style.opacity = '0';
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pointers.size === 2) {
+                const [p1, p2] = [...pointers.values()];
+                pinchStart = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+                pinchDist = cam.dist;
+            }
+            if (hint) hint.style.display = 'none';
         });
 
         canvas.addEventListener('pointermove', (e) => {
-            if (!isDragging) return;
-            const dx = e.clientX - lastX;
-            const dy = e.clientY - lastY;
-            lastX = e.clientX;
-            lastY = e.clientY;
-            cam.az = (cam.az - dx * 0.45 + 360) % 360;
-            cam.el = Math.max(-85, Math.min(85, cam.el + dy * 0.45));
-            updateCamera();
+            const last = pointers.get(e.pointerId);
+            if (!last) return;
+            if (pointers.size === 1) {
+                cam.az = (cam.az - (e.clientX - last.x) * 0.35 + 360) % 360;
+                cam.el = Math.max(-86, Math.min(86, cam.el + (e.clientY - last.y) * 0.3));
+            }
+            last.x = e.clientX;
+            last.y = e.clientY;
+            if (pointers.size === 2 && pinchStart > 0) {
+                const [p1, p2] = [...pointers.values()];
+                cam.dist = Math.max(2.2, Math.min(35.0, (pinchDist * pinchStart) / Math.hypot(p1.x - p2.x, p1.y - p2.y)));
+            }
         });
 
-        const stopDrag = (e) => {
-            if (isDragging) {
-                isDragging = false;
-                try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-            }
-        };
-        canvas.addEventListener('pointerup', stopDrag);
-        canvas.addEventListener('pointercancel', stopDrag);
+        const removePointer = (e) => pointers.delete(e.pointerId);
+        canvas.addEventListener('pointerup', removePointer);
+        canvas.addEventListener('pointercancel', removePointer);
 
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const factor = e.deltaY > 0 ? 1.08 : 0.92;
-            cam.dist = Math.max(2.2, Math.min(35.0, cam.dist * factor));
-            updateCamera();
+            cam.dist = Math.max(2.2, Math.min(35.0, cam.dist * Math.exp(e.deltaY * 0.0012)));
         }, { passive: false });
 
         if (reset) {
@@ -777,23 +803,16 @@
                 }
                 const { pos, forward } = anim.trajectory(anim.progress);
                 if (pos) spacecraft.position.copy(pos);
-                if (forward) {
-                    const lookTarget = pos.clone().add(forward);
-                    spacecraft.lookAt(lookTarget);
-                }
                 if (onProgress) onProgress(anim.progress);
             }
 
-            // Pulse burn markers
-            activeElements.forEach((obj) => {
-                if (obj.userData && obj.userData.ring) {
-                    const scale = 1.0 + 0.3 * Math.sin(now * 0.006);
-                    obj.userData.ring.scale.set(scale, scale, 1);
-                    obj.userData.ringMat.opacity = 0.4 + 0.3 * Math.cos(now * 0.006);
-                }
-            });
+            // Parts that keep their size on screen as the view zooms
+            sz = cam.dist / 100;
+            const unitKey = Math.round(Math.log(sz) * 16);
+            sizers.forEach((fn) => fn(sz, unitKey));
 
             updateCamera();
+            stars.follow(camera);
             renderer.render(scene, camera);
 
             // Update Labels

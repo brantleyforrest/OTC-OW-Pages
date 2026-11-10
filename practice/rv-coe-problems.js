@@ -117,17 +117,19 @@
     const snapRadius = (x) => Math.round(x / 100) * 100;
     const snapSpeed = (x) => Number(x.toFixed(3));
 
-    function randomRadius() {
+    // lowest: the smallest radius a problem may use (km).
+    function randomRadius(lowest) {
+        const start = Math.max(6700, lowest);
+        const split = Math.max(9000, start * 1.45);
         const band = Math.random();
-        if (band < 0.5) return snapRadius(between(6700, 9000));
-        if (band < 0.8) return snapRadius(between(9000, 30000));
+        if (band < 0.5) return snapRadius(between(start, split));
+        if (band < 0.8) return snapRadius(between(split, 30000));
         return snapRadius(between(30000, 45000));
     }
 
     // The speed that makes this radius circular, the perigee, or the apogee of a random ellipse.
-    function speedFor(kind, R) {
+    function speedFor(kind, R, lowest) {
         if (kind === 'circular') return Math.sqrt(MU / R);
-        const lowest = R_EARTH + MIN_ALTITUDE;
         const eMax = kind === 'perigee'
             ? Math.min(MAX_E - 0.05, (MAX_APOGEE - R) / (MAX_APOGEE + R))
             : Math.min(MAX_E - 0.05, (R - lowest) / (R + lowest));
@@ -151,7 +153,7 @@
 
     // The nonzero components of position and velocity, as [in r, in v]. The velocity is always
     // perpendicular to the position, because the satellite is at an apsis or on a circle.
-    function buildCandidate() {
+    function buildCandidate(lowest) {
         const kind = pick(['circular', 'circular', 'perigee', 'perigee', 'perigee', 'apogee', 'apogee', 'apogee']);
         const pattern = pick(['1-1', '1-1', '2-1', '2-1', '2-1', '1-2', '1-2', '1-2']);
 
@@ -159,8 +161,8 @@
             const equatorialPair = Math.random() < 0.5;
             const rAxis = equatorialPair ? pick([0, 1]) : pick([0, 1, 2]);
             const vAxis = equatorialPair ? 1 - rAxis : (rAxis === 2 ? pick([0, 1]) : 2);
-            const R = randomRadius();
-            const speed = speedFor(kind, R);
+            const R = randomRadius(lowest);
+            const speed = speedFor(kind, R, lowest);
             if (!speed) return null;
             return { kind, r: vectorAlong(rAxis, randomSign() * R), v: vectorAlong(vAxis, randomSign() * snapSpeed(speed)) };
         }
@@ -168,38 +170,41 @@
         if (pattern === '2-1') {
             const vAxis = pick([0, 1, 2]);
             const axes = [0, 1, 2].filter((axis) => axis !== vAxis);
-            const r = equalParts(axes, snapRadius(randomRadius() * Math.SQRT1_2));
-            const speed = speedFor(kind, length(r));
+            const r = equalParts(axes, snapRadius(randomRadius(lowest) * Math.SQRT1_2));
+            const speed = speedFor(kind, length(r), lowest);
             if (!speed) return null;
             return { kind, r, v: vectorAlong(vAxis, randomSign() * snapSpeed(speed)) };
         }
 
         const rAxis = pick([0, 1, 2]);
         const axes = [0, 1, 2].filter((axis) => axis !== rAxis);
-        const R = randomRadius();
-        const speed = speedFor(kind, R);
+        const R = randomRadius(lowest);
+        const speed = speedFor(kind, R, lowest);
         if (!speed) return null;
         return { kind, r: vectorAlong(rAxis, randomSign() * R), v: equalParts(axes, snapSpeed(speed * Math.SQRT1_2)) };
     }
 
     const nonzeroCount = (p) => p.filter((c) => c !== 0).length;
 
-    function isUsable(candidate, S) {
+    function isUsable(candidate, S, lowest) {
         const counts = [nonzeroCount(candidate.r), nonzeroCount(candidate.v)];
         if (counts[0] < 1 || counts[1] < 1 || counts[0] > 2 || counts[1] > 2 || counts[0] + counts[1] > 3) return false;
         if (S.rDotV !== 0 || S.energy >= 0 || S.apsis !== candidate.kind) return false;
-        if (candidate.kind === 'circular') return S.circular && S.R >= R_EARTH + MIN_ALTITUDE && S.R <= MAX_CIRCULAR;
+        if (candidate.kind === 'circular') return S.circular && S.R >= lowest && S.R <= MAX_CIRCULAR;
         if (S.eMag < MIN_E || S.eMag > MAX_E) return false;
         const perigee = S.aRaw * (1 - S.eMag), apogee = S.aRaw * (1 + S.eMag);
-        return perigee >= R_EARTH + MIN_ALTITUDE && apogee <= MAX_APOGEE;
+        return perigee >= lowest && apogee <= MAX_APOGEE;
     }
 
-    function generate() {
+    // options.minRadius: the smallest distance from Earth's center the satellite may reach (km).
+    // A larger value keeps the orbit well clear of Earth in the 3D view.
+    function generate(options = {}) {
+        const lowest = Math.max(R_EARTH + MIN_ALTITUDE, options.minRadius || 0);
         for (;;) {
-            const candidate = buildCandidate();
+            const candidate = buildCandidate(lowest);
             if (!candidate) continue;
             const S = solve(candidate.r, candidate.v);
-            if (isUsable(candidate, S)) return fromState(candidate.r, candidate.v);
+            if (isUsable(candidate, S, lowest)) return fromState(candidate.r, candidate.v);
         }
     }
 

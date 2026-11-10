@@ -30,7 +30,7 @@
 
         /* Test mode before grading: answers only, in one centered column */
         body.answers-only .tool-stage-col { display: none; }
-        body.answers-only .tool-layout { grid-template-columns: minmax(0, 42rem); justify-content: center; }
+        body.answers-only .tool-layout { grid-template-columns: minmax(0, 40rem); justify-content: center; }
 
         /* Caption below view */
         .tool-hud {
@@ -68,11 +68,12 @@
             font-family: var(--font-mono);
             font-size: 0.8rem;
             font-weight: 600;
-            padding: 0.1rem 0.35rem;
-            border-radius: 4px;
-            background: rgba(6, 11, 20, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 0 0.25rem;
+            border-radius: 3px;
+            background: rgba(6, 11, 20, 0.72);
         }
+
+        .tool-label .katex { font-size: 1.12em; }
 
         /* Controls under canvas */
         .playback-bar {
@@ -128,47 +129,18 @@
         .tool-side .panel { padding: 0.8rem 0.9rem; }
         .tool-side > .col > .panel { flex-grow: 0; }
 
-        .selector-row {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-bottom: 0.6rem;
-        }
-
-        .selector-label {
-            font-size: 0.76rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: var(--text-dim);
-        }
-
-        .segmented.compact button {
-            padding: 0.3rem 0.5rem;
-            font-size: 0.76rem;
-        }
-
-        .actions-row {
+        .mode-row {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 0.45rem;
-            margin-top: 0.6rem;
+            gap: 0.5rem 0.75rem;
         }
 
-        .btn-preset {
-            padding: 0.3rem 0.6rem;
-            font-size: 0.76rem;
-            border-color: var(--border-accent);
-            color: var(--accent-blue);
-        }
-
-        .btn-preset:hover {
-            background: rgba(58, 130, 247, 0.15);
-            color: #ffffff;
-        }
-
-        .mode-caption { margin-top: 0.45rem; font-size: 0.78rem; line-height: 1.35; }
+        .mode-row .segmented { flex: 1 1 12rem; }
+        .mode-row + .mode-row { margin-top: 0.5rem; }
+        .segmented.compact button { padding: 0.3rem 0.5rem; font-size: 0.76rem; }
+        .btn-preset { padding: 0.3rem 0.6rem; font-size: 0.76rem; }
+        .mode-caption { margin-top: 0.4rem; }
 
         /* Given container */
         .given {
@@ -190,8 +162,8 @@
         /* Answers */
         .answers {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-            gap: 0.4rem 0.75rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.4rem 0.8rem;
         }
 
         .answer label {
@@ -256,12 +228,12 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 0.4rem 0.75rem;
-            margin-top: 0.55rem;
+            margin-top: 0.35rem;
         }
 
         .answer-score { font-size: 0.86rem; font-weight: 600; color: #ffffff; }
         .answer-score.warn { font-weight: 500; color: #fbbf24; }
-        .answer-limits { margin-top: 0.45rem; font-size: 0.78rem; }
+        .answer-limits { margin-top: 0.45rem; }
 
         /* Walkthrough */
         .walk-head {
@@ -321,7 +293,7 @@
             text-align: right;
         }
 
-        .step-body { padding: 0.1rem 0.2rem 0.7rem 1.75rem; }
+        .step-body { padding: 0.1rem 0.2rem 0.7rem 1.95rem; }
 
         .methods { flex-wrap: wrap; margin: 0.15rem 0 0.25rem; }
         .methods button { flex: 1 1 auto; padding: 0.3rem 0.5rem; font-size: 0.76rem; }
@@ -359,7 +331,7 @@
             overflow-x: auto;
             margin-top: 0.5rem;
             border-radius: 6px;
-            border: 1px solid var(--border-accent);
+            border: 1px solid var(--border-subtle);
         }
 
         .hohmann-table {
@@ -367,49 +339,71 @@
             border-collapse: collapse;
             font-size: 0.82rem;
             text-align: center;
-            background: #091322;
+            background: var(--deep-space);
         }
 
         .hohmann-table th, .hohmann-table td {
-            border: 1px solid #1e3a5f;
+            border: 1px solid var(--border-subtle);
             padding: 0.45rem 0.55rem;
         }
 
         .hohmann-table th {
-            background: #112540;
-            color: #93c5fd;
+            background: var(--surface-card);
+            color: var(--text-muted);
             font-weight: 600;
         }
 
         .hohmann-table td.highlight-cell {
-            background: rgba(58, 130, 247, 0.12);
+            background: var(--surface-hover);
             color: #ffffff;
             font-weight: 500;
         }
 
         .hohmann-table td.summary-cell {
-            background: rgba(197, 155, 60, 0.15);
-            color: #fbbf24;
+            background: var(--gold-glow);
+            color: var(--accent-gold);
             font-weight: 600;
         }
 
         .hohmann-table td.transfer-row {
-            background: rgba(245, 158, 11, 0.08);
-            color: #fcd34d;
+            background: transparent;
+            color: var(--text-main);
         }
 
         @media (min-width: 1081px) {
             .tool-layout { --aside-w: 36rem; }
         }
 
+        @media (min-width: 1081px) and (min-height: 600px) {
+            html { scroll-padding-top: calc(var(--nav-h) + 0.5rem); }
+        }
+
+        @media (min-width: 700px) and (max-width: 1080px) {
+            .tool-side { grid-template-columns: minmax(0, 1fr); }
+        }
+
         @media (min-width: 1081px) and (max-width: 1300px) {
-            .tool-layout { --aside-w: 32rem; }
+            .tool-layout { --aside-w: 31rem; }
+        }
+
+        @media (max-width: 640px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+            .tool-hud { font-size: 0.8rem; min-height: 0; }
+            .step-body { padding-left: 0.2rem; }
         }
 
         @media (max-width: 640px) {
             .playback-bar { flex-wrap: wrap; gap: 0.4rem; }
-            .answers { grid-template-columns: 1fr; }
             #maneuver-type { flex-wrap: wrap; }
+        }
+
+        @media (max-width: 640px) and (orientation: portrait) {
+            :root:has(.answer input:focus) { --tool-view-h: 24svh; }
+            body.answers-only .tool-main { padding-top: calc(var(--nav-h) + 0.5rem); }
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+            body.answers-only .top-nav { width: 100%; }
+            body.answers-only .tool-main { padding: calc(var(--nav-h) + 0.5rem) 1rem 1rem; }
         }
     </style>
 </head>
@@ -492,8 +486,7 @@
             <aside class="tool-side">
                 <div class="col">
                     <div class="panel">
-                        <div class="selector-row">
-                            <span class="selector-label">Maneuver Type</span>
+                        <div class="mode-row">
                             <div class="segmented compact" id="maneuver-type" role="group" aria-label="Select maneuver category">
                                 <button type="button" data-value="all" aria-pressed="true">All</button>
                                 <button type="button" data-value="hohmann" aria-pressed="false">Hohmann</button>
@@ -503,16 +496,15 @@
                             </div>
                         </div>
 
-                        <div class="selector-row">
-                            <span class="selector-label">Mode</span>
+                        <div class="mode-row">
                             <div class="segmented" id="mode" role="group" aria-label="Choose a mode">
                                 <button type="button" data-value="practice" aria-pressed="true">Practice</button>
                                 <button type="button" data-value="test" aria-pressed="false">Test</button>
                             </div>
+                            <button type="button" class="btn" id="new-problem">New Problem</button>
                         </div>
 
-                        <div class="actions-row">
-                            <button type="button" class="btn primary" id="new-problem">New Problem</button>
+                        <div class="mode-row">
                             <button type="button" class="btn btn-preset" id="preset-slide2" title="Load Hohmann Transfer Example from Slide 2">Slide #2 Example</button>
                             <button type="button" class="btn btn-preset" id="preset-slide1" title="Load Simple Plane Change Example from Slide 1">Slide #1 Example</button>
                             <button type="button" class="btn btn-preset" id="preset-combined" title="Load the GPS Combined Plane Change Example from the slides">Combined Example</button>
