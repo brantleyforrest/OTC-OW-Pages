@@ -81,6 +81,11 @@
         const ARC_SIDES = 8;
         const DIMMED = 0.3;
         const HOME_SECONDS = 0.9;
+        const CAMERA_SECONDS = 1.4;     // A camera move to the next step
+        const MAX_TILT = 74;            // Steepest camera angle a step uses, in degrees
+        const FRAME_MARGIN = 1.18;      // Room left around what a step frames
+        const EARTH_EDGE = 1.03;
+        const TIP_CLEARANCE = 3.2;      // The camera stays this many tip distances from the center
 
         // Levels for a burn's arrows: before it happens, while it happens, and after it.
         const UPCOMING = 0.3;
@@ -448,6 +453,14 @@
         const planeNormal = (inc, raan) => new THREE.Vector3(
             Math.sin(raan * D2R) * Math.sin(inc * D2R), -Math.cos(raan * D2R) * Math.sin(inc * D2R), Math.cos(inc * D2R));
         const ring = (r, inc, raan) => (t, out) => orbitPoint(r, inc, raan, t * 360, out);
+        const ringSample = (r, inc, raan, from = 0, to = 360, count = 36) =>
+            Array.from({ length: count + 1 }, (_, k) => orbitPoint(r, inc, raan, from + ((to - from) * k) / count));
+
+        // Looks down on a plane from its north side, tilted a little toward -J.
+        function aboveView(normal) {
+            const up = normal.z < 0 ? normal.clone().negate() : normal.clone();
+            return up.addScaledVector(Z_AXIS, 0.24).add(new THREE.Vector3(0, -0.35, 0)).normalize();
+        }
 
         function fromAngles(az, el) {
             const a = az * D2R, b = el * D2R;
@@ -614,7 +627,16 @@
                 r2Anchor: Q2.clone().multiplyScalar(0.6),
                 i1Anchor: orbitPoint(R1, i1, 0, 90),
                 i2Anchor: orbitPoint(R2, i2, 0, 90),
-                home: homeView(W, -70)
+                home: homeView(W, -70),
+                // For framing each step
+                above: aboveView(W),
+                ring1Points: ringSample(R1, i1, 0),
+                transferPoints: Array.from({ length: 13 }, (_, k) => transferAt(k * 15)),
+                burnFrames: {
+                    burn1: [R1, incStart, iTransfer, 0],
+                    burn2: [R2, iTransfer, incEnd, 180],
+                    burn3: raise ? [R2, i1, i2, 180] : [R1, i1, i2, 0]
+                }
             };
         }
 
@@ -658,7 +680,22 @@
                     : null,
                 anchor1: polar ? orbitPoint(r, plane1.inc, plane1.raan, 0) : orbitPoint(r, plane1.inc, plane1.raan, 90),
                 anchor2: polar ? orbitPoint(r, plane2.inc, plane2.raan, 0) : orbitPoint(r, plane2.inc, plane2.raan, 90),
-                home: homeView(W1.clone().add(W2).normalize(), 35)
+                home: homeView(planesMatch ? W1 : W1.clone().add(W2).normalize(), 35),
+                // For framing each step. At the burn, look along the line where the planes
+                // cross, so the two velocities show at their true angle. Over a pole, look in
+                // from the side instead of down Earth's axis.
+                above: aboveView(W1),
+                ring1Points: ringSample(r, plane1.inc, plane1.raan),
+                nearBurn: ringSample(r, plane1.inc, plane1.raan, uBurn - 14, uBurn + 14, 4)
+                    .concat(ringSample(r, plane2.inc, plane2.raan, uBurn - 14, uBurn + 14, 4)),
+                V1tip: B.clone().add(T1),
+                V2tip: B.clone().add(T2),
+                burnDir: (() => {
+                    const Bhat = B.clone().normalize();
+                    return polar
+                        ? Bhat.clone().addScaledVector(T1.clone().add(T2).normalize(), 0.9).normalize()
+                        : Bhat.clone().addScaledVector(Z_AXIS, 0.35).addScaledVector(new THREE.Vector3().crossVectors(Z_AXIS, Bhat).normalize(), -0.25).normalize();
+                })()
             };
         }
 
@@ -676,6 +713,9 @@
         const CAMERA_KEYS = Object.keys(camView);
         const anchors = { theta: new THREE.Vector3(), tof: new THREE.Vector3(), du: new THREE.Vector3(), raan: new THREE.Vector3() };
 
+        let focusKey = 'start';   // The step the camera frames
+        let manual = false;       // True once the reader has turned or zoomed the view in this step
+
         function homeGoal() {
             return { az: data.home.az, el: data.home.el, zoom: 1, x: 0, y: 0, z: 0 };
         }
@@ -685,6 +725,98 @@
             flight = { from, to: { ...goal, az: nearestAngle(from.az, goal.az) }, clock: 0, seconds };
         }
 
+        // The camera setting that looks along `direction` and fits these points and Earth. With
+        // `tight`, only the points are fitted, so the view centers on them. From Test 1.
+        function fit(direction, points, tight = false, clearTip = true) {
+            const az = Math.atan2(direction.y, direction.x) * R2D;
+            const el = Math.max(-MAX_TILT, Math.min(MAX_TILT, Math.asin(Math.max(-1, Math.min(1, direction.z))) * R2D));
+            const dir = fromAngles(az, el);
+            const right = new THREE.Vector3().crossVectors(Z_AXIS, dir).normalize();
+            const up = new THREE.Vector3().crossVectors(dir, right);
+            const all = tight ? points : points.concat([
+                right.clone().multiplyScalar(EARTH_EDGE), right.clone().multiplyScalar(-EARTH_EDGE),
+                up.clone().multiplyScalar(EARTH_EDGE), up.clone().multiplyScalar(-EARTH_EDGE)
+            ]);
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const point of all) {
+                const x = point.dot(right), y = point.dot(up);
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+            }
+            const midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
+
+            const aspect = viewW / viewH;
+            let distance = 0;
+            for (const point of all) {
+                const depth = point.dot(dir);
+                const needY = (Math.abs(point.dot(up) - midY) * FRAME_MARGIN) / TAN_HALF_FOV;
+                const needX = (Math.abs(point.dot(right) - midX) * FRAME_MARGIN) / (TAN_HALF_FOV * aspect);
+                distance = Math.max(distance, depth + needY, depth + needX);
+            }
+            // An arrow pointing at the camera looks huge up close.
+            if (clearTip) distance = Math.max(distance, data.kTip.dot(dir) * TIP_CLEARANCE);
+
+            const target = right.multiplyScalar(midX).addScaledVector(up, midY);
+            const zoom = Math.min(MAX_ZOOM, (distance * Math.min(1, aspect)) / data.camFit);
+            return { az, el, zoom, x: target.x, y: target.y, z: target.z };
+        }
+
+        // A burn seen from above its plane, or, when it turns the velocity, from outside the
+        // orbit, so the triangle of velocities shows at its true angle.
+        function burnGoal(b, R, incBefore, incAfter, u) {
+            const near = ringSample(R, incBefore, 0, u - 12, u + 12, 4).concat(ringSample(R, incAfter, 0, u - 12, u + 12, 4));
+            const points = [b.P, b.tipBefore, b.tipAfter, b.dvFrom, b.dvEnd, b.afterFrom, ...near];
+            if (b.collinear) return fit(data.above, points, true, false);
+            const outward = b.P.clone().normalize();
+            return fit(outward.add(new THREE.Vector3(0, -0.3, 0.35)).normalize(), points, true, false);
+        }
+
+        // Where the camera goes for each step: the whole maneuver at the start and the end, and
+        // a close view of each burn, coast, and transfer in between.
+        function goalFor(key) {
+            const d = data;
+            if (key === 'start' || key === 'coast2') return homeGoal();
+            if (d.family === 'transfer') {
+                if (d.noTransfer) return homeGoal();
+                switch (key) {
+                    case 'coast1': return fit(d.above, [...d.ring1Points, d.P1]);
+                    case 'transfer': return fit(d.above, [...d.transferPoints, d.P1, d.P2]);
+                    case 'burn1': case 'burn2': case 'burn3':
+                        return d.burns[key] ? burnGoal(d.burns[key], ...d.burnFrames[key]) : homeGoal();
+                    default: return homeGoal();
+                }
+            }
+            if (d.planesMatch) return homeGoal();
+            if (key === 'coast1') return fit(d.above, [...d.ring1Points, d.sat, d.B]);
+            if (key === 'burn') return fit(d.burnDir, [d.B, d.V1tip, d.V2tip, ...d.nearBurn], true, false);
+            return homeGoal();
+        }
+
+        // Moves the camera to frame a step.
+        function setFocus(key, instant = false) {
+            focusKey = key;
+            manual = false;
+            if (!data) return;
+            if (instant || Kit.prefersReducedMotion()) {
+                flight = null;
+                Object.assign(camView, goalFor(key));
+            } else {
+                flyTo(goalFor(key), CAMERA_SECONDS);
+            }
+            dirty = true;
+        }
+
+        // Keeps the current step framed after the orbits or the view size change.
+        function refit() {
+            if (!data || manual) return;
+            const goal = goalFor(focusKey);
+            if (flight) flight.to = { ...goal, az: nearestAngle(flight.from.az, goal.az) };
+            else Object.assign(camView, goal);
+        }
+
         function setModel(model) {
             if (!model) return;
             modelId += 1;
@@ -692,13 +824,15 @@
             data.id = modelId;
             for (const object of everything) object.visible = false;
             setWord(labels.burn, data.family === 'plane' ? (data.polar ? model.next_pole : model.next_node) || '' : '');
-            // A new kind of maneuver starts from its own view. Moving a slider keeps the reader's view;
-            // the camera distance follows the size of the orbits on its own.
+            // A new kind of maneuver starts from its overview. Moving a slider keeps the current
+            // step framed, unless the reader has moved the view.
             if (model.type !== lastType) {
-                if (!lastType) Object.assign(camView, homeGoal());
-                else flyTo(homeGoal(), HOME_SECONDS);
+                const first = !lastType;
                 lastType = model.type;
                 layer.remeasure();
+                setFocus('start', first);
+            } else {
+                refit();
             }
             phase = phaseAt(model, time);
             dirty = true;
@@ -716,8 +850,11 @@
             dirty = true;
         }
 
+        // Returns to the framing of the current step.
         function resetView() {
-            if (data) flyTo(homeGoal(), HOME_SECONDS);
+            if (!data) return;
+            manual = false;
+            flyTo(goalFor(focusKey), HOME_SECONDS);
         }
 
         /* Scene update ----------------------------------------------------- */
@@ -1032,6 +1169,7 @@
             const last = pointers.get(event.pointerId);
             if (!last || !data) return;
             flight = null;
+            manual = true;
             if (pointers.size === 1) {
                 camView.az -= (event.clientX - last.x) * 0.35;
                 camView.el = Math.min(86, Math.max(-86, camView.el + (event.clientY - last.y) * 0.3));
@@ -1053,6 +1191,7 @@
             if (!data) return;
             event.preventDefault();
             flight = null;
+            manual = true;
             camView.zoom = clampZoom(camView.zoom * Math.exp(event.deltaY * 0.0012));
             dirty = true;
         }, { passive: false });
@@ -1067,6 +1206,7 @@
             camera.aspect = viewW / viewH;
             camera.updateProjectionMatrix();
             layer.remeasure();
+            refit();
             renderFrame();
         }
 
@@ -1087,7 +1227,7 @@
             }
         });
 
-        return { setModel, setTime, setShown, resetView, resize };
+        return { setModel, setTime, setShown, setFocus, resetView, resize };
     }
 
     global.ManeuverScene = { create, segments, phaseAt, planeBurn };

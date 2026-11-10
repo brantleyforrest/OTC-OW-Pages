@@ -100,7 +100,7 @@
         #maneuver-type { flex: 1 1 22rem; }
         .timeline-grow { flex: 3 1 14rem; }
         .speed-grow { flex: 1 1 7rem; min-width: 7rem; }
-        #btn-play { min-width: 4.6rem; }
+        #btn-back, #btn-next { min-width: 4.6rem; }
 
         .ctl-checks-row {
             padding-top: 0.35rem;
@@ -490,7 +490,8 @@
                     <!-- Row 2: Playback -->
                     <div class="ctl-row">
                         <div class="buttons">
-                            <button type="button" class="btn primary" id="btn-play">Pause</button>
+                            <button type="button" class="btn" id="btn-back">Back</button>
+                            <button type="button" class="btn primary" id="btn-next">Next</button>
                             <button type="button" class="btn" id="btn-rewind">Restart</button>
                         </div>
                         <div class="ctl-grow timeline-grow">

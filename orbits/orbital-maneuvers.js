@@ -61,12 +61,11 @@
     const state = {
         type: 'hohmann',
         values: JSON.parse(JSON.stringify(DEFAULTS)),
-        playing: !Kit.prefersReducedMotion(),
+        step: 0,          // 0 is the overview; each later step is one part of the maneuver
+        anim: null,       // The part that is playing, if any
         speedIndex: 1,
         speeds: [{ rate: 0.5, label: 'Slow' }, { rate: 1, label: 'Normal' }, { rate: 2, label: 'Fast' }],
-        endHold: 0,
         timeline: 0,
-        draggingTimeline: false,
         activePhase: '',
         shown: {
             vectors: true,
@@ -179,7 +178,8 @@
     /* DOM Element Caches                                                 */
     /* ------------------------------------------------------------------ */
     const typeButtons = document.querySelectorAll('#maneuver-type button');
-    const btnPlay = $('btn-play');
+    const btnBack = $('btn-back');
+    const btnNext = $('btn-next');
     const btnRewind = $('btn-rewind');
     const timelineSlider = $('timeline-slider');
     const timelineValueEl = $('timeline-value');
@@ -649,10 +649,9 @@
         // Card click jumpers
         equationCardsEl.querySelectorAll('.equation-card').forEach((cardEl) => {
             cardEl.addEventListener('click', () => {
-                // Pauses on the part of the maneuver this equation describes.
-                setPlaying(false);
-                state.endHold = 0;
-                setTimeline(Number(cardEl.dataset.targetT || 0));
+                // Moves to the step this equation describes.
+                const t = Number(cardEl.dataset.targetT || 0);
+                goToStep(stepForTime(t), { at: t });
             });
         });
     }
@@ -966,9 +965,15 @@
         if (!currentSolved) return;
         const m = currentSolved;
         const phase = Timeline.phaseAt(m, state.timeline);
-        const text = phaseText(m, phase.key);
+        const n = Timeline.segments(m).length;
+        const overview = state.step === 0;
+        const text = overview
+            ? { hud: n === 1 ? '<b>Overview.</b> Press Next to play it.' : `<b>Overview.</b> The whole maneuver, in ${n} steps. Press Next to step through it.`, card: '' }
+            : phaseText(m, phase.key);
         if (hudEl && hudEl.innerHTML !== text.hud) hudEl.innerHTML = text.hud;
-        if (timelineValueEl) timelineValueEl.textContent = phaseName(m, phase.key);
+        if (timelineValueEl) {
+            timelineValueEl.textContent = overview ? 'Overview' : `Step ${state.step} of ${n}: ${phaseName(m, phase.key)}`;
+        }
         if (state.activePhase !== text.card) {
             state.activePhase = text.card;
             if (equationCardsEl) {
@@ -993,24 +998,89 @@
         renderDvBudget(currentSolved);
         renderWhatToNotice(currentSolved);
 
+        // The parts of a maneuver can change with the sliders (a plane change before or after
+        // the transfer, or no transfer at all), so the step is kept within the new list.
+        const list = Timeline.segments(currentSolved);
+        if (state.step > list.length) {
+            state.step = list.length;
+            state.anim = null;
+        }
+        if (!state.anim && stepForTime(state.timeline) !== state.step) state.timeline = stepEnd(state.step);
         if (sceneController) {
             sceneController.setModel(currentSolved);
             sceneController.setTime(state.timeline);
+            const key = state.step === 0 ? 'start' : list[state.step - 1].key;
+            if (key !== state.focusKey) focusStep();
         }
+        updateStepButtons();
         updateHudAndHighlight();
     }
 
     /* ------------------------------------------------------------------ */
-    /* Playback & Animation Loop                                          */
+    /* Steps & Animation Loop                                             */
     /* ------------------------------------------------------------------ */
-    const CYCLE_SECONDS = 14;   // One pass through the maneuver at Normal speed
-    const END_HOLD = 1.2;       // Pause at the end before starting again, in seconds
+    // Step 0 is an overview of the whole maneuver. Each later step plays one part of it (a
+    // coast, a burn, or the transfer) and then stops, and the camera moves to frame that part.
+    const CYCLE_SECONDS = 14;   // The whole maneuver at Normal speed
+    const MIN_STEP_SECONDS = 1;
+
+    function stepList() {
+        return currentSolved ? Timeline.segments(currentSolved) : [];
+    }
+
+    // The step whose part of the maneuver includes time t.
+    function stepForTime(t) {
+        const list = stepList();
+        if (!list.length) return 0;
+        const index = list.findIndex((seg) => t < seg.to);
+        return (index < 0 ? list.length - 1 : index) + 1;
+    }
+
+    // Where a step stops: the end of its part, kept just inside it so the caption matches.
+    function stepEnd(step) {
+        const list = stepList();
+        if (step <= 0 || !list.length) return 0;
+        if (step >= list.length) return 1;
+        return list[step - 1].to - 1e-4;
+    }
 
     function setTimeline(t) {
         state.timeline = Math.max(0, Math.min(1, t));
         timelineSlider.value = Math.round(state.timeline * 1000);
         if (sceneController) sceneController.setTime(state.timeline);
         updateHudAndHighlight();
+    }
+
+    function focusStep() {
+        if (!sceneController) return;
+        const list = stepList();
+        state.focusKey = state.step === 0 ? 'start' : list[state.step - 1].key;
+        sceneController.setFocus(state.focusKey);
+    }
+
+    // Shows a step. With `animate`, its part of the maneuver plays from the start; otherwise it
+    // jumps straight to `at`, or to where the step ends.
+    function goToStep(step, { animate = false, at = null } = {}) {
+        const list = stepList();
+        step = Math.max(0, Math.min(list.length, step));
+        const changed = step !== state.step;
+        state.step = step;
+        state.anim = null;
+        if (step > 0 && animate && !Kit.prefersReducedMotion()) {
+            const seg = list[step - 1];
+            state.anim = { from: seg.from, to: stepEnd(step), clock: 0 };
+            setTimeline(seg.from);
+        } else {
+            setTimeline(at === null ? stepEnd(step) : at);
+        }
+        if (changed || animate) focusStep();
+        updateStepButtons();
+    }
+
+    function updateStepButtons() {
+        const n = stepList().length;
+        btnBack.disabled = state.step <= 0;
+        btnNext.disabled = state.step >= n && !state.anim;
     }
 
     // Slider changes are applied once per frame, because the equations are slow to redraw.
@@ -1024,29 +1094,34 @@
             updatePending = false;
             updateAll();
         }
-        if (!state.playing || state.draggingTimeline) return;
-        if (state.timeline >= 1) {
-            state.endHold += dt;
-            if (state.endHold < END_HOLD) return;
-            state.endHold = 0;
-            setTimeline(0);
-            return;
+        const anim = state.anim;
+        if (!anim) return;
+        const rate = state.speeds[state.speedIndex].rate;
+        const seconds = Math.max(MIN_STEP_SECONDS, ((anim.to - anim.from) * CYCLE_SECONDS) / rate);
+        anim.clock += dt;
+        const k = Math.min(1, anim.clock / seconds);
+        setTimeline(anim.from + (anim.to - anim.from) * k);
+        if (k >= 1) {
+            state.anim = null;
+            updateStepButtons();
         }
-        setTimeline(state.timeline + (dt * state.speeds[state.speedIndex].rate) / CYCLE_SECONDS);
     });
 
     /* ------------------------------------------------------------------ */
     /* UI Event Bindings                                                  */
     /* ------------------------------------------------------------------ */
-    // Maneuver type selection
+    // Maneuver type selection. The scene frames the overview of a new type on its own.
     typeButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
             typeButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
             btn.setAttribute('aria-pressed', 'true');
             state.type = btn.dataset.type;
             buildSlidersHtml();
+            state.step = 0;
+            state.anim = null;
+            state.timeline = 0;
             updateAll();
-            if (sceneController) sceneController.resetView();
+            goToStep(0);
         });
     });
 
@@ -1055,42 +1130,34 @@
         state.values[state.type] = JSON.parse(JSON.stringify(DEFAULTS[state.type]));
         buildSlidersHtml();
         updateAll();
+        goToStep(0);
+        focusStep();
     });
 
-    // Play/Pause state and alternation
-    // The button names what it will do: Pause while playing, Play while paused.
-    function setPlaying(val) {
-        state.playing = Boolean(val);
-        btnPlay.textContent = state.playing ? 'Pause' : 'Play';
-        // Playing from the end starts the maneuver again.
-        if (state.playing && state.timeline >= 1) {
-            state.endHold = 0;
-            setTimeline(0);
+    // Next finishes the part that is playing, if any, and plays the next one.
+    btnNext.addEventListener('click', () => {
+        if (state.step >= stepList().length) {
+            if (state.anim) goToStep(state.step);
+            return;
         }
-    }
+        goToStep(state.step + 1, { animate: true });
+    });
 
-    btnPlay.addEventListener('click', () => {
-        setPlaying(!state.playing);
+    // Back shows the end of the step before.
+    btnBack.addEventListener('click', () => {
+        goToStep(state.step - 1);
     });
 
     btnRewind.addEventListener('click', () => {
-        state.endHold = 0;
-        setTimeline(0);
+        goToStep(0);
+        focusStep();
     });
 
-    // Scrub slider
+    // Scrubbing stops the step that is playing and moves to whichever step holds the new time.
     timelineSlider.addEventListener('input', (e) => {
-        state.endHold = 0;
-        setTimeline(Number(e.target.value) / 1000);
+        const t = Number(e.target.value) / 1000;
+        goToStep(t <= 0 ? 0 : stepForTime(t), { at: t });
     });
-
-    timelineSlider.addEventListener('pointerdown', () => {
-        state.draggingTimeline = true;
-    });
-
-    const stopDrag = () => { state.draggingTimeline = false; };
-    window.addEventListener('pointerup', stopDrag);
-    window.addEventListener('pointercancel', stopDrag);
 
     speedSlider.addEventListener('input', () => {
         state.speedIndex = Number(speedSlider.value);
@@ -1115,5 +1182,5 @@
     buildSlidersHtml();
     updateAll();
     updateShown();
-    setPlaying(state.playing);
+    goToStep(0);
 })();
