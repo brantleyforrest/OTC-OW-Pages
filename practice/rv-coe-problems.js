@@ -16,8 +16,9 @@
     const R_EARTH = 6378.137;   // Earth's equatorial radius (km), as in the lessons
     const R2D = 180 / Math.PI;
 
-    const MIN_ALTITUDE = 200;   // Lowest perigee altitude used in a problem (km)
+    const MIN_ALTITUDE = 300;   // Lowest altitude used in a problem (km), so no orbit decays within days
     const MAX_APOGEE = 100000;  // Highest apogee distance used in a problem (km)
+    const MAX_CIRCULAR = 45000; // Highest circular radius (km), a little above geostationary
     const MIN_E = 0.02;
     const MAX_E = 0.7;
 
@@ -71,16 +72,22 @@
         const raanFlat = equatorial ? 0 : arccos(n[0] / N);
         const raanRaw = n[1] < 0 ? 360 - raanFlat : raanFlat;
 
-        const hasPerigeeAngle = !equatorial && !circular;
-        const argpFlat = hasPerigeeAngle ? arccos(dot(n, eVec) / (N * eMag)) : 0;
-        const argpRaw = eVec[2] < 0 ? 360 - argpFlat : argpFlat;
-
-        const nuFlat = circular ? 0 : arccos(dot(eVec, r) / (eMag * R));
-        const nuRaw = rDotV < 0 ? 360 - nuFlat : nuFlat;
+        // An undefined angle is taken as 0°, and every angle measured from it is still defined.
+        // With no node (equatorial), the node direction is +I. With no perigee (circular), the
+        // perigee direction is the node direction. Angles are measured in the direction of travel.
+        const hHat = h.map((c) => c / H);
+        const nodeHat = equatorial ? [1, 0, 0] : n.map((c) => c / N);
+        const perigeeHat = circular ? nodeHat : eVec.map((c) => c / eMag);
+        const angleAround = (from, to) => {
+            const raw = Math.atan2(dot(hHat, cross(from, to)), dot(from, to)) * R2D;
+            return wrap360(Math.round(raw * 1e6) / 1e6);
+        };
+        const argpRaw = circular ? 0 : angleAround(nodeHat, perigeeHat);
+        const nuRaw = angleAround(perigeeHat, r.map((c) => c / R));
 
         const raanUndefined = equatorial;
-        const argpUndefined = equatorial || circular;
-        const nuUndefined = circular;
+        const argpUndefined = circular;
+        const nuUndefined = false;
 
         // A circular orbit's radius is exact. The energy result differs from it only because the
         // given speed is rounded.
@@ -181,7 +188,7 @@
         const counts = [nonzeroCount(candidate.r), nonzeroCount(candidate.v)];
         if (counts[0] < 1 || counts[1] < 1 || counts[0] > 2 || counts[1] > 2 || counts[0] + counts[1] > 3) return false;
         if (S.rDotV !== 0 || S.energy >= 0 || S.apsis !== candidate.kind) return false;
-        if (candidate.kind === 'circular') return S.circular;
+        if (candidate.kind === 'circular') return S.circular && S.R >= R_EARTH + MIN_ALTITUDE && S.R <= MAX_CIRCULAR;
         if (S.eMag < MIN_E || S.eMag > MAX_E) return false;
         const perigee = S.aRaw * (1 - S.eMag), apogee = S.aRaw * (1 + S.eMag);
         return perigee >= R_EARTH + MIN_ALTITUDE && apogee <= MAX_APOGEE;
@@ -502,9 +509,17 @@
         };
     }
 
-    function undefinedArgpReason(S) {
-        if (S.equatorial && S.circular) return 'The orbit has no ascending node and no perigee.';
-        return S.equatorial ? 'The orbit has no ascending node to measure from.' : 'The orbit has no perigee to measure to.';
+    // Where an undefined angle's default puts the reference, which later angles are measured from.
+    const referenceText = (S) => (S.equatorial ? `along $+${I_HAT}$, since $\\Omega$ defaults to $0°$` : 'at the ascending node');
+
+    // For an equatorial orbit, how far the satellite has traveled from +I in its direction of travel.
+    function equatorialTravel(S) {
+        const [rx, ry] = S.r;
+        const eastward = rx * S.v[1] - ry * S.v[0] > 0;
+        const [polar, axis] = rx > 0 ? [0, `+${I_HAT}`] : ry > 0 ? [90, `+${J_HAT}`] : rx < 0 ? [180, `${MINUS}${I_HAT}`] : [270, `${MINUS}${J_HAT}`];
+        const value = eastward ? polar : wrap360(-polar);
+        const sentence = `$${R_V}$ points along $${axis}$. The satellite moves ${eastward ? 'east, so it has' : 'west, so it has'} traveled $${deg(value)}$ from $+${I_HAT}$ in its direction of travel.`;
+        return { value, sentence };
     }
 
     const PLACE_TEXT = {
@@ -516,18 +531,36 @@
 
     function stepArgumentOfPerigee(S) {
         if (S.argpUndefined) {
-            const reason = undefinedArgpReason(S);
+            const reason = 'The orbit has no perigee to measure to.';
             return {
                 key: 'argp',
                 title: prose('Argument of perigee, $\\omega$'),
                 result: angleResult(S.answers.argp),
-                caption: prose(`<b>Argument of perigee.</b> ${reason} $\\omega$ is undefined and defaults to $0°$.`),
-                methods: undefinedMethod(rule(reason, '$\\omega$ is undefined, so it defaults to $0°$'))
+                caption: prose(`<b>Argument of perigee.</b> ${reason} $\\omega$ is undefined and defaults to $0°$. That places the perigee ${referenceText(S)}, and $\\nu$ is measured from there.`),
+                methods: undefinedMethod(rule(reason, `$\\omega$ is undefined, so it defaults to $0°$, placing the perigee ${referenceText(S)}`))
+            };
+        }
+        const near = atPerigee(S);
+        if (S.equatorial) {
+            const { value: past, sentence } = equatorialTravel(S);
+            const value = near ? past : wrap360(past + 180);
+            return {
+                key: 'argp',
+                title: prose('Argument of perigee, $\\omega$'),
+                result: angleResult(S.answers.argp),
+                caption: prose('<b>Argument of perigee.</b> There is no ascending node, so $\\Omega$ defaults to $0°$ and $\\omega$ is measured from $+' + I_HAT + '$. It is measured along the orbit, in the direction of travel, to perigee.'),
+                methods: [{
+                    name: 'Right-hand rule',
+                    value,
+                    html: rule('Because $\\Omega$ defaults to $0°$, the node is taken along $+' + I_HAT + '$. $\\omega$ grows in the direction of travel.')
+                        + rule(sentence)
+                        + rule(near ? 'The satellite is at perigee, so perigee is at that same point.' : 'The satellite is at apogee, and perigee is a half orbit from apogee.',
+                            near ? `$\\omega = ${deg(value)}$` : `$\\omega = ${deg(past)} \\pm 180° = ${deg(value)}$`)
+                }]
             };
         }
         const place = placeOf(S);
         const traveled = QUARTERS_PAST_NODE[place];
-        const near = atPerigee(S);
         const value = near ? traveled : wrap360(traveled + 180);
         return {
             key: 'argp',
@@ -546,13 +579,20 @@
     }
 
     function stepTrueAnomaly(S) {
-        if (S.nuUndefined) {
+        if (S.circular) {
+            const from = S.equatorial ? `$+${I_HAT}$` : 'the ascending node';
+            const traveled = S.equatorial ? equatorialTravel(S) : { value: QUARTERS_PAST_NODE[placeOf(S)], sentence: PLACE_TEXT[placeOf(S)] };
             return {
                 key: 'nu',
                 title: prose('True anomaly, $\\nu$'),
                 result: angleResult(S.answers.nu),
-                caption: prose('<b>True anomaly.</b> A circle has no perigee to measure from, so $\\nu$ is undefined and defaults to $0°$.'),
-                methods: undefinedMethod(rule('The orbit has no perigee to measure from.', '$\\nu$ is undefined, so it defaults to $0°$'))
+                caption: prose(`<b>True anomaly.</b> A circle has no perigee, so $\\omega$ defaults to $0°$ and the perigee is taken ${referenceText(S)}. $\\nu$ is measured along the orbit, in the direction of travel, from there to the satellite.`),
+                methods: [{
+                    name: 'From the reference',
+                    value: traveled.value,
+                    html: rule(`$\\omega$ defaults to $0°$, so the perigee is taken at ${from}.`)
+                        + rule(traveled.sentence, `$\\nu = ${deg(traveled.value)}$`)
+                }]
             };
         }
         const near = atPerigee(S);

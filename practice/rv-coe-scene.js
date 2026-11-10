@@ -54,7 +54,7 @@
             case 'arcI': return S.i > 0.5;
             case 'arcRaan': return !S.raanUndefined && S.raan > 0.5;
             case 'arcArgp': return !S.argpUndefined && S.argp > 0.5;
-            case 'arcNu': return !S.nuUndefined && S.nu > 0.5;
+            case 'arcNu': return S.nu > 0.5;
             default: return true;
         }
     }
@@ -72,6 +72,7 @@
         const ORBIT_SIDES = 6;
         const ARC_SEGMENTS = 96;
         const ARC_SIDES = 8;
+        const RAAN_SEGMENTS = 96;
         const MAX_TILT = 74;            // Steepest camera angle a step uses, in degrees
         const FRAME_MARGIN = 1.18;      // Room left around what a step frames
         const EARTH_EDGE = 1.03;
@@ -360,7 +361,16 @@
         const markerPen = createMarker(COLORS.orbit);
 
         const arcI = createArc(COLORS.i);
-        const arcRaan = createArc(COLORS.raan);
+        // RAAN is shown as a filled wedge in the equatorial plane, from +I to the ascending node,
+        // with a rim along its outer edge and a bar along the edge that sweeps out the angle.
+        const raanFan = createFan(fanGeometry(RAAN_SEGMENTS), COLORS.raan);
+        const raanRim = new THREE.Line(
+            new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array((RAAN_SEGMENTS + 1) * 3), 3)),
+            new THREE.LineBasicMaterial({ color: COLORS.raan, transparent: true, opacity: 0 })
+        );
+        raanRim.frustumCulled = false;
+        scene.add(raanRim);
+        const raanEdge = createBar(COLORS.raan);
         const arcArgp = createArc(COLORS.argp);
         const arcNu = createArc(COLORS.nu);
         const northHalf = createArc(COLORS.raan, { arrowhead: false });
@@ -456,7 +466,8 @@
             const e = S.circular ? 0 : S.eMag;
             const r = toScene(S.r);
             const W = toUnit(S.h);
-            const P = S.circular ? toUnit(S.r) : toUnit(S.eVec);
+            // A circle's perigee defaults to the ascending node, or to +I if there is no node.
+            const P = S.circular ? (S.equatorial ? X_AXIS.clone() : toUnit(S.n)) : toUnit(S.eVec);
             const Q = new THREE.Vector3().crossVectors(W, P).normalize();
             const a = S.a / R_E;
             const p = a * (1 - e * e);
@@ -486,7 +497,7 @@
                 center: P.clone().multiplyScalar(-a * e),
                 near: atPerigee ? perigee : apogee,
                 far: atPerigee ? apogee : perigee,
-                barEnd: S.circular ? P.clone().multiplyScalar(-a) : apogee,
+                barEnd: S.circular ? r.clone().normalize().multiplyScalar(-a) : apogee,
                 vTip: r.clone().addScaledVector(vDir, vLength),
                 iTip: new THREE.Vector3(axisBase * 1.08, 0, 0),
                 jTip: new THREE.Vector3(0, axisBase * 1.08, 0),
@@ -506,7 +517,10 @@
                     return out.copy(P).multiplyScalar(dist * Math.cos(theta)).addScaledVector(Q, dist * Math.sin(theta));
                 }
             };
-            data.aAnchor = data.center.clone().lerp(data.barEnd, 0.62);
+            // Where an orbit with no ascending node puts its zero-degree reference: along +I
+            const thetaI = Math.atan2(X_AXIS.dot(Q), X_AXIS.dot(P));
+            data.defaultPoint = n ? data.nodePoint : data.orbitPoint(thetaI, new THREE.Vector3());
+            data.aAnchor =data.center.clone().lerp(data.barEnd, 0.62);
             data.wholeOrbit = sampleOrbit(0, TWO_PI, 48);
 
             // The orbit is drawn starting from the satellite, in the direction of travel.
@@ -519,6 +533,21 @@
                 orbitFanPoints.setXYZ(k + 1, tmp.x, tmp.y, tmp.z);
             }
             orbitFanPoints.needsUpdate = true;
+
+            // The RAAN wedge: its corner is Earth's center, and its edge runs from +I to the node.
+            const wedgeFan = raanFan.geometry.attributes.position;
+            const wedgeRim = raanRim.geometry.attributes.position;
+            wedgeFan.setXYZ(0, 0, 0, 0);
+            for (let k = 0; k <= RAAN_SEGMENTS; k++) {
+                const angle = (k / RAAN_SEGMENTS) * S.raan * D2R;
+                const x = Math.cos(angle) * data.arcRadiusRaan, y = Math.sin(angle) * data.arcRadiusRaan;
+                wedgeFan.setXYZ(k + 1, x, y, 0);
+                wedgeRim.setXYZ(k, x, y, 0);
+            }
+            wedgeFan.needsUpdate = true;
+            wedgeRim.needsUpdate = true;
+            const midAngle = S.raan * D2R / 2;
+            anchors.raan.set(Math.cos(midAngle), Math.sin(midAngle), 0).multiplyScalar(data.arcRadiusRaan * 0.62);
 
             stage = 'given';
             stageClock = 0;
@@ -660,6 +689,22 @@
             return along.addScaledVector(thumbUp, 0.45).addScaledVector(across, 0.3).addScaledVector(Z_AXIS, 0.12).normalize();
         }
 
+        // An undefined angle defaults to 0°, which puts its reference point at the ascending node.
+        // An equatorial orbit has no node, so the reference point is along +I. Both RAAN and any
+        // undefined angle look at that spot.
+        function nodeFraming(above, equatorEdges) {
+            const d = data;
+            const S = d.S;
+            if (S.equatorial) return fit(above, [d.iTip, d.defaultPoint, ...equatorEdges]);
+            const swept = [];
+            for (let k = 0; k <= 12; k++) {
+                const angle = (k / 12) * S.raan * D2R;
+                swept.push(new THREE.Vector3(Math.cos(angle) * d.arcRadiusRaan, Math.sin(angle) * d.arcRadiusRaan, 0));
+            }
+            const northSide = sampleOrbit(d.thetaNode, d.thetaNode + Math.PI, 16);
+            return fit(fromAngles(S.raan / 2, 64), [d.iTip, d.nodePoint, d.kTip, ...swept, ...northSide]);
+        }
+
         function stageGoal(name) {
             const d = data;
             const S = d.S;
@@ -679,21 +724,14 @@
                     return fit(above, [...d.wholeOrbit, d.r, d.vTip]);
                 case 'i':
                     return tiltView();
-                case 'raan': {
-                    if (S.equatorial) return tiltView();
-                    const swept = [];
-                    for (let k = 0; k <= 12; k++) {
-                        const angle = (k / 12) * S.raan * D2R;
-                        swept.push(new THREE.Vector3(Math.cos(angle) * d.arcRadiusRaan, Math.sin(angle) * d.arcRadiusRaan, 0));
-                    }
-                    const northSide = sampleOrbit(d.thetaNode, d.thetaNode + Math.PI, 16);
-                    return fit(fromAngles(S.raan / 2, 64), [d.iTip, d.nodePoint, d.kTip, ...swept, ...northSide]);
-                }
+                case 'raan':
+                    return nodeFraming(above, equatorEdges);
                 case 'argp':
-                    if (S.argpUndefined || S.argp < 0.5) return fit(above, d.wholeOrbit);
-                    return fit(above, [...sampleOrbit(-d.argp, 0, 16), d.nodePoint, d.perigee]);
+                    if (S.argpUndefined) return nodeFraming(above, equatorEdges);
+                    if (S.argp < 0.5) return fit(above, d.wholeOrbit);
+                    return fit(above, [...sampleOrbit(-d.argp, 0, 16), d.defaultPoint, d.perigee]);
                 case 'nu':
-                    if (S.nuUndefined || S.nu < 0.5) return fit(above, d.wholeOrbit);
+                    if (S.nu < 0.5) return fit(above, d.wholeOrbit);
                     return fit(above, [...sampleOrbit(0, S.nu * D2R, 16), d.r, d.vTip, d.perigee]);
                 default:
                     return fit(above, d.wholeOrbit);
@@ -731,6 +769,27 @@
             orbitFan.geometry.setDrawRange(0, 3 * drawn);
             orbitFan.fill.opacity = 0.11 * part.level;
             if (k < 1) placeMarker(markerPen, 1, d.orbitCurve.getPointAt(k, tmp), 0.42 * sz);
+        }
+
+        // Sweeps the wedge open from +I to the ascending node as the part builds.
+        function updateRaanWedge(sz) {
+            const d = data;
+            const part = parts.arcRaan;
+            const k = smooth(part.grow);
+            const shown = part.on && k > 0.002 && part.level > 0.01;
+            raanFan.mesh.visible = shown;
+            raanRim.visible = shown;
+            if (!shown) { placeBar(raanEdge, 0, ORIGIN, ORIGIN, 0); return; }
+
+            const drawn = Math.max(1, Math.ceil(RAAN_SEGMENTS * k));
+            raanFan.geometry.setDrawRange(0, 3 * drawn);
+            raanRim.geometry.setDrawRange(0, drawn + 1);
+            raanFan.fill.opacity = 0.38 * part.level;
+            raanRim.material.opacity = part.level;
+
+            const angle = k * d.S.raan * D2R;
+            tmpA.set(Math.cos(angle) * d.arcRadiusRaan, Math.sin(angle) * d.arcRadiusRaan, 0);
+            placeBar(raanEdge, part.level, ORIGIN, tmpA, 0.14 * sz);
         }
 
         function updateScene() {
@@ -785,8 +844,7 @@
             drawArc(arcI, parts.arcI, arcKey('i'), (t, out) => out.copy(Z_AXIS).multiplyScalar(Math.cos(iRad * t) * radial)
                 .addScaledVector(sideways, Math.sin(iRad * t) * radial), sz, anchors.i);
 
-            const raanRad = S.raan * D2R;
-            drawArc(arcRaan, parts.arcRaan, arcKey('raan'), (t, out) => out.set(Math.cos(raanRad * t) * d.arcRadiusRaan, Math.sin(raanRad * t) * d.arcRadiusRaan, 0), sz, anchors.raan);
+            updateRaanWedge(sz);
             drawArc(arcArgp, parts.arcArgp, arcKey('argp'), (t, out) => d.orbitPoint(-d.argp * (1 - t), out), sz, anchors.argp);
             const nuRad = S.nu * D2R;
             drawArc(arcNu, parts.arcNu, arcKey('nu'), (t, out) => d.orbitPoint(nuRad * t, out), sz, anchors.nu);

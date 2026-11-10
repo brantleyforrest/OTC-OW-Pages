@@ -290,21 +290,22 @@
     const eqGroup = new THREE.Group();
     scene.add(eqGroup);
     const eqFill = new THREE.MeshBasicMaterial({ color: 0x3a82f7, transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false });
-    const eqDisk = new THREE.Mesh(new THREE.CircleGeometry(1, 96), eqFill);
+    // The disk and rim hold the orbit's projection onto the equatorial plane (z dropped). They
+    // are filled in by rebuildOrbitGeometry whenever the orbit changes.
+    const ORBIT_PTS = 256;
+    const eqDiskGeo = pointGeometry(ORBIT_PTS + 2);
+    eqDiskGeo.setIndex(fanIndex(ORBIT_PTS));
+    const eqDisk = new THREE.Mesh(eqDiskGeo, eqFill);
+    eqDisk.frustumCulled = false;
     eqDisk.renderOrder = ORDER.planes;
     eqGroup.add(eqDisk);
     const eqRimMat = new THREE.LineBasicMaterial({ color: 0x3a82f7, transparent: true, opacity: 0.3 });
-    {
-        const pts = [];
-        for (let j = 0; j <= 120; j++) {
-            const ang = (j / 120) * TWO_PI;
-            pts.push(new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0));
-        }
-        eqGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), eqRimMat));
-    }
+    const eqRimGeo = pointGeometry(ORBIT_PTS + 1);
+    const eqRim = new THREE.Line(eqRimGeo, eqRimMat);
+    eqRim.frustumCulled = false;
+    eqGroup.add(eqRim);
 
     /* Orbital plane, drawn as a triangle fan from Earth's center */
-    const ORBIT_PTS = 256;
     const orbDiskGeo = pointGeometry(ORBIT_PTS + 2);
     orbDiskGeo.setIndex(fanIndex(ORBIT_PTS));
     const orbFill = new THREE.MeshBasicMaterial({ color: COLORS.orbit, transparent: true, opacity: 0.04, side: THREE.DoubleSide, depthWrite: false });
@@ -550,6 +551,18 @@
             diskPos.setXYZ(k + 1, tmpA.x, tmpA.y, tmpA.z);
         }
         diskPos.needsUpdate = true;
+
+        // The same points with the height dropped: the orbit's shadow on the equatorial plane
+        const eqDiskPos = eqDiskGeo.attributes.position;
+        const eqRimPos = eqRimGeo.attributes.position;
+        eqDiskPos.setXYZ(0, 0, 0, 0);
+        for (let k = 0; k <= ORBIT_PTS; k++) {
+            orbitCurve.getPoint(k / ORBIT_PTS, tmpA);
+            eqDiskPos.setXYZ(k + 1, tmpA.x, tmpA.y, 0);
+            eqRimPos.setXYZ(k, tmpA.x, tmpA.y, 0);
+        }
+        eqDiskPos.needsUpdate = true;
+        eqRimPos.needsUpdate = true;
     }
 
     function rebuildOrbitTube(radius) {
@@ -666,13 +679,9 @@
         const axisBase = Math.max(2.1, aScene * 1.575);
 
         // Planes brighten only while an element measured between them is shown.
-        // The equatorial plane is the orbit turned about the line of nodes into the equator: the
-        // same size and shape at every inclination, with Earth at one focus and the ascending
-        // node on its rim.
-        const flatPerigee = (state.raan + state.argp) * D2R;
-        eqGroup.rotation.z = flatPerigee;
-        eqGroup.position.set(-aScene * e * Math.cos(flatPerigee), -aScene * e * Math.sin(flatPerigee), 0);
-        eqGroup.scale.set(aScene, aScene * Math.sqrt(1 - e * e), 1);
+        // The equatorial plane shows the orbit's projection onto it at the current inclination
+        // (built in rebuildOrbitGeometry). It narrows as the inclination grows and touches the
+        // orbit at the nodes.
         const eqOn = has('i') || has('raan');
         eqFill.opacity = eqOn ? 0.14 : 0.05;
         eqRimMat.opacity = eqOn ? 0.6 : 0.3;
