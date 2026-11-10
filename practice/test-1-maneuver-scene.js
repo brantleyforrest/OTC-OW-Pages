@@ -1,4 +1,4 @@
-// The 3D view for orbital maneuver problems on the Test 1 Practice work-in-progress page. It is
+// The 3D view for orbital maneuver problems on the Test 1 Practice page. It is
 // drawn the same way as the R-V view (rv-coe-scene.js). It starts with only Earth, the reference
 // axes, and the given orbits. Each walkthrough step animates in what that step finds, moves the
 // camera to frame it, and dims what came before. The satellite moves along with the steps: it
@@ -1223,5 +1223,5 @@
         return { setProblem, setStage, setAnswersShown, resize };
     }
 
-    global.ManeuversWipScene = { create };
+    global.Test1ManeuverScene = { create };
 })(window);

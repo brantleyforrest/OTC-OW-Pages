@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test 1 Practice | OTC OW</title>
-    <meta name="description" content="Practice problems for Test 1. Practice mode shows each problem in 3D and walks through the steps. Test mode accepts answers only, then shows the solution.">
+    <meta name="description" content="Practice problems for Test 1: R-V vectors to orbital elements, Hohmann transfers, simple plane changes, and combined plane changes. Practice mode shows each problem in 3D and walks through the steps. Test mode accepts answers only, then shows the solution.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -18,6 +18,8 @@
             --param-raan: #a3e635;
             --param-argp: #f472b6;
             --param-nu: #c4a1ff;
+            --param-v: #e0b64f;
+            --param-dv: #f87171;
             --answer-right: #34d399;
             --answer-wrong: #f87171;
         }
@@ -100,7 +102,20 @@
         }
 
         .mode-row .segmented { flex: 1 1 12rem; }
-        .mode-caption { margin-top: 0.4rem; }
+        .mode-caption { margin: 0.4rem 0 0.7rem; }
+
+        /* Section: R-V problems or maneuver problems. Each has its own kinds of problem. */
+        .sections { margin: 0; }
+        .sections button {
+            flex: 1 1 0;
+            padding: 0.5rem 0.5rem;
+            font-size: 0.86rem;
+            font-weight: 600;
+        }
+
+        /* Topic: which kind of maneuver is generated */
+        .topics { flex-wrap: wrap; margin-top: 0.5rem; }
+        .topics button { flex: 1 1 auto; padding: 0.3rem 0.5rem; font-size: 0.76rem; }
 
         /* The given vectors */
         .given {
@@ -144,6 +159,11 @@
         .answer[data-field="raan"] { --row-color: var(--param-raan); }
         .answer[data-field="argp"] { --row-color: var(--param-argp); }
         .answer[data-field="nu"] { --row-color: var(--param-nu); }
+        .answer[data-field="a_tx"] { --row-color: var(--param-a); }
+        .answer[data-field^="dv"] { --row-color: var(--param-dv); }
+        .answer[data-field="tof"] { --row-color: var(--param-nu); }
+        .answer[data-field="v"] { --row-color: var(--param-v); }
+        .answer[data-field="delta_theta"] { --row-color: var(--param-i); }
 
         .answer-box {
             display: flex;
@@ -293,6 +313,50 @@
 
         .step-nav .btn { padding: 0.32rem 0.8rem; font-size: 0.8rem; min-width: 4.6rem; }
 
+        /* The 5-column table from the lesson, for the transfer problems */
+        .hohmann-table-wrap {
+            overflow-x: auto;
+            margin-top: 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .hohmann-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            text-align: center;
+            background: var(--deep-space);
+        }
+
+        .hohmann-table th, .hohmann-table td {
+            border: 1px solid var(--border-subtle);
+            padding: 0.45rem 0.55rem;
+        }
+
+        .hohmann-table th {
+            background: var(--surface-card);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .hohmann-table td.highlight-cell {
+            background: var(--surface-hover);
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        .hohmann-table td.summary-cell {
+            background: var(--gold-glow);
+            color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        .hohmann-table td.transfer-row {
+            background: transparent;
+            color: var(--text-main);
+        }
+
         @media (min-width: 1081px) {
             .tool-layout { --aside-w: 36rem; }
         }
@@ -382,8 +446,10 @@
             <div class="col tool-stage-col">
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view">
-                        <canvas id="scene" aria-label="A 3D view of Earth, the position and velocity vectors, and the orbit they produce."></canvas>
-                        <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                        <canvas id="scene-rv" aria-label="A 3D view of Earth, the position and velocity vectors, and the orbit they produce."></canvas>
+                        <canvas id="scene-maneuver" aria-label="A 3D view of Earth, the initial and target orbits, the transfer, and the velocity change at each burn." hidden></canvas>
+                        <div class="tool-labels" id="labels-rv" aria-hidden="true"></div>
+                        <div class="tool-labels" id="labels-maneuver" aria-hidden="true" hidden></div>
                         <button type="button" class="btn view-reset" id="reset-view">Reset View</button>
                         <div class="tool-hint" id="view-hint">Drag to rotate. Scroll or pinch to zoom.</div>
                         <div class="tool-status" id="status" style="display: none;"></div>
@@ -403,6 +469,17 @@
                             <button type="button" class="btn" id="new-problem">New Problem</button>
                         </div>
                         <p class="ctl-caption mode-caption" id="mode-caption"></p>
+                        <div class="segmented sections" id="section" role="group" aria-label="Choose a section">
+                            <button type="button" data-value="rv" aria-pressed="true">R-V to COEs</button>
+                            <button type="button" data-value="maneuvers" aria-pressed="false">Orbital Maneuvers</button>
+                        </div>
+                        <div class="segmented topics" id="topic" role="group" aria-label="Choose a kind of maneuver" hidden>
+                            <button type="button" data-value="random" aria-pressed="true">Random</button>
+                            <button type="button" data-value="hohmann" aria-pressed="false">Hohmann</button>
+                            <button type="button" data-value="inclination" aria-pressed="false">Inclination</button>
+                            <button type="button" data-value="polar_raan" aria-pressed="false">Polar RAAN</button>
+                            <button type="button" data-value="combined" aria-pressed="false">Combined</button>
+                        </div>
                     </div>
 
                     <div class="panel accent">
@@ -437,8 +514,12 @@
     <script src="../assets/earth-scene.js"></script>
     <script src="answer-check.js"></script>
     <script src="practice-math.js"></script>
+    <script src="satellite-motion.js"></script>
     <script src="rv-coe-problems.js"></script>
     <script src="rv-coe-scene.js"></script>
+    <script src="maneuvers-problems.js"></script>
+    <script src="test-1-maneuver-problems.js"></script>
+    <script src="test-1-maneuver-scene.js"></script>
     <script src="test-1-practice.js"></script>
 </body>
 </html>

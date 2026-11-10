@@ -1,23 +1,34 @@
-// Test 1 Practice: the two modes, the answer form, and the walkthrough.
+// Test 1 Practice: two sections on one page, the R-V problems and the orbital maneuver
+// problems, with the same two modes, answer form, and walkthrough for both.
 // Practice mode shows the view from the start and lets the student walk through the steps.
 // Test mode shows only the problem and the answer form until the answers are graded.
-// Problem types supply the numbers and the worked steps. See rv-coe-problems.js.
+// Problem types supply the numbers and the worked steps. See rv-coe-problems.js and
+// test-1-maneuver-problems.js.
 (function () {
     'use strict';
 
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
     const Check = window.AnswerCheck;
-    const { math } = window.PracticeMath;
-    const problemType = window.RvCoeProblems;
+    const { math, prose } = window.PracticeMath;
+    const RvCoe = window.RvCoeProblems;
+    const Maneuvers = window.Test1ManeuverProblems;
+
+    // The R-V problems keep the satellite at least 1.5 Earth radii from Earth's center, so that
+    // the orbit has room in the view.
+    const RV_MIN_RADIUS = 9600;
 
     const MODE_CAPTIONS = {
-        practice: 'The view starts with the problem as given, and the walkthrough builds the orbit step by step.',
+        practice: 'The view starts with the problem as given, and the walkthrough builds the solution step by step.',
         test: 'Enter your answers and submit. The view and the walkthrough open after grading.'
     };
 
+    // The page has two sections. Each section has its own problems, and a link can open either
+    // one (#rv or #maneuvers).
     const state = {
         mode: 'practice',
+        section: location.hash === '#maneuvers' ? 'maneuvers' : 'rv',
+        maneuverType: 'random',  // In the maneuvers section: one kind of maneuver, or any of them
         problem: null,
         submitted: false,
         blankWarned: false,
@@ -28,74 +39,119 @@
     const viz = createViz();
 
     /* ------------------------------------------------------------------ */
+    /* Problems                                                           */
+    /* ------------------------------------------------------------------ */
+    // Each problem type is turned into the same form: its text, its answer fields, its steps,
+    // which view draws it, and how a typed answer is graded.
+    function rvProblem() {
+        const p = RvCoe.generate({ minRadius: RV_MIN_RADIUS });
+        return {
+            view: 'rv',
+            title: RvCoe.title,
+            prompt: prose(RvCoe.prompt),
+            limitsHtml: RvCoe.limitsHtml,
+            overviewCaption: RvCoe.overviewCaption,
+            fields: RvCoe.fields,
+            statement: p.statement,
+            answers: p.answers,
+            steps: p.steps,
+            source: p,
+            grade: (field, text) => Check.grade(field.tolerance, text, p.answers[field.key].value)
+        };
+    }
+
+    function maneuverProblem(type) {
+        const p = Maneuvers.generate(type);
+        return {
+            view: 'maneuver',
+            title: p.title,
+            prompt: p.prompt,
+            limitsHtml: p.limitsHtml,
+            overviewCaption: p.overviewCaption,
+            fields: p.fields,
+            statement: p.statement,
+            answers: p.answers,
+            steps: p.steps,
+            source: p,
+            grade: (field, text) => Maneuvers.grade(field.tolerance, text, p.answers[field.key].value, field.unitType)
+        };
+    }
+
+    function generate() {
+        if (state.section === 'rv') return rvProblem();
+        const types = Maneuvers.types;
+        const type = state.maneuverType === 'random' ? types[Math.floor(Math.random() * types.length)] : state.maneuverType;
+        return maneuverProblem(type);
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Answer Form                                                        */
     /* ------------------------------------------------------------------ */
-    const answerRows = {};
+    let answerRows = {};
 
-    problemType.fields.forEach((field, index) => {
-        const row = document.createElement('div');
-        row.className = 'answer';
-        row.dataset.field = field.key;
+    function buildAnswerForm() {
+        const fields = state.problem.fields;
+        $('answers').textContent = '';
+        answerRows = {};
 
-        const label = document.createElement('label');
-        label.htmlFor = `answer-${field.key}`;
-        const symbol = document.createElement('span');
-        symbol.className = 'sym';
-        symbol.innerHTML = math(field.tex);
-        label.append(symbol, document.createTextNode(field.name));
+        fields.forEach((field, index) => {
+            const row = document.createElement('div');
+            row.className = 'answer';
+            row.dataset.field = field.key;
 
-        const box = document.createElement('div');
-        box.className = 'answer-box';
-        const input = document.createElement('input');
-        input.id = `answer-${field.key}`;
-        input.type = 'text';
-        input.inputMode = 'decimal';
-        input.spellcheck = false;
-        const unit = document.createElement('span');
-        unit.className = 'answer-unit';
-        unit.textContent = field.unit;
-        box.append(input, unit);
+            const label = document.createElement('label');
+            label.htmlFor = `answer-${field.key}`;
+            const symbol = document.createElement('span');
+            symbol.className = 'sym';
+            symbol.innerHTML = math(field.tex);
+            const name = document.createElement('span');
+            name.innerHTML = prose(field.name);
+            label.append(symbol, name);
 
-        const noteEl = document.createElement('div');
-        noteEl.className = 'answer-note';
+            const box = document.createElement('div');
+            box.className = 'answer-box';
+            const input = document.createElement('input');
+            input.id = `answer-${field.key}`;
+            input.type = 'text';
+            input.inputMode = 'decimal';
+            input.spellcheck = false;
+            const unit = document.createElement('span');
+            unit.className = 'answer-unit';
+            unit.textContent = field.unit;
+            box.append(input, unit);
 
-        row.append(label, box, noteEl);
-        $('answers').appendChild(row);
-        answerRows[field.key] = { row, input, noteEl };
+            const noteEl = document.createElement('div');
+            noteEl.className = 'answer-note';
 
-        // Enter moves to the next box. In the last box, it submits the form.
-        input.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter') return;
-            const next = problemType.fields[index + 1];
-            if (!next) return;
-            event.preventDefault();
-            answerRows[next.key].input.focus();
+            row.append(label, box, noteEl);
+            $('answers').appendChild(row);
+            answerRows[field.key] = { row, input, noteEl };
+
+            // Enter moves to the next box. In the last box, it submits the form.
+            input.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                const next = fields[index + 1];
+                if (!next) return;
+                event.preventDefault();
+                answerRows[next.key].input.focus();
+            });
+
+            // In practice mode, changing an answer clears its old mark.
+            input.addEventListener('input', () => {
+                if (state.submitted) return;
+                setMark(field.key, '', '');
+                $('score').textContent = '';
+                state.blankWarned = false;
+            });
         });
-
-        // In practice mode, changing an answer clears its old mark.
-        input.addEventListener('input', () => {
-            if (state.submitted) return;
-            setMark(field.key, '', '');
-            $('score').textContent = '';
-            state.blankWarned = false;
-        });
-    });
+        setScore('');
+    }
 
     function setMark(key, result, text) {
         const { row, noteEl } = answerRows[key];
         row.classList.toggle('right', result === 'right');
         row.classList.toggle('wrong', result === 'wrong');
         noteEl.textContent = text;
-    }
-
-    function resetAnswers() {
-        problemType.fields.forEach((field) => {
-            answerRows[field.key].input.value = '';
-            answerRows[field.key].input.readOnly = false;
-            setMark(field.key, '', '');
-        });
-        $('score').textContent = '';
-        $('score').classList.remove('warn');
     }
 
     function setScore(text, warn) {
@@ -118,9 +174,10 @@
 
     function gradeAnswers() {
         const isTest = state.mode === 'test';
-        const results = problemType.fields.map((field) => ({
+        const problem = state.problem;
+        const results = problem.fields.map((field) => ({
             field,
-            result: Check.grade(field.tolerance, answerRows[field.key].input.value, state.problem.answers[field.key].value)
+            result: problem.grade(field, answerRows[field.key].input.value)
         }));
 
         const blanks = results.filter((item) => item.result === 'blank').length;
@@ -133,16 +190,20 @@
         results.forEach(({ field, result }) => {
             // In test mode, anything that is not right is marked wrong, including a blank.
             const shown = result === 'right' ? 'right' : (isTest || result === 'wrong' ? 'wrong' : '');
-            setMark(field.key, shown, noteFor(result, state.problem.answers[field.key], isTest));
+            setMark(field.key, shown, noteFor(result, problem.answers[field.key], isTest));
         });
 
         const correct = results.filter((item) => item.result === 'right').length;
         setScore(`${correct} of ${results.length} correct`);
 
+        // The view labels computed values only once every field holds an answer.
+        const allAttempted = results.every((item) => item.result === 'right' || item.result === 'wrong');
+        if (isTest || allAttempted) viz.showAnswers();
+
         if (isTest) {
             state.submitted = true;
-            problemType.fields.forEach((field) => { answerRows[field.key].input.readOnly = true; });
-            state.problem.steps.forEach((step, index) => state.visited.add(index));
+            problem.fields.forEach((field) => { answerRows[field.key].input.readOnly = true; });
+            problem.steps.forEach((step, index) => state.visited.add(index));
             applyLayout();
             refreshSteps();
             viz.resize();
@@ -242,7 +303,7 @@
         if (index >= 0) state.visited.add(index);
         refreshSteps();
         const step = state.problem.steps[index];
-        viz.setStage(step ? step.key : 'given', step ? step.caption : problemType.overviewCaption);
+        viz.setStage(step ? step.key : 'given', step ? step.caption : state.problem.overviewCaption);
         if (index >= 0) stepRows[index].head.scrollIntoView({ block: 'start' });
     }
 
@@ -261,19 +322,41 @@
     }
 
     function newProblem() {
-        state.problem = problemType.generate();
+        state.problem = generate();
         state.submitted = false;
         state.blankWarned = false;
         state.active = -1;
         state.visited = new Set();
 
+        $('problem-title').textContent = state.problem.title;
+        $('problem-prompt').innerHTML = state.problem.prompt;
         $('given').innerHTML = state.problem.statement;
-        resetAnswers();
+        $('answer-limits').innerHTML = state.problem.limitsHtml;
+        buildAnswerForm();
         buildSteps();
         applyLayout();
         viz.setProblem(state.problem);
-        viz.setStage('given', problemType.overviewCaption);
+        viz.setStage('given', state.problem.overviewCaption);
     }
+
+    function showSection() {
+        $('topic').hidden = state.section !== 'maneuvers';
+        for (const button of $('section').querySelectorAll('button')) {
+            button.setAttribute('aria-pressed', String(button.dataset.value === state.section));
+        }
+    }
+
+    Kit.bindSegmented($('section'), (section) => {
+        state.section = section;
+        history.replaceState(null, '', `#${section}`);
+        showSection();
+        newProblem();
+    });
+
+    Kit.bindSegmented($('topic'), (type) => {
+        state.maneuverType = type;
+        newProblem();
+    });
 
     Kit.bindSegmented($('mode'), (mode) => {
         state.mode = mode;
@@ -286,18 +369,33 @@
     /* ------------------------------------------------------------------ */
     /* 3D View                                                            */
     /* ------------------------------------------------------------------ */
-    // The answer form and the walkthrough do not depend on this. If the 3D library cannot be
-    // loaded, the view reports that, and the rest of the page still works.
+    // Each problem type has its own view, with its own canvas and labels. Only the view for the
+    // current problem is shown. The answer form and the walkthrough do not depend on either.
+    // If the 3D library cannot be loaded, the view reports that, and the rest of the page still works.
     function createViz() {
         const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
         const statusEl = $('status');
         const hud = $('hud');
-        const pending = { problem: null, stage: 'given' };
-        let live = null;
+        const views = {
+            rv: { make: () => window.RvCoeScene, canvas: $('scene-rv'), labels: $('labels-rv'), constants: RvCoe.constants, live: null },
+            maneuver: { make: () => window.Test1ManeuverScene, canvas: $('scene-maneuver'), labels: $('labels-maneuver'), constants: Maneuvers.constants, live: null }
+        };
+        const pending = { view: 'rv', problem: null, stage: 'given', answersShown: false };
 
         function showStatus(text) {
             statusEl.style.display = 'flex';
             statusEl.textContent = text;
+        }
+
+        function current() {
+            return views[pending.view].live;
+        }
+
+        function showView(name) {
+            for (const [key, v] of Object.entries(views)) {
+                v.canvas.hidden = key !== name;
+                v.labels.hidden = key !== name;
+            }
         }
 
         (async () => {
@@ -309,31 +407,47 @@
                 showStatus('The 3D library could not be loaded. The view needs an internet connection the first time it opens. The answers and walkthrough still work.');
                 return;
             }
-            live = window.RvCoeScene.create(THREE, {
-                view: $('view'),
-                canvas: $('scene'),
-                labels: $('labels'),
-                hint: $('view-hint'),
-                reset: $('reset-view'),
-                showStatus
-            }, problemType.constants);
-            if (!live) return;
+            for (const v of Object.values(views)) {
+                v.live = v.make().create(THREE, {
+                    view: $('view'),
+                    canvas: v.canvas,
+                    labels: v.labels,
+                    hint: $('view-hint'),
+                    reset: $('reset-view'),
+                    showStatus
+                }, v.constants, { moveSatellite: true });
+            }
+            if (!views.rv.live && !views.maneuver.live) return;
             statusEl.style.display = 'none';
-            if (pending.problem) live.setProblem(pending.problem);
+            const live = current();
+            if (!live || !pending.problem) return;
+            live.setProblem(pending.problem.source);
+            if (live.setAnswersShown) live.setAnswersShown(pending.answersShown);
             live.setStage(pending.stage);
         })();
 
         return {
             setProblem(problem) {
+                pending.view = problem.view;
                 pending.problem = problem;
-                if (live) live.setProblem(problem);
+                pending.answersShown = false;
+                showView(problem.view);
+                const live = current();
+                if (live) live.setProblem(problem.source);
             },
             setStage(stage, caption) {
                 pending.stage = stage;
                 hud.innerHTML = caption;
+                const live = current();
                 if (live) live.setStage(stage);
             },
+            showAnswers() {
+                pending.answersShown = true;
+                const live = current();
+                if (live && live.setAnswersShown) live.setAnswersShown(true);
+            },
             resize() {
+                const live = current();
                 if (live) live.resize();
             }
         };
@@ -342,9 +456,7 @@
     /* ------------------------------------------------------------------ */
     /* Start                                                              */
     /* ------------------------------------------------------------------ */
-    $('problem-title').textContent = problemType.title;
-    $('problem-prompt').textContent = problemType.prompt;
-    $('answer-limits').innerHTML = problemType.limitsHtml;
     $('mode-caption').textContent = MODE_CAPTIONS[state.mode];
+    showSection();
     newProblem();
 })();

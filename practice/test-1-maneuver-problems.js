@@ -1,6 +1,7 @@
-// Orbital maneuver problems for the Test 1 Practice work-in-progress page. The solvers and the
+// Orbital maneuver problems for the Test 1 Practice page. The solvers and the
 // worked math come from maneuvers-problems.js. This file picks the numbers and writes the
-// problem text in the same voice as the R-V problems.
+// problem text in the same voice as the R-V problems. Every orbit is given by its radius from
+// Earth's center, never by its altitude.
 //
 // Every orbit is at least 1.5 Earth radii from Earth's center, and a transfer's higher orbit is
 // 1.6 to 2.6 times its lower one, so that every orbit, burn, and angle has room in the 3D view.
@@ -9,11 +10,11 @@
     'use strict';
 
     const Base = global.ManeuversProblems;
-    const { math, prose } = global.PracticeMath;
+    const { math, prose, calc, note } = global.PracticeMath;
 
     const LOWER_RADIUS = [9600, 16000];     // Lower orbit of a transfer (km)
     const RADIUS_RATIO = [1.6, 2.6];        // Higher orbit / lower orbit
-    const ALTITUDE = [3300, 14000];         // Plane change orbits (km), so r is at least 9,678 km
+    const PLANE_RADIUS = [9700, 20400];     // Plane change orbits (km), from Earth's center
     const LOWERING = 0.3;                   // Share of transfers that go down instead of up
 
     const INCLINATION_PAIRS = [[28.5, 55.0], [28.5, 51.6], [51.6, 28.5], [15.0, 45.0], [30.0, 60.0], [20.0, 45.0], [35.0, 65.0], [60.0, 30.0]];
@@ -26,6 +27,8 @@
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
     const between = ([low, high]) => low + (high - low) * Math.random();
     const snap = (x) => Math.round(x / 100) * 100;
+    // The solvers take an altitude. This keeps the radius a round number.
+    const altitudeFor = (r) => r - Base.constants.R_EARTH;
 
     const km = (x) => Number(x).toLocaleString('en-US', { maximumFractionDigits: 0 });
     const one = (x) => Number(x).toFixed(1);
@@ -140,7 +143,7 @@
         inclination: (d) => ({
             title: 'Simple Plane Change: Inclination',
             prompt: 'A circular orbit changes inclination, with $\\Omega$ unchanged. Find the speed, the plane change angle, and $\\Delta V$. $u$ is measured from the ascending node.',
-            statement: item(`h = ${km(d.alt)}\\text{ km}`) + item(`i_1 = ${one(d.i1)}°`) + item(`i_2 = ${one(d.i2)}°`) + item(`\\Omega = ${one(d.raan)}°`) + item(`u = ${Math.round(d.u_sc)}°`),
+            statement: item(`r = ${km(d.r)}\\text{ km}`) + item(`i_1 = ${one(d.i1)}°`) + item(`i_2 = ${one(d.i2)}°`) + item(`\\Omega = ${one(d.raan)}°`) + item(`u = ${Math.round(d.u_sc)}°`),
             overview: '<b>The problem as given.</b> The spacecraft is on the initial orbit at $u$. The target orbit is the same size, with the same $\\Omega$, tilted to $i_2$.',
             limits: PLANE_LIMITS,
             steps: planeSteps(false)
@@ -148,14 +151,23 @@
         polar_raan: (d) => ({
             title: 'Simple Plane Change: Polar RAAN',
             prompt: 'A circular polar orbit changes its RAAN. Find the speed, the plane change angle, and $\\Delta V$. $u$ is measured from the ascending node.',
-            statement: item(`h = ${km(d.alt)}\\text{ km}`) + item('i = 90°') + item(`\\Omega_1 = ${one(d.raan1)}°`) + item(`\\Omega_2 = ${one(d.raan2)}°`) + item(`u = ${Math.round(d.u_sc)}°`),
+            statement: item(`r = ${km(d.r)}\\text{ km}`) + item('i = 90°') + item(`\\Omega_1 = ${one(d.raan1)}°`) + item(`\\Omega_2 = ${one(d.raan2)}°`) + item(`u = ${Math.round(d.u_sc)}°`),
             overview: '<b>The problem as given.</b> The spacecraft is on the initial polar orbit at $u$. The target orbit is the same size, also polar, turned to $\\Omega_2$.',
             limits: PLANE_LIMITS,
             steps: planeSteps(true)
         })
     };
 
-    // Rewrites the text of a problem from maneuvers-problems.js. The numbers and the worked math stay.
+    // The speed of a plane change orbit, from the radius as given
+    function speedWork(d) {
+        return calc('V = \\sqrt{\\frac{\\mu}{r}}', [
+            `\\sqrt{\\frac{398{,}600.44}{${km(d.r)}}}`
+        ], `${d.v.toFixed(6)}\\text{ km/s} \\approx ${d.v.toFixed(3)}\\text{ km/s}`)
+            + note('The orbit is circular, so the speed is the same all the way around, whatever its tilt.');
+    }
+
+    // Rewrites the text of a problem from maneuvers-problems.js. The numbers and the worked math
+    // stay, except that a plane change's speed starts from the radius as given.
     function restyle(problem) {
         const d = problem.data;
         const text = TEXT[d.type](d);
@@ -172,7 +184,9 @@
         });
         problem.steps = problem.steps.map((step) => {
             const words = text.steps[step.key];
-            return words ? { ...step, title: prose(words.title), caption: prose(words.caption) } : step;
+            const next = words ? { ...step, title: prose(words.title), caption: prose(words.caption) } : step;
+            if (step.key === 'speed') next.methods = [{ name: 'Formula', html: speedWork(d) }];
+            return next;
         });
         return problem;
     }
@@ -187,13 +201,13 @@
         },
         inclination() {
             const [i1, i2] = pick(INCLINATION_PAIRS);
-            const alt = snap(between(ALTITUDE));
-            return Base.buildInclinationProblem(Base.solveInclinationChange(alt, i1, i2, pick(RAAN_CHOICES), pick(NODE_POSITIONS)));
+            const r = snap(between(PLANE_RADIUS));
+            return Base.buildInclinationProblem(Base.solveInclinationChange(altitudeFor(r), i1, i2, pick(RAAN_CHOICES), pick(NODE_POSITIONS)));
         },
         polar_raan() {
             const [raan1, raan2] = pick(POLAR_RAAN_PAIRS);
-            const alt = snap(between(ALTITUDE));
-            return Base.buildPolarRaanProblem(Base.solvePolarRaanChange(alt, raan1, raan2, pick(POLE_POSITIONS)));
+            const r = snap(between(PLANE_RADIUS));
+            return Base.buildPolarRaanProblem(Base.solvePolarRaanChange(altitudeFor(r), raan1, raan2, pick(POLE_POSITIONS)));
         },
         combined() {
             const [R1, R2] = transferRadii();
@@ -209,7 +223,7 @@
         return restyle(GENERATORS[chosen]());
     }
 
-    global.ManeuversWipProblems = {
+    global.Test1ManeuverProblems = {
         constants: Base.constants,
         types: TYPES,
         generate,
