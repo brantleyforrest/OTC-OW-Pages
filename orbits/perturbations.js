@@ -377,10 +377,10 @@
 //     Search the page and scripts for the division symbol, and replace any with a slash.
 //     Confirm the page contains no identifying information about any person.
 //
-// Register, only after the tool works. Other work may be under way in index.html, study-guides.html, and
+// Register, only after the tool works. Other work may be under way in index.html and
 // README.md, so re-read each one, add only your own lines, and do not reformat. The guide in
 // _template/README.md refers to AGENTS.md section 6, but that file is not in this repository, so follow this list:
-//     Add a .tool-card to both index.html and study-guides.html, after the Sun-Synchronous Orbit card, copying its markup.
+//     Add a .tool-card to index.html, after the Sun-Synchronous Orbit card, copying its markup.
 //         Title: Perturbations Explorer
 //         Text:  "Watch drag, J₂, J₂,₂, the Sun and Moon, and sunlight change an orbit, each compared with the two-body orbit it started from."
 //         href:  orbits/perturbations.html

@@ -1011,7 +1011,7 @@
             </a>
 
             <div class="nav-links">
-                <a href="index.html" class="nav-link active" id="nav-tools" data-view="tools">
+                <a href="#tools" class="nav-link active" id="nav-tools" data-view="tools">
                     <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <circle cx="12" cy="12" r="9"></circle>
                         <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
@@ -1022,7 +1022,7 @@
                     <span class="nav-text-full">Interactive Tools</span>
                     <span class="nav-text-short">Tools</span>
                 </a>
-                <a href="study-guides.html" class="nav-link" id="nav-guides" data-view="guides">
+                <a href="#study" class="nav-link" id="nav-guides" data-view="guides">
                     <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                     </svg>
@@ -1178,6 +1178,22 @@
                         <p class="card-desc">A view from above the North Pole. Follow one day step by step to see why Earth must turn a little more than 360° before the Sun returns to the same place in the sky.</p>
                         <a href="time/solar-sidereal-day.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                     </div>
+
+                    <div class="tool-card" data-tags="hohmann transfer plane change inclination raan polar delta-v delta v impulse transfer orbit orbital maneuvers practice 3d orbit">
+                        <div class="card-top">
+                            <div class="card-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="9"></circle>
+                                    <path d="M12 3a9 9 0 0 1 9 9"></path>
+                                    <path d="M12 7a5 5 0 0 1 5 5"></path>
+                                    <polyline points="21 7 21 12 16 12"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 class="card-title">Orbital Maneuvers Visualizer</h2>
+                        <p class="card-desc">An interactive 3D visualizer and math practice suite for Hohmann transfers, simple plane changes (inclination and polar RAAN), and combined plane changes. Follow step-by-step calculations and test your knowledge.</p>
+                        <a href="practice/maneuvers-practice.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                    </div>
                 </div>
             </div>
         </main>
@@ -1204,7 +1220,36 @@
                 </p>
 
                 <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
-                    <span class="btn-launch disabled" aria-disabled="true">Work in Progress</span>
+                    <a href="practice/test-1-practice.html" class="btn-launch">
+                        Launch Tool
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <div class="portal-card">
+                <div class="portal-card-icon gold">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path d="M12 3a9 9 0 0 1 9 9"></path>
+                        <polyline points="21 7 21 12 16 12"></polyline>
+                    </svg>
+                </div>
+
+                <h2>Orbital Maneuvers Practice</h2>
+                <p class="desc">
+                    Practice Hohmann transfers, simple plane changes (inclination and polar RAAN), and combined plane changes. Features interactive 3D trajectories, worked 5-column math solutions, and practice &amp; test modes.
+                </p>
+
+                <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
+                    <a href="practice/maneuvers-practice.html" class="btn-launch">
+                        Launch Practice
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
                 </div>
             </div>
 
@@ -1251,19 +1296,26 @@
             const navGuides = document.getElementById('nav-guides');
 
             if (isGuides) {
+                const wasActive = guidesView.classList.contains('active');
                 toolsView.classList.remove('active');
                 guidesView.classList.add('active');
                 navTools.classList.remove('active');
                 navGuides.classList.add('active');
                 document.title = 'Study | OTC OW';
-                if (pushState) history.pushState({ view: 'guides' }, '', 'study-guides.html');
+                if (pushState && (!wasActive || window.location.hash.toLowerCase() !== '#study')) {
+                    history.pushState({ view: 'guides' }, '', '#study');
+                }
             } else {
+                const wasActive = toolsView.classList.contains('active');
                 guidesView.classList.remove('active');
                 toolsView.classList.add('active');
                 navGuides.classList.remove('active');
                 navTools.classList.add('active');
                 document.title = 'Interactive Tools | OTC OW';
-                if (pushState) history.pushState({ view: 'tools' }, '', 'index.html');
+                if (pushState && (!wasActive || window.location.hash)) {
+                    const cleanUrl = window.location.pathname + window.location.search;
+                    history.pushState({ view: 'tools' }, '', cleanUrl);
+                }
             }
             window.scrollTo({ top: 0, behavior: 'instant' });
         }
@@ -1276,14 +1328,20 @@
             });
         });
 
-        window.addEventListener('popstate', function(e) {
-            const path = window.location.pathname;
-            if (path.includes('study-guides')) {
+        function checkHash() {
+            const hash = window.location.hash.toLowerCase();
+            if (hash === '#study' || hash === '#guides' || hash === '#study-guides') {
                 switchView('guides', false);
             } else {
                 switchView('tools', false);
             }
-        });
+        }
+
+        window.addEventListener('popstate', checkHash);
+        window.addEventListener('hashchange', checkHash);
+
+        // Check hash on initial load to activate the requested view
+        checkHash();
 
         // Interactive Tool Search & Filter Engine
         function initToolSearch() {

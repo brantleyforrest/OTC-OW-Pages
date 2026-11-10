@@ -53,7 +53,7 @@ Upright phones match `(max-width: 640px) and (orientation: portrait)`. Rotated p
 - **Dragging on the view moves the view.** Set `touch-action: none` on the canvas of any tool that can be rotated or zoomed.
 - **Controls stay reachable while typing.** The view shrinks while a number field has focus, so that the field is not hidden between the view and the keyboard.
 - **Phone changes never affect laptops or desktops.** Keep phone-only rules inside the media queries above. The touch conditions in the rotated query keep small desktop windows out, so do not remove them. Compare the layout before and after at the large-screen test sizes.
-- **The tools index is a compact list.** On phones, upright or rotated, each tool is one short row and the whole row opens the tool. Rotated phones show the lessons in two columns. `index.html` and `study-guides.html` each contain both views, so make every index change in both files.
+- **The tools index is a compact list.** On phones, upright or rotated, each tool is one short row and the whole row opens the tool. Rotated phones show the lessons in two columns. `index.html` contains both views (switching between `#tools` and `#study`), and `study-guides.html` redirects to `index.html#study` for backwards compatibility.
 
 ## Rules That Prevent Known Problems
 
