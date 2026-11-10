@@ -99,6 +99,15 @@
             margin-bottom: 0.45rem;
         }
 
+        .btn-play {
+            padding: 0.32rem 0.75rem;
+            font-size: 0.8rem;
+            gap: 0.4rem;
+            min-width: 5.4rem;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
         .playback-btn {
             background: none;
             border: 0;
@@ -107,7 +116,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0.25rem;
+            padding: 0.3rem;
             border-radius: 4px;
             transition: color 0.15s, background 0.15s;
         }
@@ -554,11 +563,12 @@
 
                     <!-- Row 2: Playback Timeline -->
                     <div class="playback-bar" id="playback-bar">
-                        <button type="button" class="playback-btn" id="btn-play" title="Play or Pause" aria-label="Play or Pause">
-                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" id="icon-play">
-                                <rect x="6" y="4" width="4" height="16"></rect>
-                                <rect x="14" y="4" width="4" height="16"></rect>
+                        <button type="button" class="btn btn-sm btn-play primary" id="btn-play" title="Pause animation" aria-label="Pause animation">
+                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" id="icon-play" aria-hidden="true">
+                                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+                                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
                             </svg>
+                            <span id="text-play">Pause</span>
                         </button>
                         <button type="button" class="playback-btn" id="btn-rewind" title="Restart timeline" aria-label="Restart timeline">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">

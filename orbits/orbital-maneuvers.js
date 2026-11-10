@@ -176,6 +176,7 @@
     const typeButtons = document.querySelectorAll('#maneuver-type button');
     const btnPlay = $('btn-play');
     const iconPlay = $('icon-play');
+    const textPlay = $('text-play');
     const btnRewind = $('btn-rewind');
     const timelineSlider = $('timeline-slider');
     const btnSpeed = $('btn-speed');
@@ -1016,12 +1017,24 @@
         updateAll();
     });
 
-    // Play/Pause
+    // Play/Pause state and alternation
+    function setPlaying(val) {
+        state.playing = Boolean(val);
+        btnPlay.classList.toggle('primary', state.playing);
+        btnPlay.title = state.playing ? 'Pause animation' : 'Play animation';
+        btnPlay.setAttribute('aria-label', state.playing ? 'Pause animation' : 'Play animation');
+        if (iconPlay) {
+            iconPlay.innerHTML = state.playing
+                ? '<rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect>'
+                : '<polygon points="7 4 19 12 7 20 7 4"></polygon>';
+        }
+        if (textPlay) {
+            textPlay.textContent = state.playing ? 'Pause' : 'Play';
+        }
+    }
+
     btnPlay.addEventListener('click', () => {
-        state.playing = !state.playing;
-        iconPlay.innerHTML = state.playing
-            ? '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>'
-            : '<polygon points="6 4 20 12 6 20 6 4"></polygon>';
+        setPlaying(!state.playing);
     });
 
     // Rewind / Restart
@@ -1072,4 +1085,5 @@
     buildSlidersHtml();
     updateAll();
     updateShown();
+    setPlaying(state.playing);
 })();

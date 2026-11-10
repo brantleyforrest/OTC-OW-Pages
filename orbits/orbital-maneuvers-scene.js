@@ -72,8 +72,9 @@
         const projected = new THREE.Vector3();
         const toPoint = new THREE.Vector3();
 
-        const sizers = [];
         let sz = 0.1;
+        let viewW = 1;
+        let viewH = 1;
 
         // Camera state
         const cam = {
@@ -84,15 +85,20 @@
         };
         let homeView = { az: 28, el: 38, dist: 12 };
         let lastFrameReach = 0;
+        let lastType = '';
 
         function updateCamera() {
+            const aspect = viewW / Math.max(1, viewH);
+            const fit = Math.min(1, aspect * 0.95);
+            const d = cam.dist / Math.max(0.35, fit);
             const radAz = cam.az * D2R;
             const radEl = cam.el * D2R;
-            const cx = cam.dist * Math.cos(radEl) * Math.cos(radAz);
-            const cy = cam.dist * Math.cos(radEl) * Math.sin(radAz);
-            const cz = cam.dist * Math.sin(radEl);
+            const cx = d * Math.cos(radEl) * Math.cos(radAz);
+            const cy = d * Math.cos(radEl) * Math.sin(radAz);
+            const cz = d * Math.sin(radEl);
             camera.position.set(cx + cam.target.x, cy + cam.target.y, cz + cam.target.z);
             camera.lookAt(cam.target);
+            camera.updateMatrixWorld();
         }
 
         /* ------------------------------------------------------------------ */
@@ -141,6 +147,7 @@
         }
 
         function placeArrow(arrow, from, to, sizeScale, weight = 1, opacity = 1) {
+            if (!arrow || !from || !to) return;
             tmp.subVectors(to, from);
             const len = tmp.length();
             if (len < 1e-4 || opacity < 0.01) {
@@ -148,17 +155,27 @@
                 return;
             }
             arrow.group.visible = true;
+
             const thick = weight * sizeScale;
-            const headLen = Math.min(3.2 * thick, len * 0.45);
+            // Proportional arrow geometry:
+            // Arrowhead length capped at 2.4 * thick, but never more than 38% of total arrow length
+            const headLen = Math.min(2.4 * thick, len * 0.38);
             const shaftLen = Math.max(1e-4, len - headLen);
+
+            // Head radius scales down with headLen for short arrows so it stays sharp and never pancakes
+            const headRadius = Math.min(0.40 * thick, headLen * 0.35);
+            // Shaft radius is kept substantially slimmer than the head base
+            const shaftRadius = Math.min(0.12 * thick, headRadius * 0.38);
 
             arrow.group.position.copy(from);
             arrow.group.quaternion.setFromUnitVectors(Y_AXIS, tmp.normalize());
 
-            arrow.shaft.scale.set(0.18 * thick, shaftLen, 0.18 * thick);
+            // SHAFT_GEO has radius 1.0, height 1.0
+            arrow.shaft.scale.set(shaftRadius, shaftLen, shaftRadius);
             arrow.shaft.position.y = shaftLen / 2;
 
-            arrow.head.scale.set(thick * 0.9, headLen, thick * 0.9);
+            // HEAD_GEO has radius 0.5, height 1.6
+            arrow.head.scale.set(headRadius / 0.5, headLen / 1.6, headRadius / 0.5);
             arrow.head.position.y = shaftLen + headLen / 2;
 
             setOpacity(arrow.shaft, opacity);
@@ -173,7 +190,7 @@
         }
 
         function placeMarker(marker, position, opacity = 1, customScale = 1) {
-            if (!marker) return;
+            if (!marker || !position) return;
             if (opacity < 0.01) {
                 marker.visible = false;
                 return;
@@ -196,7 +213,7 @@
             }
         }
 
-        function createTube(color, { arc = false, radius = arc ? 0.28 : 0.2, ghost = 0.3 } = {}) {
+        function createTube(color, { arc = false, radius = arc ? 0.22 : 0.16, ghost = 0.3 } = {}) {
             const tube = ghosted(new THREE.BufferGeometry(), color, ghost);
             scene.add(tube);
             return {
@@ -216,8 +233,9 @@
                 return;
             }
             tObj.tube.visible = true;
-            if (tObj.key !== key) {
-                tObj.key = key;
+            const fullKey = `${key}|${(sz * radiusMult).toPrecision(2)}`;
+            if (tObj.key !== fullKey) {
+                tObj.key = fullKey;
                 tObj.curve = new PathCurve(pointAt, tObj.segments);
                 setGeometry(tObj.tube, new THREE.TubeGeometry(tObj.curve, tObj.segments, tObj.radius * sz * radiusMult, tObj.sides, false));
             }
@@ -265,10 +283,10 @@
             const line = new THREE.Line(new THREE.BufferGeometry(), mat);
             line.frustumCulled = false;
             scene.add(line);
-            return { line, mat };
+            return { line, mat, key: '' };
         }
 
-        function setDashedPoints(dLine, points, opacity = 0.5) {
+        function setDashedPoints(dLine, points, key, opacity = 0.5) {
             if (!dLine) return;
             if (opacity < 0.01 || !points || points.length < 2) {
                 dLine.line.visible = false;
@@ -276,9 +294,12 @@
             }
             dLine.line.visible = true;
             dLine.mat.opacity = opacity;
-            dLine.line.geometry.dispose();
-            dLine.line.geometry = new THREE.BufferGeometry().setFromPoints(points);
-            dLine.line.computeLineDistances();
+            if (key === undefined || dLine.key !== key) {
+                dLine.key = key;
+                dLine.line.geometry.dispose();
+                dLine.line.geometry = new THREE.BufferGeometry().setFromPoints(points);
+                dLine.line.computeLineDistances();
+            }
         }
 
         /* ------------------------------------------------------------------ */
@@ -331,7 +352,7 @@
 
         function burnAt(P, before, after) {
             const collinear = before.angleTo(after) < 0.5 * D2R;
-            const offset = collinear ? P.clone().normalize().multiplyScalar(0.09 * Math.max(before.length(), after.length())) : new THREE.Vector3();
+            const offset = collinear ? P.clone().normalize().multiplyScalar(0.08 * Math.max(before.length(), after.length())) : new THREE.Vector3();
             const afterFrom = P.clone().add(offset);
             const tipBefore = P.clone().add(before);
             const tipAfter = afterFrom.clone().add(after);
@@ -342,8 +363,8 @@
                 afterFrom,
                 tipBefore,
                 tipAfter,
-                dvFrom: tipBefore.clone().sub(offset),
-                dvEnd: P.clone().sub(offset).add(after),
+                dvFrom: collinear ? P.clone().add(offset).add(before) : tipBefore,
+                dvEnd: tipAfter,
                 before,
                 after
             };
@@ -358,16 +379,16 @@
         const axisK = createArrow(COLORS.eci);
 
         // Orbits and Tubes
-        const orbit1Tube = createTube(COLORS.orbit1);
-        const orbit2Tube = createTube(COLORS.orbit2);
-        const transferActiveTube = createTube(COLORS.transfer);
-        const transferFaintTube = createTube(COLORS.transfer, { radius: 0.12, ghost: 0.18 });
-        const thetaArcTube = createTube(COLORS.theta, { arc: true });
-        const duArcTube = createTube(COLORS.tof, { arc: true });
-        const raanArcTube = createTube(COLORS.node, { arc: true });
+        const orbit1Tube = createTube(COLORS.orbit1, { radius: 0.16 });
+        const orbit2Tube = createTube(COLORS.orbit2, { radius: 0.16 });
+        const transferActiveTube = createTube(COLORS.transfer, { radius: 0.19 });
+        const transferFaintTube = createTube(COLORS.transfer, { radius: 0.10, ghost: 0.20 });
+        const thetaArcTube = createTube(COLORS.theta, { arc: true, radius: 0.22 });
+        const duArcTube = createTube(COLORS.tof, { arc: true, radius: 0.22 });
+        const raanArcTube = createTube(COLORS.node, { arc: true, radius: 0.22 });
 
         // Planes & Discs
-        const equatorDisc = createDisc(0x3a82f7, 0.14, 0.5);
+        const equatorDisc = createDisc(0x3a82f7, 0.08, 0.4);
 
         // Dashed lines (apsides, nodes)
         const apsidesLine = createDashedLine(0x94a3b8);
@@ -436,6 +457,7 @@
             dv2: addMeasureLabel('\\Delta V_2', '#f87171', 0),
             dv: addMeasureLabel('\\Delta V', '#f87171', 0),
             theta: addMeasureLabel('\\Delta \\theta', '#38bdf8', 0),
+            raan: addMeasureLabel('\\Delta \\Omega', '#38bdf8', 1),
             du: addMeasureLabel('\\Delta u', '#c4a1ff', 1),
             nodeWord: addWordLabel(2, true),
             poleWord: addWordLabel(2, true)
@@ -482,27 +504,34 @@
             currentModel = model;
             const type = model.type;
             const reach = Math.max(model.R1 || model.r || 10000, model.R2 || model.r || 10000) / R_E;
+            const fitDist = Math.max(4.5, (reach * 1.35) / TAN_HALF_FOV);
 
             // Update axes size
-            const axisBase = Math.max(2.2, reach * 1.25);
+            const axisBase = Math.max(2.0, reach * 1.25);
             placeArrow(axisI, ORIGIN, new THREE.Vector3(axisBase * 1.08, 0, 0), sz, 1, 0.9);
             placeArrow(axisJ, ORIGIN, new THREE.Vector3(0, axisBase * 1.08, 0), sz, 1, 0.9);
             placeArrow(axisK, ORIGIN, new THREE.Vector3(0, 0, axisBase * 0.9), sz, 1, 0.9);
 
             // Compute visual layout based on type
             if (type === 'hohmann') {
-                buildHohmannData(model, reach, axisBase);
+                buildHohmannData(model, reach, axisBase, fitDist);
             } else if (type === 'inclination') {
-                buildInclinationData(model, reach, axisBase);
+                buildInclinationData(model, reach, axisBase, fitDist);
             } else if (type === 'polar_raan') {
-                buildPolarRaanData(model, reach, axisBase);
+                buildPolarRaanData(model, reach, axisBase, fitDist);
             } else if (type === 'combined') {
-                buildCombinedData(model, reach, axisBase);
+                buildCombinedData(model, reach, axisBase, fitDist);
             }
 
-            // Adjust camera distance if scale changed significantly
-            if (lastFrameReach > 0 && Math.abs(reach - lastFrameReach) / lastFrameReach > 0.15) {
-                cam.dist = Math.max(3.0, reach * 2.2);
+            // Adjust camera view when type changes or reach changes significantly
+            if (lastType !== type) {
+                cam.az = homeView.az;
+                cam.el = homeView.el;
+                cam.dist = fitDist;
+                cam.target.set(0, 0, 0);
+                lastType = type;
+            } else if (lastFrameReach > 0 && Math.abs(reach - lastFrameReach) / lastFrameReach > 0.06) {
+                cam.dist = fitDist;
             }
             lastFrameReach = reach;
         }
@@ -510,7 +539,7 @@
         /* ------------------------------------------------------------------ */
         /* 1. Hohmann Transfer Data                                           */
         /* ------------------------------------------------------------------ */
-        function buildHohmannData(model, reach, axisBase) {
+        function buildHohmannData(model, reach, axisBase, fitDist) {
             const R1_n = model.R1 / R_E;
             const R2_n = model.R2 / R_E;
             const atx_n = model.a_tx / R_E;
@@ -522,7 +551,7 @@
 
             // Velocity vectors scale
             const maxV = Math.max(model.v1, model.v_tx1, model.v2, model.v_tx2);
-            const vScale = (0.42 * R1_n) / Math.max(1e-4, maxV);
+            const vScale = (0.52 * R1_n) / Math.max(1e-4, maxV);
 
             const v1Vec = new THREE.Vector3(0, model.v1 * vScale, 0);
             const vtx1Vec = new THREE.Vector3(0, model.v_tx1 * vScale, 0);
@@ -560,13 +589,13 @@
                 faintTx: (t, out) => transferPt(180 + t * 180, out)
             };
 
-            homeView = { az: 28, el: 42, dist: Math.max(3.5, reach * 2.2) };
+            homeView = { az: 28, el: 44, dist: fitDist };
         }
 
         /* ------------------------------------------------------------------ */
         /* 2. Inclination Change Data                                         */
         /* ------------------------------------------------------------------ */
-        function buildInclinationData(model, reach, axisBase) {
+        function buildInclinationData(model, reach, axisBase, fitDist) {
             const r_n = model.r / R_E;
             const i1 = model.i1;
             const i2 = model.i2;
@@ -580,7 +609,7 @@
             const burnPos = orbitPoint(r_n, i1, raan, uBurn);
             const otherNodePos = orbitPoint(r_n, i1, raan, uBurn + 180);
 
-            const vLen = 0.42 * r_n;
+            const vLen = 0.50 * r_n;
             const vScale = vLen / Math.max(1e-4, model.v);
 
             const T1 = orbitTangent(i1, raan, uBurn).multiplyScalar(vLen);
@@ -594,6 +623,9 @@
                 reach,
                 planesMatch,
                 r_n,
+                i1,
+                i2,
+                raan,
                 satPos,
                 burnPos,
                 otherNodePos,
@@ -609,13 +641,13 @@
                 nodeLinePts: [along.clone().multiplyScalar(-r_n * 1.3), along.clone().multiplyScalar(r_n * 1.3)]
             };
 
-            homeView = { az: raan + 35, el: 26, dist: Math.max(3.2, reach * 2.2) };
+            homeView = { az: raan + 35, el: 32, dist: fitDist };
         }
 
         /* ------------------------------------------------------------------ */
         /* 3. Polar RAAN Change Data                                          */
         /* ------------------------------------------------------------------ */
-        function buildPolarRaanData(model, reach, axisBase) {
+        function buildPolarRaanData(model, reach, axisBase, fitDist) {
             const r_n = model.r / R_E;
             const raan1 = model.raan1;
             const raan2 = model.raan2;
@@ -628,18 +660,27 @@
             const burnPos = orbitPoint(r_n, 90, raan1, uBurn);
             const otherPolePos = orbitPoint(r_n, 90, raan1, uBurn + 180);
 
-            const vLen = 0.42 * r_n;
+            const vLen = 0.50 * r_n;
             const T1 = orbitTangent(90, raan1, uBurn).multiplyScalar(vLen);
             const T2 = orbitTangent(90, raan2, uBurn).multiplyScalar(vLen);
             const b = burnAt(burnPos, T1, T2);
+
+            const raanArcRad = r_n * 0.75;
+            const raanArc = (t, out) => {
+                const angle = (raan1 + t * (raan2 - raan1)) * D2R;
+                return out.set(raanArcRad * Math.cos(angle), raanArcRad * Math.sin(angle), 0);
+            };
 
             visualData = {
                 type: 'polar_raan',
                 reach,
                 planesMatch,
                 r_n,
+                raan1,
+                raan2,
                 satPos,
                 burnPos,
+                otherNodePos: otherPolePos,
                 otherPolePos,
                 coast,
                 u_sc,
@@ -650,17 +691,18 @@
                 ring2: (t, out) => orbitPoint(r_n, 90, raan2, t * 360, out),
                 duArc: (t, out) => orbitPoint(r_n, 90, raan1, u_sc + t * coast, out),
                 thetaArc: turnArc(burnPos, T1, T2, 0.45 * vLen),
+                raanArc,
                 nodeLinePts: [new THREE.Vector3(0, 0, -r_n * 1.3), new THREE.Vector3(0, 0, r_n * 1.3)]
             };
 
             const midRaan = (raan1 + raan2) / 2;
-            homeView = { az: midRaan + 45, el: 32, dist: Math.max(3.2, reach * 2.2) };
+            homeView = { az: midRaan + 45, el: 34, dist: fitDist };
         }
 
         /* ------------------------------------------------------------------ */
         /* 4. Combined Plane Change Data                                      */
         /* ------------------------------------------------------------------ */
-        function buildCombinedData(model, reach, axisBase) {
+        function buildCombinedData(model, reach, axisBase, fitDist) {
             const R1_n = model.R1 / R_E;
             const R2_n = model.R2 / R_E;
             const atx_n = model.a_tx / R_E;
@@ -687,7 +729,7 @@
             const P2 = orbitPoint(R2_n, i2, 0, 180);
 
             const maxV = Math.max(model.v1, model.v_tx1, model.v2, model.v_tx2);
-            const vScale = (0.42 * R1_n) / Math.max(1e-4, maxV);
+            const vScale = (0.52 * R1_n) / Math.max(1e-4, maxV);
 
             // Velocity vectors at Burn 1 (u = 0)
             const v1Dir = orbitTangent(i1, 0, 0);
@@ -752,7 +794,7 @@
                 thetaArc
             };
 
-            homeView = { az: 32, el: 38, dist: Math.max(3.5, reach * 2.2) };
+            homeView = { az: 32, el: 38, dist: fitDist };
         }
 
         /* ------------------------------------------------------------------ */
@@ -936,14 +978,14 @@
 
             if (d.type === 'hohmann') {
                 // Orbit 1 and Orbit 2
-                drawTube(orbit1Tube, d.ring1, `h_r1_${d.R1_n.toFixed(2)}`, 1.0);
-                drawTube(orbit2Tube, d.ring2, `h_r2_${d.R2_n.toFixed(2)}`, d.noTransfer ? 0 : 1.0);
+                drawTube(orbit1Tube, d.ring1, `h_r1_${d.R1_n.toFixed(3)}`, 1.0);
+                drawTube(orbit2Tube, d.ring2, `h_r2_${d.R2_n.toFixed(3)}`, d.noTransfer ? 0 : 1.0);
 
                 // Transfer
                 if (!d.noTransfer) {
-                    drawTube(transferActiveTube, d.activeTx, `h_tx_${d.atx_n.toFixed(2)}`, 1.0);
-                    drawTube(transferFaintTube, d.faintTx, `h_tx_faint_${d.atx_n.toFixed(2)}`, 0.28);
-                    setDashedPoints(apsidesLine, [new THREE.Vector3(-d.R2_n * 1.15, 0, 0), new THREE.Vector3(d.R1_n * 1.15, 0, 0)], 0.35);
+                    drawTube(transferActiveTube, d.activeTx, `h_tx_${d.atx_n.toFixed(3)}`, 1.0);
+                    drawTube(transferFaintTube, d.faintTx, `h_tx_faint_${d.atx_n.toFixed(3)}`, 0.28);
+                    setDashedPoints(apsidesLine, [new THREE.Vector3(-d.R2_n * 1.15, 0, 0), new THREE.Vector3(d.R1_n * 1.15, 0, 0)], `h_aps_${d.R1_n.toFixed(3)}_${d.R2_n.toFixed(3)}`, 0.35);
 
                     placeMarker(burn1Marker, d.P1, 1.0);
                     placeMarker(burn2Marker, d.P2, 1.0);
@@ -974,6 +1016,7 @@
 
                 thetaArcTube.tube.visible = false;
                 duArcTube.tube.visible = false;
+                raanArcTube.tube.visible = false;
                 nodeLine.line.visible = false;
                 equatorDisc.group.visible = false;
                 burn3Marker.visible = false;
@@ -982,8 +1025,11 @@
 
             } else if (d.type === 'inclination' || d.type === 'polar_raan') {
                 const isPolar = d.type === 'polar_raan';
-                drawTube(orbit1Tube, d.ring1, `inc_r1_${d.r_n.toFixed(2)}`, 1.0);
-                drawTube(orbit2Tube, d.ring2, `inc_r2_${d.r_n.toFixed(2)}`, d.planesMatch ? 0 : 0.95);
+                const k1 = isPolar ? `pol_r1_${d.r_n.toFixed(3)}_${d.raan1.toFixed(1)}` : `inc_r1_${d.r_n.toFixed(3)}_${d.i1.toFixed(1)}_${d.raan.toFixed(1)}`;
+                const k2 = isPolar ? `pol_r2_${d.r_n.toFixed(3)}_${d.raan2.toFixed(1)}` : `inc_r2_${d.r_n.toFixed(3)}_${d.i2.toFixed(1)}_${d.raan.toFixed(1)}`;
+
+                drawTube(orbit1Tube, d.ring1, k1, 1.0);
+                drawTube(orbit2Tube, d.ring2, k2, d.planesMatch ? 0 : 0.95);
 
                 transferActiveTube.tube.visible = false;
                 transferFaintTube.tube.visible = false;
@@ -995,7 +1041,8 @@
                 placeDisc(equatorDisc, d.axisBase * 0.92, 0.5);
 
                 // Line of nodes or polar crossing line
-                setDashedPoints(nodeLine, d.nodeLinePts, 0.45);
+                const dashKey = isPolar ? `spin_axis_${d.r_n.toFixed(3)}` : `node_line_${d.raan.toFixed(1)}_${d.r_n.toFixed(3)}`;
+                setDashedPoints(nodeLine, d.nodeLinePts, dashKey, 0.45);
 
                 if (!d.planesMatch) {
                     placeMarker(burn1Marker, d.burnPos, 1.0, 1.1);
@@ -1003,16 +1050,24 @@
 
                     // du arc
                     if (angVis && d.coast > 1.0) {
-                        drawTube(duArcTube, d.duArc, `du_${d.coast.toFixed(1)}`, 0.85);
+                        drawTube(duArcTube, d.duArc, `${d.type}_du_${d.u_sc.toFixed(1)}_${d.coast.toFixed(1)}`, 0.85);
                     } else {
                         duArcTube.tube.visible = false;
                     }
 
                     // theta arc
                     if (angVis && d.thetaArc) {
-                        drawTube(thetaArcTube, d.thetaArc, `theta_${d.type}`, 0.9);
+                        const thKey = isPolar ? `pol_th_${d.raan1.toFixed(1)}_${d.raan2.toFixed(1)}_${d.uBurn.toFixed(1)}` : `inc_th_${d.i1.toFixed(1)}_${d.i2.toFixed(1)}_${d.uBurn.toFixed(1)}`;
+                        drawTube(thetaArcTube, d.thetaArc, thKey, 0.9);
                     } else {
                         thetaArcTube.tube.visible = false;
+                    }
+
+                    // Equatorial RAAN arc
+                    if (isPolar && angVis && d.raanArc) {
+                        drawTube(raanArcTube, d.raanArc, `pol_raan_${d.raan1.toFixed(1)}_${d.raan2.toFixed(1)}`, 0.85);
+                    } else {
+                        raanArcTube.tube.visible = false;
                     }
 
                     // Vectors
@@ -1022,7 +1077,7 @@
 
                         placeArrow(vBefore1, d.b.P, d.b.tipBefore, sz, 1.1, bLevel);
                         placeArrow(vAfter1, d.b.P, d.b.tipAfter, sz, 1.1, bLevel);
-                        placeArrow(vDv1, d.b.tipBefore, d.b.tipAfter, sz, 1.4, bLevel);
+                        placeArrow(vDv1, d.b.dvFrom, d.b.dvEnd, sz, 1.45, bLevel);
                     } else {
                         hideArrows();
                     }
@@ -1031,14 +1086,15 @@
                     node1Marker.visible = false;
                     duArcTube.tube.visible = false;
                     thetaArcTube.tube.visible = false;
+                    raanArcTube.tube.visible = false;
                     hideArrows();
                 }
 
             } else if (d.type === 'combined') {
-                drawTube(orbit1Tube, d.ring1, `c_r1_${d.R1_n.toFixed(2)}`, 1.0);
-                drawTube(orbit2Tube, d.ring2, `c_r2_${d.R2_n.toFixed(2)}`, 1.0);
-                drawTube(transferActiveTube, d.activeTx, `c_tx_${d.atx_n.toFixed(2)}`, 1.0);
-                drawTube(transferFaintTube, d.faintTx, `c_tx_faint_${d.atx_n.toFixed(2)}`, 0.28);
+                drawTube(orbit1Tube, d.ring1, `c_r1_${d.R1_n.toFixed(3)}_${d.i1.toFixed(1)}`, 1.0);
+                drawTube(orbit2Tube, d.ring2, `c_r2_${d.R2_n.toFixed(3)}_${d.i2.toFixed(1)}`, 1.0);
+                drawTube(transferActiveTube, d.activeTx, `c_tx_${d.atx_n.toFixed(3)}_${d.iTransfer.toFixed(1)}_${d.eSigned.toFixed(3)}`, 1.0);
+                drawTube(transferFaintTube, d.faintTx, `c_tx_faint_${d.atx_n.toFixed(3)}_${d.iTransfer.toFixed(1)}_${d.eSigned.toFixed(3)}`, 0.28);
 
                 placeDisc(equatorDisc, d.axisBase * 0.92, 0.35);
 
@@ -1052,12 +1108,13 @@
 
                 // Theta arc at combined burn
                 if (angVis && d.thetaArc) {
-                    drawTube(thetaArcTube, d.thetaArc, 'c_theta', 0.9);
+                    drawTube(thetaArcTube, d.thetaArc, `c_theta_${d.i1.toFixed(1)}_${d.i2.toFixed(1)}_${d.loc}_${d.isRaise}`, 0.9);
                 } else {
                     thetaArcTube.tube.visible = false;
                 }
 
                 duArcTube.tube.visible = false;
+                raanArcTube.tube.visible = false;
                 nodeLine.line.visible = false;
                 node1Marker.visible = false;
                 node2Marker.visible = false;
@@ -1152,6 +1209,12 @@
                         showLbl(sceneLabels.theta, d.burnPos.clone().add(new THREE.Vector3(0, 0, 0.3 * sz)), `${currentModel.delta_theta.toFixed(1)}°`);
                         if (d.coast > 1.0) {
                             showLbl(sceneLabels.du, d.satPos, `${Math.round(d.coast)}°`);
+                        }
+                        if (d.type === 'polar_raan' && d.raanArc) {
+                            const midAngle = ((d.raan1 + d.raan2) / 2) * D2R;
+                            const arcR = d.r_n * 0.75;
+                            const lblPos = new THREE.Vector3(arcR * Math.cos(midAngle), arcR * Math.sin(midAngle), 0);
+                            showLbl(sceneLabels.raan, lblPos, `${currentModel.delta_raan.toFixed(1)}°`);
                         }
                     }
                     if (d.type === 'inclination') {
