@@ -7,7 +7,7 @@
     const Kit = global.ToolKit;
     const { math } = global.PracticeMath;
 
-    const STAGES = ['given', 'mag', 'a', 'h', 'i', 'n', 'raan', 'e', 'argp', 'nu'];
+    const STAGES = ['given', 'mag', 'a', 'e', 'i', 'raan', 'argp', 'nu'];
     const stageOrder = (name) => STAGES.indexOf(name);
 
     const CAMERA_SECONDS = 1.7;
@@ -23,24 +23,23 @@
     const PARTS = {
         axisI: { from: 'given', focus: ['given', 'raan'], dimmed: 0.45 },
         axisJ: { from: 'given', focus: ['given'], dimmed: 0.45 },
-        axisK: { from: 'given', focus: ['given', 'i', 'n'], dimmed: 0.45 },
-        r: { from: 'given', focus: ['given', 'mag', 'h', 'nu'] },
-        v: { from: 'given', focus: ['given', 'mag', 'h'] },
+        axisK: { from: 'given', focus: ['given', 'i', 'raan'], dimmed: 0.45 },
+        r: { from: 'given', focus: ['given', 'mag', 'i', 'nu'] },
+        v: { from: 'given', focus: ['given', 'mag', 'i'] },
         rightAngle: { from: 'mag', until: 'mag', focus: ['mag'], seconds: 0.7 },
         majorAxis: { from: 'a', focus: ['a', 'e'], seconds: 1.7 },
         aBar: { from: 'a', until: 'a', focus: ['a'], seconds: 1.2, after: 'majorAxis' },
         apsides: { from: 'a', focus: ['a', 'e'], seconds: 0.4, after: 'majorAxis', dimmed: 0.6 },
-        h: { from: 'h', focus: ['h', 'i', 'n'], seconds: 1.5 },
-        plane: { from: 'h', until: 'raan', focus: ['h', 'i', 'n'], seconds: 1.6, after: 'h', dimmed: 0.5 },
+        orbit: { from: 'e', focus: ['e', 'i'], seconds: 4.2, dimmed: 0.6 },
+        perigeeSpan: { from: 'e', until: 'e', focus: ['e'], seconds: 0.9, after: 'orbit' },
+        thumb: { from: 'i', focus: ['i', 'argp', 'nu'], seconds: 1.5 },
+        curlOrbit: { from: 'i', focus: ['i', 'argp', 'nu'], seconds: 1.3, after: 'thumb' },
         equator: { from: 'i', focus: ['i', 'raan'], seconds: 1.6, dimmed: 0.45 },
         arcI: { from: 'i', focus: ['i'], seconds: 1.6, after: 'equator' },
-        n: { from: 'n', focus: ['n', 'raan', 'argp'], seconds: 1.4 },
-        nodeLine: { from: 'n', until: 'n', focus: ['n'], seconds: 1.4 },
-        northHalf: { from: 'n', until: 'n', focus: ['n'], seconds: 1.3, after: 'n' },
-        arcRaan: { from: 'raan', focus: ['raan'], seconds: 1.9 },
-        e: { from: 'e', focus: ['e', 'argp', 'nu'], seconds: 1.4 },
-        orbit: { from: 'e', focus: ['e'], seconds: 4.2, after: 'e', dimmed: 0.6 },
-        perigeeSpan: { from: 'e', until: 'e', focus: ['e'], seconds: 0.9, after: 'orbit' },
+        curlEarth: { from: 'raan', until: 'raan', focus: ['raan'], seconds: 1.2 },
+        node: { from: 'raan', focus: ['raan', 'argp'], seconds: 1.4 },
+        northHalf: { from: 'raan', until: 'raan', focus: ['raan'], seconds: 1.3, after: 'node' },
+        arcRaan: { from: 'raan', focus: ['raan'], seconds: 1.9, after: 'northHalf' },
         arcArgp: { from: 'argp', focus: ['argp'], seconds: 2 },
         arcNu: { from: 'nu', focus: ['nu'], seconds: 2 }
     };
@@ -51,8 +50,8 @@
     // Some parts do not exist for some orbits. A circle has no perigee, for example.
     function partExists(name, S) {
         switch (name) {
-            case 'majorAxis': case 'apsides': case 'e': case 'perigeeSpan': return !S.circular;
-            case 'n': case 'nodeLine': case 'northHalf': return !S.equatorial;
+            case 'majorAxis': case 'apsides': case 'perigeeSpan': return !S.circular;
+            case 'node': case 'northHalf': case 'curlEarth': return !S.equatorial;
             case 'arcI': return S.i > 0.5;
             case 'arcRaan': return !S.raanUndefined && S.raan > 0.5;
             case 'arcArgp': return !S.argpUndefined && S.argp > 0.5;
@@ -77,11 +76,14 @@
         const MAX_TILT = 74;            // Steepest camera angle a step uses, in degrees
         const FRAME_MARGIN = 1.18;      // Room left around what a step frames
         const EARTH_EDGE = 1.03;
-        const SHORTEST_ARROW = 1.6;     // n and e are drawn at least this long, to clear Earth
+        const SHORTEST_ARROW = 1.6;     // The arrow to the node is at least this long, to clear Earth
+        const TIP_CLEARANCE = 3.2;      // The camera stays this many tip distances from the center
+        const CURL_SWEEP = 300 * D2R;   // How far a ring of curled fingers goes around its axis
 
         const COLORS = {
             eci: '#60a5fa',
             orbit: '#e0b64f',
+            hand: '#ffc9a3',
             r: '#f0f4fa',
             v: '#f87171',
             a: '#ff8a3d',
@@ -339,21 +341,17 @@
         const axisK = createArrow(COLORS.eci);
 
         const equatorDisc = createDisc(0x3a82f7, 0.15, 0.6);
-        const planeDisc = createDisc(COLORS.orbit, 0.13, 0.5);
         const orbitFan = createFan(fanGeometry(ORBIT_SEGMENTS), COLORS.orbit);
-        const northFan = createFan(fanGeometry(ARC_SEGMENTS), COLORS.raan);
         const orbitTube = ghosted(new THREE.BufferGeometry(), COLORS.orbit, 0.28);
         scene.add(orbitTube);
 
         const arrowR = createArrow(COLORS.r);
         const arrowV = createArrow(COLORS.v);
-        const arrowH = createArrow(COLORS.i);
-        const arrowN = createArrow(COLORS.raan);
-        const arrowE = createArrow(COLORS.e);
+        const arrowThumb = createArrow(COLORS.hand);
+        const arrowNode = createArrow(COLORS.raan);
 
         const barA = createBar(COLORS.a);
         const majorAxis = createBar(COLORS.a);
-        const nodeLine = createBar(COLORS.raan);
         const rightMarkA = createBar(0xffffff);
         const rightMarkB = createBar(0xffffff);
 
@@ -369,6 +367,9 @@
         const arcArgp = createArc(COLORS.argp);
         const arcNu = createArc(COLORS.nu);
         const perigeeSpan = createArc(COLORS.e, { arrowhead: false });
+        const northHalf = createArc(COLORS.raan, { arrowhead: false });
+        const curlOrbit = createArc(COLORS.hand);
+        const curlEarth = createArc(COLORS.hand);
 
         /* Labels ----------------------------------------------------------- */
         function measureLabel(tex, color, rank) {
@@ -378,8 +379,8 @@
             return label;
         }
 
-        function wordLabel(text) {
-            const label = layer.add(text, { rank: 3, optional: true });
+        function wordLabel(text, rank = 3, optional = true) {
+            const label = layer.add(text, { rank, optional });
             label.el.classList.add('word');
             return label;
         }
@@ -399,9 +400,6 @@
             K: axisLabel('K'),
             r: measureLabel(vectorTex('r'), COLORS.r, 0),
             v: measureLabel(vectorTex('v'), COLORS.v, 0),
-            h: measureLabel(vectorTex('h'), COLORS.i, 0),
-            n: measureLabel(vectorTex('n'), COLORS.raan, 0),
-            e: measureLabel(vectorTex('e'), COLORS.e, 0),
             a: measureLabel('a', COLORS.a, 0),
             i: measureLabel('i', COLORS.i, 0),
             raan: measureLabel('\\Omega', COLORS.raan, 0),
@@ -409,7 +407,8 @@
             nu: measureLabel('\\nu', COLORS.nu, 0),
             perigee: wordLabel('Perigee'),
             apogee: wordLabel('Apogee'),
-            node: wordLabel('Ascending node')
+            node: wordLabel('Ascending node'),
+            thumb: wordLabel('Right thumb', 1, false)
         };
 
         function setLabelValue(label, text) {
@@ -479,11 +478,13 @@
             const perigee = P.clone().multiplyScalar(rp);
             const apogee = P.clone().multiplyScalar(-ra);
             const atPerigee = S.apsis === 'perigee';
+            const thumbLength = axisBase * 0.72;
+            const kLength = axisBase * 0.9;
 
             problemId += 1;
             data = {
                 S, e, r, W, P, Q, a, p, rp, ra, n, argp, reach, axisBase, vDir, perigee, apogee,
-                rNode, thetaSat,
+                rNode, thetaSat, thetaNode,
                 id: problemId,
                 rHat: r.clone().normalize(),
                 center: P.clone().multiplyScalar(-a * e),
@@ -493,12 +494,14 @@
                 vTip: r.clone().addScaledVector(vDir, vLength),
                 iTip: new THREE.Vector3(axisBase * 1.08, 0, 0),
                 jTip: new THREE.Vector3(0, axisBase * 1.08, 0),
-                kTip: new THREE.Vector3(0, 0, axisBase * 0.9),
-                hTip: W.clone().multiplyScalar(axisBase * 0.72),
+                kTip: new THREE.Vector3(0, 0, kLength),
+                hTip: W.clone().multiplyScalar(thumbLength),
                 nTip: n ? n.clone().multiplyScalar(Math.max(rNode, SHORTEST_ARROW)) : new THREE.Vector3(),
-                eTip: P.clone().multiplyScalar(Math.max(rp, SHORTEST_ARROW)),
                 nodePoint: n ? n.clone().multiplyScalar(rNode) : new THREE.Vector3(),
-                planeRadius: Math.max(1.7, reach * 1.1),
+                curlCenter: W.clone().multiplyScalar(thumbLength * 0.8),
+                curlRadius: thumbLength * 0.18,
+                earthCurlCenter: new THREE.Vector3(0, 0, kLength * 0.62),
+                earthCurlRadius: kLength * 0.18,
                 equatorRadius: axisBase * 0.96,
                 arcRadiusRaan: Math.max(rNode, 1.45),
                 camFit: viewRadius / TAN_HALF_FOV,
@@ -521,21 +524,6 @@
                 orbitFanPoints.setXYZ(k + 1, tmp.x, tmp.y, tmp.z);
             }
             orbitFanPoints.needsUpdate = true;
-
-            // The half of the orbital plane north of the equator
-            if (n) {
-                const north = new THREE.Vector3().crossVectors(W, n).normalize();
-                const northPoints = northFan.geometry.attributes.position;
-                northPoints.setXYZ(0, 0, 0, 0);
-                for (let k = 0; k <= ARC_SEGMENTS; k++) {
-                    const phi = (k / ARC_SEGMENTS) * Math.PI;
-                    tmp.copy(n).multiplyScalar(Math.cos(phi)).addScaledVector(north, Math.sin(phi)).multiplyScalar(data.planeRadius);
-                    northPoints.setXYZ(k + 1, tmp.x, tmp.y, tmp.z);
-                }
-                northPoints.needsUpdate = true;
-            }
-
-            planeDisc.group.quaternion.setFromUnitVectors(Z_AXIS, W);
 
             stage = 'given';
             stageClock = 0;
@@ -657,15 +645,24 @@
                 distance = Math.max(distance, depth + needY, depth + needX);
             }
 
+            // An arrow pointing at the camera looks huge up close.
+            for (const tip of [data.kTip, data.hTip]) distance = Math.max(distance, tip.dot(dir) * TIP_CLEARANCE);
+
             const target = right.multiplyScalar(midX).addScaledVector(up, midY);
             const zoom = Math.min(MAX_ZOOM, (distance * Math.min(1, aspect)) / data.camFit);
             return { az, el, zoom, x: target.x, y: target.y, z: target.z };
         }
 
+        // Looks along the line where the orbit meets the equator, from the satellite's side and a
+        // little above the orbit, so the tilt, the thumb, and the curl of the fingers all show.
         function sideView() {
-            const along = data.n || data.rHat;
+            const d = data;
+            const along = (d.n || d.rHat).clone();
+            if (along.dot(d.rHat) < 0) along.negate();
             const across = new THREE.Vector3().crossVectors(Z_AXIS, along).normalize();
-            return along.clone().addScaledVector(Z_AXIS, 0.2).addScaledVector(across, 0.14).normalize();
+            const thumbUp = d.W.z < 0 ? d.W.clone().negate() : d.W.clone();
+            if (across.dot(thumbUp) < 0) across.negate();
+            return along.addScaledVector(thumbUp, 0.45).addScaledVector(across, 0.3).addScaledVector(Z_AXIS, 0.12).normalize();
         }
 
         function stageGoal(name) {
@@ -675,24 +672,18 @@
 
             const above = (d.W.z < 0 ? d.W.clone().negate() : d.W.clone()).addScaledVector(Z_AXIS, 0.24).normalize();
             const both = (u, size) => [u.clone().multiplyScalar(size), u.clone().multiplyScalar(-size)];
-            const planeEdges = [...both(d.P, d.planeRadius), ...both(d.Q, d.planeRadius)];
             const equatorEdges = [...both(X_AXIS, d.equatorRadius), ...both(Y_AXIS, d.equatorRadius)];
-            const tiltView = () => fit(sideView(), [d.kTip, d.hTip, ...planeEdges, ...equatorEdges]);
+            const tiltView = () => fit(sideView(), [d.kTip, d.hTip, d.r, d.vTip, ...equatorEdges, ...d.wholeOrbit]);
 
             switch (name) {
                 case 'mag':
                     return fit(above, [d.r, d.vTip]);
                 case 'a':
                     return fit(above, [d.near, d.far, d.barEnd, d.r, d.vTip]);
-                case 'h': {
-                    const corner = d.rHat.clone().add(d.vDir).addScaledVector(d.W, 0.75).normalize();
-                    return fit(corner, [d.r, d.vTip, d.hTip, ...planeEdges]);
-                }
+                case 'e':
+                    return fit(above, [...d.wholeOrbit, d.r, d.vTip]);
                 case 'i':
                     return tiltView();
-                case 'n':
-                    if (S.equatorial) return tiltView();
-                    return fit(fromAngles(Math.atan2(d.n.y, d.n.x) * R2D - 50, 34), [d.kTip, d.hTip, ...planeEdges]);
                 case 'raan': {
                     if (S.equatorial) return tiltView();
                     const swept = [];
@@ -700,13 +691,14 @@
                         const angle = (k / 12) * S.raan * D2R;
                         swept.push(new THREE.Vector3(Math.cos(angle) * d.arcRadiusRaan, Math.sin(angle) * d.arcRadiusRaan, 0));
                     }
-                    return fit(fromAngles(S.raan / 2, 64), [d.iTip, d.nTip, ...swept]);
+                    const northSide = sampleOrbit(d.thetaNode, d.thetaNode + Math.PI, 16);
+                    return fit(fromAngles(S.raan / 2, 64), [d.iTip, d.nTip, d.kTip, ...swept, ...northSide]);
                 }
                 case 'argp':
-                    if (S.argpUndefined) return fit(above, d.wholeOrbit);
-                    return fit(above, [...sampleOrbit(-d.argp, 0, 16), d.nTip, d.eTip]);
+                    if (S.argpUndefined || S.argp < 0.5) return fit(above, d.wholeOrbit);
+                    return fit(above, [...sampleOrbit(-d.argp, 0, 16), d.nTip, d.perigee]);
                 case 'nu':
-                    if (S.nuUndefined) return fit(above, d.wholeOrbit);
+                    if (S.nuUndefined || S.nu < 0.5) return fit(above, d.wholeOrbit);
                     return fit(above, [...sampleOrbit(0, S.nu * D2R, 16), d.r, d.vTip, d.perigee]);
                 default:
                     return fit(above, d.wholeOrbit);
@@ -716,6 +708,12 @@
         /* Scene update ----------------------------------------------------- */
         const anchors = { i: new THREE.Vector3(), raan: new THREE.Vector3(), argp: new THREE.Vector3(), nu: new THREE.Vector3() };
         let tubeKey = '';
+
+        // A ring of curled fingers around an axis, starting along `start` and turning toward `toward`.
+        const curl = (center, radius, start, toward) => (t, out) => {
+            const angle = t * CURL_SWEEP;
+            return out.copy(center).addScaledVector(start, radius * Math.cos(angle)).addScaledVector(toward, radius * Math.sin(angle));
+        };
 
         function updateOrbit(sz, zoomKey) {
             const d = data;
@@ -775,28 +773,13 @@
             placeMarker(markerPerigee, apsisOpacity, d.perigee, 0.46 * sz);
             placeMarker(markerApogee, apsisOpacity, d.apogee, 0.46 * sz);
 
-            // The planes, the vectors that define them, and where they meet
-            placeArrow(arrowH, parts.h, ORIGIN, d.hTip, sz, 1.2);
-            placeDisc(planeDisc, parts.plane, d.planeRadius);
+            // The right hand on the orbit's axis, the equator, and the way to the ascending node
+            placeArrow(arrowThumb, parts.thumb, ORIGIN, d.hTip, sz, 1.2);
+            drawArc(curlOrbit, parts.curlOrbit, arcKey('curlOrbit'), curl(d.curlCenter, d.curlRadius, d.rHat, d.vDir), sz, null);
+            drawArc(curlEarth, parts.curlEarth, arcKey('curlEarth'), curl(d.earthCurlCenter, d.earthCurlRadius, X_AXIS, Y_AXIS), sz, null);
             placeDisc(equatorDisc, parts.equator, d.equatorRadius);
-
-            placeArrow(arrowN, parts.n, ORIGIN, d.nTip, sz, 1.2);
-            placeMarker(markerNode, parts.n.level * (parts.n.grow > 0.9 ? 1 : 0), d.nodePoint, 0.46 * sz);
-            if (d.n) {
-                const lineReach = d.planeRadius * smooth(parts.nodeLine.grow);
-                tmpA.copy(d.n).multiplyScalar(-lineReach);
-                tmpB.copy(d.n).multiplyScalar(lineReach);
-                placeBar(nodeLine, parts.nodeLine.level, tmpA, tmpB, 0.09 * sz);
-            } else {
-                nodeLine.visible = false;
-            }
-
-            const northGrown = smooth(parts.northHalf.grow);
-            northFan.mesh.visible = parts.northHalf.level > 0.01 && northGrown > 0.001;
-            northFan.geometry.setDrawRange(0, 3 * Math.ceil(ARC_SEGMENTS * northGrown));
-            northFan.fill.opacity = 0.26 * parts.northHalf.level;
-
-            placeArrow(arrowE, parts.e, ORIGIN, d.eTip, sz, 1.2);
+            placeArrow(arrowNode, parts.node, ORIGIN, d.nTip, sz, 1.2);
+            placeMarker(markerNode, parts.node.level * (parts.node.grow > 0.9 ? 1 : 0), d.nodePoint, 0.46 * sz);
 
             // Angles and stretches of the orbit
             const radial = Math.max(1.5, d.reach * 0.62);
@@ -815,6 +798,7 @@
             drawArc(arcNu, parts.arcNu, arcKey('nu'), (t, out) => d.orbitPoint(nuRad * t, out), sz, anchors.nu);
             const span = 28 * D2R;
             drawArc(perigeeSpan, parts.perigeeSpan, arcKey('span'), (t, out) => d.orbitPoint((2 * t - 1) * span, out), sz, null);
+            drawArc(northHalf, parts.northHalf, arcKey('north'), (t, out) => d.orbitPoint(d.thetaNode + t * Math.PI, out), sz, null);
         }
 
         /* Camera and labels ------------------------------------------------ */
@@ -835,6 +819,7 @@
 
         const projected = new THREE.Vector3();
         const tipScreen = new THREE.Vector3();
+        const axisSpots = [];
 
         function project(label, point, level = 1) {
             projected.copy(point).project(camera);
@@ -851,7 +836,17 @@
             if (size < 1e-3) { dx = 0; dy = -1; } else { dx /= size; dy /= size; }
             if (!label.width) { label.width = label.el.offsetWidth || 14; label.height = label.el.offsetHeight || 20; }
             const reach = 6 + (Math.abs(dx) * label.width) / 2 + (Math.abs(dy) * label.height) / 2;
-            layer.show(label, x + dx * reach, y + dy * reach);
+            const spot = { x: x + dx * reach, y: y + dy * reach, w: label.width, h: label.height };
+
+            // Two axes can line up on screen. The later name then moves beside the earlier one.
+            for (const other of axisSpots) {
+                const apartX = (spot.w + other.w) / 2 + 4, apartY = (spot.h + other.h) / 2 + 3;
+                if (Math.abs(spot.x - other.x) < apartX && Math.abs(spot.y - other.y) < apartY) {
+                    spot.x = other.x + (other.x < viewW / 2 ? apartX : -apartX);
+                }
+            }
+            axisSpots.push(spot);
+            layer.show(label, spot.x, spot.y);
         }
 
         function updateLabels() {
@@ -861,6 +856,7 @@
             const built = (name, level = 0.1) => parts[name].on && parts[name].grow > 0.7 && parts[name].level > level;
             layer.begin();
 
+            axisSpots.length = 0;
             showAxisName(labels.I, d.iTip, X_AXIS);
             showAxisName(labels.J, d.jTip, Y_AXIS);
             showAxisName(labels.K, d.kTip, Z_AXIS);
@@ -871,12 +867,12 @@
             project(labels.r, tmp.copy(d.r).multiplyScalar(Math.max(0.72, Math.min(0.92, 1 - 0.45 / d.r.length()))), parts.r.level);
             project(labels.v, d.vTip, parts.v.level);
 
-            if (built('h')) project(labels.h, d.hTip, parts.h.level);
-            if (built('n')) {
-                project(labels.n, tmp.copy(d.nTip).multiplyScalar(0.72), parts.n.level);
-                project(labels.node, d.nodePoint, parts.n.level);
+            if (built('thumb')) {
+                // For RAAN the thumb goes on the North Pole axis instead of the orbit's axis.
+                const onPole = stage === 'raan' && !S.equatorial;
+                project(labels.thumb, onPole ? d.earthCurlCenter : d.hTip, onPole ? 1 : parts.thumb.level);
             }
-            if (built('e')) project(labels.e, tmp.copy(d.eTip).multiplyScalar(0.72), parts.e.level);
+            if (built('node')) project(labels.node, d.nodePoint, parts.node.level);
             if (built('apsides')) {
                 project(labels.perigee, d.perigee, parts.apsides.level);
                 project(labels.apogee, d.apogee, parts.apsides.level);

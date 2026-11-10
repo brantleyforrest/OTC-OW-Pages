@@ -3,9 +3,9 @@
 // circular, or the satellite is at perigee or apogee. All six elements are asked for, and an
 // undefined element counts as 0 degrees.
 //
-// The equations, the notation, and the order of the steps follow the Inertial Frame Orbital
-// Elements lesson. The alternate methods come from that lesson and the Inertial Frame 2-Body
-// Motion lesson.
+// The walkthrough calculates only size and shape. It reads the four angles by inspection and the
+// right-hand rule, following the visual inspection section of the Inertial Frame Orbital Elements
+// lesson. The vectors h, n, and e are used only for the true answers and the 3D view.
 (function (global) {
     'use strict';
 
@@ -71,17 +71,11 @@
         const raanRaw = n[1] < 0 ? 360 - raanFlat : raanFlat;
 
         const hasPerigeeAngle = !equatorial && !circular;
-        const nDotE = dot(n, eVec);
-        const argpFlat = hasPerigeeAngle ? arccos(nDotE / (N * eMag)) : 0;
+        const argpFlat = hasPerigeeAngle ? arccos(dot(n, eVec) / (N * eMag)) : 0;
         const argpRaw = eVec[2] < 0 ? 360 - argpFlat : argpFlat;
 
-        const eDotR = dot(eVec, r);
-        const nuFlat = circular ? 0 : arccos(eDotR / (eMag * R));
+        const nuFlat = circular ? 0 : arccos(dot(eVec, r) / (eMag * R));
         const nuRaw = rDotV < 0 ? 360 - nuFlat : nuFlat;
-
-        const nDotR = dot(n, r);
-        const uFlat = equatorial ? 0 : arccos(nDotR / (N * R));
-        const u = r[2] < 0 ? 360 - uFlat : uFlat;
 
         const raanUndefined = equatorial;
         const argpUndefined = equatorial || circular;
@@ -101,9 +95,8 @@
         };
 
         return {
-            r, v, R, V, rDotV, energy, a, aRaw, h, H, i, n, N, bracket, eVec, eMag, vCirc, apsis,
-            circular, equatorial, raan: raanRaw, raanFlat, argp: argpRaw, argpFlat, nu: nuRaw, nuFlat,
-            u, uFlat, nDotE, eDotR, nDotR, raanUndefined, argpUndefined, nuUndefined, answers
+            r, v, R, V, rDotV, energy, a, aRaw, h, H, i, n, N, eVec, eMag, vCirc, apsis, circular, equatorial,
+            raan: raanRaw, argp: argpRaw, nu: nuRaw, raanUndefined, argpUndefined, nuUndefined, answers
         };
     }
 
@@ -238,32 +231,27 @@
 
     const compR = (x) => (x === 0 ? '0' : fixed(x, 0));
     const compV = (x) => (x === 0 ? '0' : fixed(x, 3));
-    const compAny = (x, digits = 5) => (Math.abs(x) < 1e-12 ? '0' : fixed(x, placesFor(x, digits)));
 
     const radiusText = (R) => (Number.isInteger(R) ? fixed(R, 0) : fixed(R, 2));
 
     /* ------------------------------------------------------------------ */
     /* Equation Notation                                                  */
     /* ------------------------------------------------------------------ */
-    const R_V = '\\bar{\\mathbf{r}}', V_V = '\\bar{\\mathbf{v}}', H_V = '\\bar{\\mathbf{h}}', N_V = '\\bar{\\mathbf{n}}', E_V = '\\bar{\\mathbf{e}}';
-    const ZERO_V = '\\bar{\\mathbf{0}}';
+    const R_V = '\\bar{\\mathbf{r}}', V_V = '\\bar{\\mathbf{v}}';
     const I_HAT = '\\mathbf{\\hat{I}}', J_HAT = '\\mathbf{\\hat{J}}', K_HAT = '\\mathbf{\\hat{K}}';
-    const V_CIRC = 'v_{\\text{circ}}', V_HORIZONTAL = 'v_{\\text{horizontal}}';
+    const V_CIRC = 'v_{\\text{circ}}';
     const MU_TEXT = '398,600.44';
 
-    const KM = '\\text{ km}', KM_S = '\\text{ km/s}';
-    const KM2_S = '\\text{ km}^2/\\text{s}', KM2_S2 = '\\text{ km}^2/\\text{s}^2';
+    const KM = '\\text{ km}', KM_S = '\\text{ km/s}', KM2_S2 = '\\text{ km}^2/\\text{s}^2';
 
     const frac = (top, bottom) => `\\dfrac{${top}}{${bottom}}`;
     const sqrt = (inner) => `\\sqrt{${inner}}`;
-    const dotted = (p, q) => `${p} \\cdot ${q}`;
-    const arcOf = (inner) => `\\arccos\\left(${inner}\\right)`;
     const paren = (text) => (text.startsWith(MINUS) ? `(${text})` : text);
     const squares = (parts) => parts.map((part) => `${paren(part)}^2`).join(' + ');
-    const products = (parts) => parts.map(([p, q]) => `(${p})(${q})`).join(' + ');
 
     const undefinedMethod = (html) => [{ name: 'Undefined', value: 0, html }];
     const angleResult = (answer) => (answer.undefined ? prose('Undefined, so $0°$') : math(answer.text));
+    const atPerigee = (S) => S.R < S.aRaw;
 
     function statement(r, v) {
         const item = (tex) => `<div class="given-item">${math(tex)}</div>`;
@@ -271,27 +259,34 @@
     }
 
     /* ------------------------------------------------------------------ */
-    /* Shared Worked Lines                                                */
+    /* Where the Satellite Is                                             */
     /* ------------------------------------------------------------------ */
+    // In every problem, r_z and v_z tell where the satellite is on its orbit. If r_z is not zero,
+    // v_z must be zero, because r and v are perpendicular and have at most three nonzero components.
+    const QUARTERS_PAST_NODE = { ascending: 0, top: 90, descending: 180, bottom: 270 };
+
+    function placeOf(S) {
+        if (S.r[2] > 0) return 'top';
+        if (S.r[2] < 0) return 'bottom';
+        if (S.v[2] > 0) return 'ascending';
+        return S.v[2] < 0 ? 'descending' : 'equatorial';
+    }
+
+    const CURL = `Curl your right fingers from $${R_V}$ toward $${V_V}$.`;
+
+    // The size of a horizontal part, as a symbol and a number.
+    function horizontalPart(letter, x, y) {
+        if (x !== 0 && y !== 0) return { tex: `${letter}_{\\text{horizontal}}`, value: Math.hypot(x, y) };
+        return { tex: `|${letter}_${x !== 0 ? 'x' : 'y'}|`, value: Math.abs(x !== 0 ? x : y) };
+    }
+
     const circularSpeedCalc = (S) => calc(`${V_CIRC} = ${sqrt(frac('\\mu', 'r'))}`,
         [sqrt(frac(MU_TEXT, radiusText(S.R)))], `${fixed(S.vCirc, 4)}${KM_S}`);
 
-    function apsisDecision(S) {
-        const perigee = S.apsis === 'perigee';
-        const speeds = `$v = ${fixed(S.V, 4)}${KM_S} ${perigee ? '>' : '<'} ${V_CIRC}$`;
-        return rule(speeds, perigee
-            ? `The satellite is at perigee, so $r_p = r = ${radiusText(S.R)}${KM}$`
-            : `The satellite is at apogee, so $r_a = r = ${radiusText(S.R)}${KM}$`);
-    }
-
-    const AXIS_LETTER = [I_HAT, J_HAT, K_HAT];
-
-    // The axis a vector lies along, such as +I-hat, or null if it has two nonzero components.
-    function axisOf(p) {
-        const nonzero = [0, 1, 2].filter((k) => p[k] !== 0);
-        if (nonzero.length !== 1) return null;
-        const k = nonzero[0];
-        return { index: k, sign: p[k] > 0 ? 1 : -1, text: `${p[k] > 0 ? '+' : MINUS}${AXIS_LETTER[k]}` };
+    function apsisByDistance(S) {
+        const near = atPerigee(S);
+        return rule(`$r = ${radiusText(S.R)}${KM}$ is ${near ? 'less' : 'more'} than $a = ${fixed(S.aRaw, 1)}${KM}$.`,
+            near ? `The satellite is at perigee, so $r_p = r$` : `The satellite is at apogee, so $r_a = r$`);
     }
 
     /* ------------------------------------------------------------------ */
@@ -300,9 +295,7 @@
     function stepMagnitudes(S) {
         const html = calc(`r = ${sqrt('r_x^2 + r_y^2 + r_z^2')}`, [sqrt(squares(S.r.map(compR)))], `${radiusText(S.R)}${KM}`)
             + calc(`v = ${sqrt('v_x^2 + v_y^2 + v_z^2')}`, [sqrt(squares(S.v.map(compV)))], `${fixed(S.V, 4)}${KM_S}`)
-            + calc(`${dotted(R_V, V_V)} = r_x v_x + r_y v_y + r_z v_z`,
-                [products(S.r.map((c, k) => [compR(c), compV(S.v[k])]))], '0')
-            + note('Velocity is perpendicular to position, so the satellite is at perigee, at apogee, or on a circular orbit.');
+            + note(`$${R_V}$ and $${V_V}$ share no nonzero component, so they are perpendicular. The satellite is at perigee, at apogee, or on a circular orbit.`);
         return {
             key: 'mag',
             title: prose('Magnitudes'),
@@ -353,119 +346,145 @@
         };
     }
 
-    function stepAngularMomentum(S) {
-        const [x, y, z] = S.r.map(compR);
-        const [vx, vy, vz] = S.v.map(compV);
-        const html = calc(`${H_V} = ${R_V} \\times ${V_V} = ${column(['r_y v_z - r_z v_y', 'r_z v_x - r_x v_z', 'r_x v_y - r_y v_x'])}`,
-            [column([`(${y})(${vz}) - (${z})(${vy})`, `(${z})(${vx}) - (${x})(${vz})`, `(${x})(${vy}) - (${y})(${vx})`])],
-            `${column(S.h.map((c) => compAny(c)))}${KM2_S}`)
-            + calc(`h = ${sqrt('h_x^2 + h_y^2 + h_z^2')}`,
-                [sqrt(squares(S.h.map((c) => compAny(c))))], `${sig(S.H)}${KM2_S}`);
+    function stepEccentricity(S) {
+        let methods;
+        if (S.circular) {
+            methods = [{
+                name: 'Compare r and a',
+                value: 0,
+                html: rule(`$a = ${fixed(S.aRaw, 1)}${KM}$ and $r = ${radiusText(S.R)}${KM}$ match to within rounding.`, 'The orbit is circular, so $e = 0$')
+            }, {
+                name: 'Circular speed',
+                value: 0,
+                html: circularSpeedCalc(S)
+                    + rule(`$v = ${fixed(S.V, 4)}${KM_S}$, which matches $${V_CIRC}$ after rounding.`, 'The orbit is circular, so $e = 0$')
+            }];
+        } else {
+            const near = atPerigee(S);
+            const other = 2 * S.aRaw - S.R;
+            const rp = near ? S.R : other;
+            const ra = near ? other : S.R;
+            const fromApsis = near ? 1 - S.R / S.aRaw : S.R / S.aRaw - 1;
+            methods = [{
+                name: 'Apsis radius',
+                value: fromApsis,
+                html: apsisByDistance(S)
+                    + (near
+                        ? calc(`r_p = a(1 - e) \\text{, so } e = 1 - ${frac('r_p', 'a')}`, [`1 - ${frac(radiusText(S.R), fixed(S.aRaw, 1))}`], fixed(fromApsis, 4))
+                        : calc(`r_a = a(1 + e) \\text{, so } e = ${frac('r_a', 'a')} - 1`, [`${frac(radiusText(S.R), fixed(S.aRaw, 1))} - 1`], fixed(fromApsis, 4)))
+            }, {
+                name: 'Both apsides',
+                value: (ra - rp) / (ra + rp),
+                html: apsisByDistance(S)
+                    + (near
+                        ? calc(`a = ${frac('r_a + r_p', '2')} \\text{, so } r_a = 2a - r_p`, [`2(${fixed(S.aRaw, 1)}) - ${radiusText(S.R)}`], `${fixed(ra, 1)}${KM}`)
+                        : calc(`a = ${frac('r_a + r_p', '2')} \\text{, so } r_p = 2a - r_a`, [`2(${fixed(S.aRaw, 1)}) - ${radiusText(S.R)}`], `${fixed(rp, 1)}${KM}`))
+                    + calc(`e = ${frac('r_a - r_p', 'r_a + r_p')}`, [frac(fixed(ra - rp, 1), fixed(ra + rp, 1))], fixed((ra - rp) / (ra + rp), 4))
+            }];
+        }
         return {
-            key: 'h',
-            title: prose(`Angular momentum, $${H_V}$`),
-            result: math(`${sig(S.H)}${KM2_S}`),
-            caption: prose(`<b>Angular momentum.</b> $${H_V}$ is perpendicular to $${R_V}$ and $${V_V}$, by the right-hand rule. The orbit lies in the plane those two share.`),
-            methods: [{ name: 'Cross product', value: S.H, html }]
+            key: 'e',
+            title: prose('Eccentricity, $e$'),
+            result: math(S.answers.e.text),
+            caption: prose(`<b>Eccentricity.</b> With $a$ and $e$, the orbit’s size and shape are known, so it can be drawn. It lies in the plane of $${R_V}$ and $${V_V}$.`),
+            methods
         };
     }
 
-    function directionWord(i) {
-        if (i < 89.995) return 'prograde';
-        if (i > 90.005) return 'retrograde';
-        return 'polar';
-    }
-
-    function velocityTiltMethod(S) {
-        if (S.r[2] !== 0) return null;
+    function inclinationMethod(S) {
+        const [rx, ry, rz] = S.r;
         const [vx, vy, vz] = S.v;
-        const horizontal = Math.hypot(vx, vy);
-        const speedLine = calc(`${V_HORIZONTAL} = ${sqrt('v_x^2 + v_y^2')}`,
-            [sqrt(squares([compV(vx), compV(vy)]))], `${sig(horizontal)}${KM_S}`);
+        const place = placeOf(S);
+        const eastward = rx * vy - ry * vx > 0;
 
-        if (horizontal === 0) {
+        if (place === 'equatorial') {
+            const value = eastward ? 0 : 180;
             return {
-                name: 'Velocity tilt',
-                value: 90,
-                html: speedLine + rule('The velocity has no horizontal speed at the equator.', 'The orbit is polar, so $i = 90.00°$')
+                value,
+                html: rule(`${CURL} Your thumb points straight ${eastward ? `up, along $+${K_HAT}$` : `down, along $${MINUS}${K_HAT}$`}.`)
+                    + note(`Both vectors lie in the equatorial plane, so the orbit does too. It moves ${eastward ? 'east, the same way Earth turns' : 'west, against Earth’s turn'}.`)
+                    + rule(eastward ? 'Your thumb matches the North Pole.' : 'Your thumb is opposite the North Pole.', `$i = ${deg(value)}$`)
             };
         }
 
-        const position = axisOf(S.r);
-        const eastward = -S.r[1] * vx + S.r[0] * vy > 0;
-        const EAST = { 0: { 1: `+${J_HAT}`, '-1': `${MINUS}${J_HAT}` }, 1: { 1: `${MINUS}${I_HAT}`, '-1': `+${I_HAT}` } };
-        const eastText = EAST[position.index][position.sign];
-        const theta = Math.atan2(Math.abs(vz), horizontal) * R2D;
+        const overPole = rx === 0 && ry === 0;
+        const straightUp = rz === 0 && vx === 0 && vy === 0;
+        if (overPole || straightUp) {
+            const why = overPole
+                ? `The satellite is directly over the ${rz > 0 ? 'North' : 'South'} Pole, so the orbit passes over the poles.`
+                : `The satellite is on the equator and moving straight ${vz > 0 ? 'north' : 'south'}, so the orbit passes over the poles.`;
+            return {
+                value: 90,
+                html: rule(`${CURL} Your thumb lies level with the equator.`) + rule(why, 'The orbit is polar, so $i = 90.00°$')
+            };
+        }
+
+        const side = rz === 0 ? horizontalPart('v', vx, vy) : horizontalPart('r', rx, ry);
+        const upLetter = rz === 0 ? '|v_z|' : '|r_z|';
+        const up = Math.abs(rz === 0 ? vz : rz);
+        const upText = rz === 0 ? fixed(up, 3) : fixed(up, 0);
+        const sideText = rz === 0 ? fixed(side.value, 3) : fixed(side.value, 0);
+        const theta = Math.atan2(up, side.value) * R2D;
         const value = eastward ? theta : 180 - theta;
+        const why = rz === 0
+            ? `The satellite is on the equator, so the climb of $${V_V}$ out of the equator is the tilt of the orbit.`
+            : `$v_z = 0$, so the satellite is at the ${rz > 0 ? 'top' : 'bottom'} of its orbit. Its latitude there equals the tilt of the orbit.`;
         return {
-            name: 'Velocity tilt',
             value,
-            html: speedLine
-                + calc(`\\tan\\theta = ${frac('|v_z|', V_HORIZONTAL)}`,
-                    [frac(fixed(Math.abs(vz), 3), sig(horizontal))], `${sig(Math.abs(vz) / horizontal)}`)
-                + calc(`\\theta = \\arctan(${sig(Math.abs(vz) / horizontal)})`, [], deg(theta))
-                + rule(`East at $${position.text}$ is $${eastText}$, so the satellite is moving ${eastward ? 'eastward' : 'westward'}.`,
+            html: rule(`${CURL} Your thumb leans ${eastward ? 'north, so the satellite moves east and the orbit is prograde' : 'south, so the satellite moves west and the orbit is retrograde'}.`)
+                + rule(why)
+                + calc(`\\tan\\theta = ${frac(upLetter, side.tex)}`, [frac(upText, sideText)], sig(up / side.value, 4))
+                + calc(`\\theta = \\arctan(${sig(up / side.value, 4)})`, [], deg(theta))
+                + rule(eastward ? 'Prograde, so the tilt is the inclination.' : 'Retrograde, so subtract the tilt from 180°.',
                     eastward ? `$i = \\theta = ${deg(value)}$` : `$i = 180° - \\theta = ${deg(value)}$`)
         };
     }
 
     function stepInclination(S) {
-        const cosI = S.h[2] / S.H;
-        const methods = [{
-            name: 'Angular momentum',
-            value: S.i,
-            html: calc(`\\cos i = ${frac(dotted(H_V, K_HAT), 'h')} = ${frac('h_z', 'h')}`,
-                [frac(sig(S.h[2]), sig(S.H))], sig(cosI, 4))
-                + calc(`i = \\arccos(${sig(cosI, 4)})`, [], deg(S.i))
-                + note(`No quadrant check is needed. This orbit is ${directionWord(S.i)}.`)
-        }];
-        const tilt = velocityTiltMethod(S);
-        if (tilt) methods.push(tilt);
+        const method = inclinationMethod(S);
         return {
             key: 'i',
             title: prose('Inclination, $i$'),
             result: angleResult(S.answers.i),
-            caption: prose(`<b>Inclination.</b> The angle from $${K_HAT}$ to $${H_V}$, which is also the tilt of the orbital plane from the equator.`),
-            methods
+            caption: prose(`<b>Inclination.</b> Curl your right fingers from $${R_V}$ to $${V_V}$. Your thumb is the orbit’s axis, and $i$ is the angle from $${K_HAT}$ to your thumb.`),
+            methods: [{ name: 'Right-hand rule', value: method.value, html: method.html }]
         };
     }
 
-    function stepNodeVector(S) {
-        const hx = compAny(S.h[0]), hy = compAny(S.h[1]);
-        const html = calc(`${N_V} = ${K_HAT} \\times ${H_V} = ${column(['-h_y', 'h_x', '0'])}`,
-            [column([`-${paren(hy)}`, hx, '0'])], `${column(S.n.map((c) => compAny(c)))}${KM2_S}`)
-            + calc(`n = ${sqrt('h_x^2 + h_y^2')}`, [sqrt(squares([hx, hy]))], `${sig(S.N)}${KM2_S}`)
-            + (S.equatorial ? note(`$${H_V}$ is parallel to $${K_HAT}$, so $${N_V}$ has no length. The orbit is equatorial and has no ascending node.`) : '');
-        return {
-            key: 'n',
-            title: prose(`Node vector, $${N_V}$`),
-            result: S.equatorial ? prose('$0$ (no node)') : math(`${sig(S.N)}${KM2_S}`),
-            caption: S.equatorial
-                ? prose(`<b>Node vector.</b> The orbit lies in the equatorial plane, so it never crosses the equator and $${N_V}$ has no length.`)
-                : prose(`<b>Node vector.</b> $${N_V}$ lies where the two planes meet. It points to the ascending node, where the satellite crosses the equator heading north. The northern half of the orbital plane is shaded.`),
-            methods: [{ name: 'Cross product', value: S.N, html }]
-        };
+    // Which way the ascending node lies, in the equatorial plane.
+    function findNode(S) {
+        const place = placeOf(S);
+        const [source, letter, sign, sentence] = {
+            ascending: [S.r, 'r', 1, `$r_z = 0$ and $v_z > 0$, so the satellite is on the equator heading north. It is at the ascending node, along $${R_V}$.`],
+            descending: [S.r, 'r', -1, `$r_z = 0$ and $v_z < 0$, so the satellite is on the equator heading south. It is at the descending node, so the ascending node is on the far side of Earth, along $${MINUS}${R_V}$.`],
+            top: [S.v, 'v', -1, `$r_z > 0$ and $v_z = 0$, so the satellite is level at the top of its orbit. The ascending node is a quarter orbit behind it, along $${MINUS}${V_V}$.`],
+            bottom: [S.v, 'v', 1, `$r_z < 0$ and $v_z = 0$, so the satellite is level at the bottom of its orbit. The ascending node is a quarter orbit ahead of it, along $${V_V}$.`]
+        }[place];
+        return { x: sign * source[0], y: sign * source[1], letter, source, sentence };
     }
 
-    function spotTheNodeMethod(S) {
-        if (S.r[2] !== 0) return null;
-        const northbound = S.v[2] > 0;
-        const position = axisOf(S.r);
-        const flat = arccos(S.r[0] / S.R);
-        const direction = S.r[1] < 0 ? 360 - flat : flat;
-        const directionLines = position
-            ? rule(`$${R_V}$ lies along $${position.text}$.`, `Its direction from $${I_HAT}$ is $${deg(direction)}$`)
-            : calc(`\\text{Direction of } ${R_V} = ${arcOf(frac('r_x', 'r'))}`, [arcOf(frac(compR(S.r[0]), radiusText(S.R)))], deg(flat))
-                + (S.r[1] < 0 ? rule(`$r_y < 0$, so use $360° - ${deg(flat)} = ${deg(direction)}$`) : '');
-        const value = northbound ? direction : wrap360(direction + 180);
+    function readNodeAngle(node) {
+        const { x, y, letter } = node;
+        if (x === 0 || y === 0) {
+            const [angle, axis, phrase] = x > 0 ? [0, `+${I_HAT}`, 'right at'] : y > 0 ? [90, `+${J_HAT}`, 'a quarter turn east of']
+                : x < 0 ? [180, `${MINUS}${I_HAT}`, 'a half turn east of'] : [270, `${MINUS}${J_HAT}`, 'three quarters of a turn east of'];
+            return {
+                value: angle,
+                html: rule(`The ascending node lies along $${axis}$, ${phrase} $${I_HAT}$.`, `$\\Omega = ${deg(angle)}$`)
+            };
+        }
+
+        const digits = letter === 'r' ? 0 : 3;
+        const theta = Math.atan2(Math.abs(y), Math.abs(x)) * R2D;
+        const [value, between, formula] = x > 0 && y > 0 ? [theta, `$+${I_HAT}$ and $+${J_HAT}$`, '\\theta']
+            : x < 0 && y > 0 ? [180 - theta, `$+${J_HAT}$ and $${MINUS}${I_HAT}$`, '180° - \\theta']
+                : x < 0 ? [180 + theta, `$${MINUS}${I_HAT}$ and $${MINUS}${J_HAT}$`, '180° + \\theta']
+                    : [360 - theta, `$${MINUS}${J_HAT}$ and $+${I_HAT}$`, '360° - \\theta'];
         return {
-            name: 'Spot the node',
             value,
-            html: directionLines + rule(
-                northbound
-                    ? '$r_z = 0$ and $v_z > 0$, so the satellite is at the ascending node.'
-                    : '$r_z = 0$ and $v_z < 0$, so the satellite is at the descending node. The ascending node is 180° away.',
-                `$\\Omega = ${deg(value)}$`)
+            html: calc(`\\tan\\theta = ${frac(`|${letter}_y|`, `|${letter}_x|`)}`, [frac(fixed(Math.abs(y), digits), fixed(Math.abs(x), digits))], sig(Math.abs(y) / Math.abs(x), 4))
+                + calc(`\\theta = \\arctan(${sig(Math.abs(y) / Math.abs(x), 4)})`, [], deg(theta))
+                + rule(`The ascending node lies between ${between}.`, `$\\Omega = ${formula} = ${deg(value)}$`)
         };
     }
 
@@ -476,83 +495,23 @@
                 title: prose('RAAN, $\\Omega$'),
                 result: angleResult(S.answers.raan),
                 caption: prose('<b>RAAN.</b> An equatorial orbit has no ascending node, so $\\Omega$ is undefined and defaults to $0°$.'),
-                methods: undefinedMethod(rule(`$${N_V} = ${ZERO_V}$, so there is no ascending node to measure to.`, '$\\Omega$ is undefined, so it defaults to $0°$'))
+                methods: undefinedMethod(rule('The orbit lies in the equatorial plane, so it never crosses the equator and has no ascending node.', '$\\Omega$ is undefined, so it defaults to $0°$'))
             };
         }
-        const methods = [{
-            name: 'Node vector',
-            value: S.raan,
-            html: calc(arcOf(frac('n_x', 'n')), [arcOf(frac(sig(S.n[0]), sig(S.N)))], deg(S.raanFlat))
-                + rule(S.n[1] < 0 ? `$n_y = ${sig(S.n[1])} < 0$, so use $360°$ minus this value.` : `$n_y = ${sig(S.n[1])} \\ge 0$, so no quadrant change is needed.`, `$\\Omega = ${deg(S.raan)}$`)
-        }];
-        const spot = spotTheNodeMethod(S);
-        if (spot) methods.push(spot);
+        const node = findNode(S);
+        const reading = readNodeAngle(node);
         return {
             key: 'raan',
             title: prose('RAAN, $\\Omega$'),
             result: angleResult(S.answers.raan),
-            caption: prose(`<b>RAAN.</b> Measured eastward along the equator from $${I_HAT}$ to $${N_V}$.`),
-            methods
-        };
-    }
-
-    function stepEccentricity(S) {
-        const vectorMethod = {
-            name: 'Eccentricity vector',
-            value: S.answers.e.value,
-            html: calc(`v^2 - ${frac('\\mu', 'r')}`, [`${sig(S.V * S.V)} - ${frac(MU_TEXT, radiusText(S.R))}`], `${sig(S.bracket)}${KM2_S2}`)
-                + calc(`${E_V} = ${frac('1', '\\mu')}\\left[\\left(v^2 - ${frac('\\mu', 'r')}\\right)${R_V} - (${dotted(R_V, V_V)})${V_V}\\right]`,
-                    [`${frac('1', MU_TEXT)}\\left[(${sig(S.bracket)})${column(S.r.map(compR))} - (0)${column(S.v.map(compV))}\\right]`],
-                    column(S.eVec.map((c) => compAny(c, 4))))
-                + calc(`e = |${E_V}|`, [sqrt(squares(S.eVec.map((c) => compAny(c, 4))))],
-                    S.circular ? `${sig(S.eMag, 2)}` : fixed(S.eMag, 4))
-                + (S.circular ? note('The value is not exactly zero only because the given speed is rounded. Treat the orbit as circular, so $e = 0$.') : '')
-        };
-
-        let methods;
-        if (S.circular) {
-            methods = [vectorMethod, {
-                name: 'Circular speed',
-                value: 0,
-                html: circularSpeedCalc(S)
-                    + rule(`$v = ${fixed(S.V, 4)}${KM_S}$, which matches $${V_CIRC}$ after rounding.`, 'The orbit is circular, so $e = 0$')
-            }];
-        } else {
-            const perigee = S.apsis === 'perigee';
-            const rp = perigee ? S.R : 2 * S.aRaw - S.R;
-            const ra = perigee ? 2 * S.aRaw - S.R : S.R;
-            const p = S.H * S.H / MU;
-            methods = [vectorMethod, {
-                name: 'Apsis radius',
-                value: perigee ? 1 - S.R / S.aRaw : S.R / S.aRaw - 1,
-                html: circularSpeedCalc(S) + apsisDecision(S)
-                    + (perigee
-                        ? calc(`r_p = a(1 - e) \\text{, so } e = 1 - ${frac('r_p', 'a')}`, [`1 - ${frac(radiusText(S.R), fixed(S.aRaw, 1))}`], fixed(1 - S.R / S.aRaw, 4))
-                        : calc(`r_a = a(1 + e) \\text{, so } e = ${frac('r_a', 'a')} - 1`, [`${frac(radiusText(S.R), fixed(S.aRaw, 1))} - 1`], fixed(S.R / S.aRaw - 1, 4)))
-            }, {
-                name: 'Both apsides',
-                value: (ra - rp) / (ra + rp),
-                html: circularSpeedCalc(S) + apsisDecision(S)
-                    + (perigee
-                        ? calc(`a = ${frac('r_a + r_p', '2')} \\text{, so } r_a = 2a - r_p`, [`2(${fixed(S.aRaw, 1)}) - ${radiusText(S.R)}`], `${fixed(ra, 1)}${KM}`)
-                        : calc(`a = ${frac('r_a + r_p', '2')} \\text{, so } r_p = 2a - r_a`, [`2(${fixed(S.aRaw, 1)}) - ${radiusText(S.R)}`], `${fixed(rp, 1)}${KM}`))
-                    + calc(`e = ${frac('r_a - r_p', 'r_a + r_p')}`, [frac(fixed(ra - rp, 1), fixed(ra + rp, 1))], fixed((ra - rp) / (ra + rp), 4))
-            }, {
-                name: 'Angular momentum',
-                value: Math.sqrt(1 - p / S.aRaw),
-                html: calc(`p = ${frac('h^2', '\\mu')}`, [frac(`${paren(sig(S.H))}^2`, MU_TEXT)], `${fixed(p, 1)}${KM}`)
-                    + calc(`p = a(1 - e^2) \\text{, so } e = ${sqrt(`1 - ${frac('p', 'a')}`)}`, [sqrt(`1 - ${frac(fixed(p, 1), fixed(S.aRaw, 1))}`)], fixed(Math.sqrt(1 - p / S.aRaw), 4))
-            }];
-        }
-
-        return {
-            key: 'e',
-            title: prose(`Eccentricity vector, $${E_V}$, and $e$`),
-            result: math(S.answers.e.text),
-            caption: S.circular
-                ? prose('<b>Eccentricity.</b> With $e = 0$, the shape is known, so the orbit can be drawn. A circle has no perigee to point to.')
-                : prose(`<b>Eccentricity.</b> $e$ is the last piece of the shape, so the orbit can now be drawn. $${E_V}$ points from Earth’s center to perigee.`),
-            methods
+            caption: prose(`<b>RAAN.</b> The bright half of the orbit is north of the equator and begins at the ascending node. $\\Omega$ is measured eastward from $${I_HAT}$ to that node.`),
+            methods: [{
+                name: 'Right-hand rule',
+                value: reading.value,
+                html: rule(node.sentence)
+                    + rule(`Point your right thumb at $${K_HAT}$. Your fingers curl east, from $${I_HAT}$ toward $${J_HAT}$. $\\Omega$ grows in that direction.`)
+                    + reading.html
+            }]
         };
     }
 
@@ -560,6 +519,13 @@
         if (S.equatorial && S.circular) return 'The orbit has no ascending node and no perigee.';
         return S.equatorial ? 'The orbit has no ascending node to measure from.' : 'The orbit has no perigee to measure to.';
     }
+
+    const PLACE_TEXT = {
+        ascending: 'The satellite is at the ascending node, so it has traveled $0°$ from it.',
+        top: 'The satellite is at the top of its orbit, a quarter orbit past the ascending node, so it has traveled $90°$.',
+        descending: 'The satellite is at the descending node, a half orbit past the ascending node, so it has traveled $180°$.',
+        bottom: 'The satellite is at the bottom of its orbit, three quarters of an orbit past the ascending node, so it has traveled $270°$.'
+    };
 
     function stepArgumentOfPerigee(S) {
         if (S.argpUndefined) {
@@ -572,33 +538,23 @@
                 methods: undefinedMethod(rule(reason, '$\\omega$ is undefined, so it defaults to $0°$'))
             };
         }
-        const perigee = S.apsis === 'perigee';
-        const fromSatellite = perigee ? S.u : wrap360(S.u + 180);
-        const methods = [{
-            name: 'Dot product',
-            value: S.argp,
-            html: calc(`${dotted(N_V, E_V)} = n_x e_x + n_y e_y + n_z e_z`,
-                [products(S.n.map((c, k) => [compAny(c), compAny(S.eVec[k], 4)]))], sig(S.nDotE))
-                + calc(arcOf(frac(dotted(N_V, E_V), 'n\\,e')), [arcOf(frac(sig(S.nDotE), `(${sig(S.N)})(${fixed(S.eMag, 4)})`))], deg(S.argpFlat))
-                + rule(S.eVec[2] < 0 ? `$e_z = ${sig(S.eVec[2], 4)} < 0$, so use $360°$ minus this value.` : `$e_z = ${sig(S.eVec[2], 4)} \\ge 0$, so no quadrant change is needed.`, `$\\omega = ${deg(S.argp)}$`)
-        }, {
-            name: 'Satellite position',
-            value: fromSatellite,
-            html: calc(`${dotted(N_V, R_V)} = n_x r_x + n_y r_y + n_z r_z`,
-                [products(S.n.map((c, k) => [compAny(c), compR(S.r[k])]))], sig(S.nDotR))
-                + calc(`u = ${arcOf(frac(dotted(N_V, R_V), 'n\\,r'))}`, [arcOf(frac(sig(S.nDotR), `(${sig(S.N)})(${radiusText(S.R)})`))], deg(S.uFlat))
-                + rule(S.r[2] < 0 ? '$r_z < 0$, so use $360°$ minus this value.' : '$r_z \\ge 0$, so no quadrant change is needed.', `$u = ${deg(S.u)}$`)
-                + rule(perigee
-                    ? '$u$ is the angle from the ascending node to the satellite. The satellite is at perigee, so $\\omega = u$.'
-                    : '$u$ is the angle from the ascending node to the satellite. The satellite is at apogee, and perigee is 180° from apogee.',
-                perigee ? `$\\omega = ${deg(fromSatellite)}$` : `$\\omega = ${deg(S.u)} \\pm 180° = ${deg(fromSatellite)}$`)
-        }];
+        const place = placeOf(S);
+        const traveled = QUARTERS_PAST_NODE[place];
+        const near = atPerigee(S);
+        const value = near ? traveled : wrap360(traveled + 180);
         return {
             key: 'argp',
             title: prose('Argument of perigee, $\\omega$'),
             result: angleResult(S.answers.argp),
             caption: prose('<b>Argument of perigee.</b> Measured along the orbit, in the direction of travel, from the ascending node to perigee.'),
-            methods
+            methods: [{
+                name: 'Right-hand rule',
+                value,
+                html: rule('Keep your right thumb on the orbit’s axis. Your fingers curl in the direction of travel. $\\omega$ grows in that direction.')
+                    + rule(PLACE_TEXT[place])
+                    + rule(near ? 'The satellite is at perigee, so perigee is at that same point.' : 'The satellite is at apogee, and perigee is a half orbit from apogee.',
+                        near ? `$\\omega = ${deg(value)}$` : `$\\omega = ${deg(traveled)} \\pm 180° = ${deg(value)}$`)
+            }]
         };
     }
 
@@ -612,27 +568,26 @@
                 methods: undefinedMethod(rule('The orbit has no perigee to measure from.', '$\\nu$ is undefined, so it defaults to $0°$'))
             };
         }
-        const perigee = S.apsis === 'perigee';
-        const methods = [{
-            name: 'Dot product',
-            value: S.nu,
-            html: calc(`${dotted(E_V, R_V)} = e_x r_x + e_y r_y + e_z r_z`,
-                [products(S.eVec.map((c, k) => [compAny(c, 4), compR(S.r[k])]))], `${sig(S.eDotR)}${KM}`)
-                + calc(arcOf(frac(dotted(E_V, R_V), 'e\\,r')), [arcOf(frac(sig(S.eDotR), `(${fixed(S.eMag, 4)})(${radiusText(S.R)})`))], deg(S.nuFlat))
-                + rule(`$${dotted(R_V, V_V)} = 0 \\ge 0$, so no quadrant change is needed.`, `$\\nu = ${deg(S.nu)}$`)
-        }, {
-            name: 'Speed check',
-            value: perigee ? 0 : 180,
-            html: circularSpeedCalc(S)
-                + rule(`$v = ${fixed(S.V, 4)}${KM_S} ${perigee ? '>' : '<'} ${V_CIRC}$, and $${dotted(R_V, V_V)} = 0$.`,
-                    perigee ? 'The satellite is at perigee, so $\\nu = 0.00°$' : 'The satellite is at apogee, so $\\nu = 180.00°$')
-        }];
+        const near = atPerigee(S);
+        const value = near ? 0 : 180;
+        const conclusion = near
+            ? 'The satellite is at perigee, so it has traveled $\\nu = 0.00°$ from perigee'
+            : 'The satellite is at apogee, a half orbit from perigee, so $\\nu = 180.00°$';
         return {
             key: 'nu',
             title: prose('True anomaly, $\\nu$'),
             result: angleResult(S.answers.nu),
             caption: prose('<b>True anomaly.</b> Measured along the orbit, in the direction of travel, from perigee to the satellite.'),
-            methods
+            methods: [{
+                name: 'Distance',
+                value,
+                html: rule(`$r = ${radiusText(S.R)}${KM}$ is ${near ? 'less' : 'more'} than $a = ${fixed(S.aRaw, 1)}${KM}$.`, conclusion)
+            }, {
+                name: 'Speed check',
+                value: S.V > S.vCirc ? 0 : 180,
+                html: circularSpeedCalc(S)
+                    + rule(`$v = ${fixed(S.V, 4)}${KM_S} ${S.V > S.vCirc ? '>' : '<'} ${V_CIRC}$.`, conclusion)
+            }]
         };
     }
 
@@ -640,11 +595,9 @@
         return [
             stepMagnitudes(S),
             stepSemiMajorAxis(S),
-            stepAngularMomentum(S),
-            stepInclination(S),
-            stepNodeVector(S),
-            stepRaan(S),
             stepEccentricity(S),
+            stepInclination(S),
+            stepRaan(S),
             stepArgumentOfPerigee(S),
             stepTrueAnomaly(S)
         ];

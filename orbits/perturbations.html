@@ -1,0 +1,80 @@
+<!--
+OUTLINE ONLY. This page contains no markup yet. Build it from the plan below, then delete this comment.
+
+START
+Copy _template/tool-template.html over this file, then keep this plan open beside it.
+    Remove the robots line.
+    Title:       Perturbations Explorer | OTC OW
+    Description: A 3D view of how drag, Earth's oblateness, the equator's ellipticity, the Sun and Moon, and sunlight change an orbit over time.
+    h1:          Perturbations Explorer
+    Intro:       The gray orbit is what two-body motion predicts. The colored orbit is what the perturbation actually does.
+
+SCRIPTS, in this order, all classic scripts
+    ../assets/tool-kit.js
+    ../assets/earth-land.js
+    ../assets/earth-scene.js
+    perturbations-model.js
+    perturbations.js
+
+LAYOUT
+Use the same two-column layout as orbits/sun-synchronous.html. Copy its @media rule that sets aside width 40rem.
+Keep the template's #view, #scene, #labels, #view-hint, #status, and #hud elements unchanged.
+Set the canvas aria-label from script, per mode.
+
+CONTROLS PANEL (.panel.controls), top to bottom
+    Row 1: #play, #restart, #reset-view, and the speed slider #speed with #speed-value (min 0, max 2, step 1, value 1).
+    Row 2: "Perturbation" .segmented #mode with data-value drag, j2, j22, third, srp.
+           Button text: Drag, J₂, J₂,₂, 3rd Body, SRP. Then the checkbox #show-labels, checked.
+    Then the mode rows below. Each one has data-mode set to its mode. Only the active mode's rows are visible.
+    Last: p.ctl-caption #mode-caption.
+
+    data-mode="drag", two rows
+        Sliders, each with a -value span:
+            #drag-hp   Perigee altitude   min 130, max 800, step 10, value 250
+            #drag-ha   Apogee altitude    min 130, max 3000, step 10, value 1200
+        .segmented #drag-area:  feathered "Feathered", nominal "Nominal" (selected), windmill "Windmill"
+        .segmented #drag-solar: min "Solar Min", mean "Mean" (selected), max "Solar Max"
+
+    data-mode="j2", two rows
+        .segmented #j2-preset: leo "LEO 45°" (selected), polar "Polar", sso "Sun-Sync", molniya "Molniya"
+        Sliders, each with a -value span:
+            #j2-inc   Inclination       min 1, max 179, step 0.1, value 45
+            #j2-hp    Perigee altitude  min 200, max 2000, step 10, value 500
+            #j2-ha    Apogee altitude   min 0, max 1000, step 1, log scale set from script
+
+    data-mode="j22", one row
+        Slider #j22-lon with -value span: Starting longitude, min -180, max 180, step 1, value 30
+        Checkbox #j22-hold: Station-Keeping
+
+    data-mode="third", one row
+        .segmented #third-body: moon "Moon" (selected), sun "Sun"
+        Checkbox #third-hold: Station-Keeping
+
+    data-mode="srp", one row
+        .segmented #srp-area: dense "Dense", arrays "Large Arrays", foil "Foil Debris"
+
+SIDE PANELS. Text and values in all of these are set from script for the active mode.
+    Column 1
+        .panel.accent, title "What to Notice": p.panel-text #notice
+        .panel, title "Live Values": .stat-grid with 6 .stat-item, ids #stat-0-label and #stat-0 through #stat-5-label and #stat-5
+        .panel: .panel-title #chart-title, then div.chart-box #chart-box containing canvas #chart with an aria-label
+    Column 2
+        .panel.eq-panel: .panel-title #eq-title, .eq-list with 5 .eq-row, using the markup in sun-synchronous.html.
+            ids #eq-0-name, #eq-0-result, #eq-0-work through #eq-4-*. Then p.eq-constants #eq-constants.
+        .panel: title "Which Perturbation Leads?", div.chart-box #leads-box containing canvas #leads, then p.panel-text.muted #leads-text
+
+PAGE-ONLY CSS
+    .chart-box { position: relative; height: 11.5rem; }
+    .chart-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .ctl-row[hidden] { display: none; }
+        This rule is required. .ctl-row sets display: flex, which otherwise overrides the hidden attribute.
+    Mode colors as CSS variables that match COLOR in perturbations.js: drag, j2, j22, moon, sun, srp.
+    On large screens, reserve the height of two mode rows, so that the view does not jump between modes.
+        Measure this once the rows exist. Do not apply it on phones. Do not set the height of .tool-canvas-box.
+
+TEXT RULES
+    Write division with a slash, never the division symbol. Applies to every string on the page.
+    Show negative numbers with a true minus sign (see sun-synchronous.js, the eq-cos line).
+    Keep text short. Shorten rather than hiding text in tabs or a scrolling box.
+    The page must contain no identifying information about any person.
+-->
