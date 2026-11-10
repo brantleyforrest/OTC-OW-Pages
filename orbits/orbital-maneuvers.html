@@ -1,517 +1,627 @@
 <!DOCTYPE html>
-<!--
-================================================================================
-ORBITAL MANEUVERS VISUALIZER: TECHNICAL IMPLEMENTATION PLAN
-================================================================================
-This file is a blank placeholder. The agent that builds the page replaces it,
-following this plan, and deletes this plan comment when the page is finished.
-
---------------------------------------------------------------------------------
-0. GOAL
---------------------------------------------------------------------------------
-An interactive 3D tool covering the four maneuver types from Test 1 Practice
-(practice/test-1-practice.html, "Orbital Maneuvers" section):
-    - Hohmann transfer
-    - Simple plane change: inclination (RAAN stays the same)
-    - Simple plane change: RAAN of a polar orbit
-    - Combined plane change (a Hohmann transfer that also changes inclination)
-
-Test 1 Practice gives the student numbers and has them do the math. This page
-does the opposite. The reader moves sliders, the 3D view updates live, and the
-equations at the side update with the current numbers substituted in. Nothing
-is graded or hidden. The point is to see how each input changes the orbits, the
-burns, and the cost in delta-V.
-
-Not in scope: generated problems, answer boxes, grading, test mode, step-by-step
-walkthroughs, the 5-column table, and the R-V to COE section.
-
---------------------------------------------------------------------------------
-1. FILES
---------------------------------------------------------------------------------
-Create:
-    orbits/orbital-maneuvers.html        This page (start from _template/tool-template.html)
-    orbits/orbital-maneuvers.js          Controls, state, equations panel, live values
-    orbits/orbital-maneuvers-scene.js    The Three.js scene (see section 6)
-
-Edit:
-    index.html     Add the tool to the Tools tab (section 11)
-    README.md      Add the tool to "Current Status" (section 11)
-
-The old standalone maneuver page (practice/maneuvers-practice.html,
-maneuvers-practice.js, maneuvers-scene.js) has been deleted from the working
-tree. Do not restore it to practice/. It is still in git, and you may read it
-for reference (section 1.1). practice/maneuvers-problems.js stays, because
-Test 1 Practice uses it.
-
-Do not edit any file in practice/. Test 1 Practice was just merged and must not
-change. If a helper from practice/ is needed in a changed form, copy it into the
-new files instead of changing the original.
-
-Read before starting:
-    _template/README.md                  Layout, phone rules, known problems, test sizes
-    _template/tool-template-3d.js        Renderer, camera, label, and resize structure
-    practice/test-1-maneuver-scene.js    How maneuvers are drawn now (to copy from)
-    practice/maneuvers-problems.js       The solvers (section 5)
-    practice/practice-math.js            KaTeX wrapper (section 7)
-
-1.1 Reference: the old maneuver page (in git only)
-Read these with git show; they are not in the working tree:
-    git show 0f959b7:practice/maneuvers-scene.js
-    git show 0f959b7:practice/maneuvers-practice.js
-    git show 0f959b7:practice/maneuvers-practice.html
-
-The old page is closer to this one than Test 1 is: it drew each maneuver all
-at once (no step-by-step build), and it had a playback bar. Copy from it:
-    - maneuvers-scene.js: the per-type builders (buildHohmannVisual,
-      buildInclinationVisual, buildPolarRaanVisual, buildCombinedVisual), and
-      how each one draws the velocity triangle at the burn and sets a home view
-      that faces the burn point.
-    - maneuvers-scene.js: the anim.trajectory(prog) pattern, a function from
-      progress (0 to 1) to the spacecraft's position and direction, with the
-      position updated while paused so the scrub slider works.
-    - maneuvers-practice.js createViz(): the playback controls (play/pause,
-      rewind, scrub slider, speed), holding the animation still while the scrub
-      slider is dragged (pointerdown/pointerup), and the onProgress callback
-      that moves the scrub slider while playing.
-    - maneuvers-practice.html: the .playback-bar styles and markup, including
-      its phone rule.
-
-Do not copy from it:
-    - Its COLORS table (initial orbit cyan, transfer amber). Use the Test 1
-      colors in section 6.1, so the two pages match.
-    - Its 15° tilt of the Hohmann orbits. Keep them in the equatorial plane,
-      so the axes and the inclination of 0° still mean what they say.
-    - Its transfer timing, which moves true anomaly at a steady rate. Use the
-      Kepler timing in section 5, so the spacecraft is faster near perigee.
-    - Anything about problems, answers, grading, modes, or walkthrough steps.
-
-_template/README.md says to register tools as described in "AGENTS.md section 6".
-There is no AGENTS.md in this repository. Follow the existing entries in
-index.html instead (section 11).
-
---------------------------------------------------------------------------------
-2. SCRIPTS AND LOAD ORDER
---------------------------------------------------------------------------------
-All local scripts are classic scripts (no type="module"), so the page works when
-opened from disk. Three.js is loaded inside the scene script with a dynamic
-import(), the same way as the template:
-    https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js
-
-In <head>, the same KaTeX stylesheet as test-1-practice.html (keep its exact
-version 0.16.11 and integrity hash).
-
-At the end of <body>, in this order:
-    katex.min.js (0.16.11, same integrity hash as test-1-practice.html)
-    ../assets/tool-kit.js
-    ../assets/earth-land.js
-    ../assets/earth-scene.js
-    ../practice/practice-math.js        Provides PracticeMath.math() for KaTeX
-    ../practice/maneuvers-problems.js   Provides ManeuversProblems solvers and constants
-    orbital-maneuvers-scene.js          Exposes window.ManeuverScene = { create }
-    orbital-maneuvers.js                Starts the page
-
-maneuvers-problems.js reads window.PracticeMath when it loads, so practice-math.js
-must come before it. If KaTeX fails to load, PracticeMath.math() falls back to
-showing TeX source. Keep that working: if a CDN fails, the sliders, values,
-and equations must still work, even without the 3D view.
-
---------------------------------------------------------------------------------
-3. PAGE LAYOUT
---------------------------------------------------------------------------------
-Use the template layout from assets/tool-theme.css:
-    .tool-stage-col   The 3D view, the timeline, and the sliders below it
-    .tool-side        Two columns on wide screens (see the "Two side columns"
-                      rule in _template/README.md, with --aside-w: 40rem):
-                        column 1: "Equations" panel (section 7)
-                        column 2: "Live Values" and "Delta-V Budget" panels (section 8),
-                                  then a short "What to Notice" panel
-                      One column on narrower large screens, stacked on tablets.
-
-Top bar: back link to ../index.html, title "Orbital Maneuvers". Keep the robots
-noindex line until the user says the page is ready to publish.
-
-Controls panel under the view, top to bottom:
-    Row 1: maneuver type, segmented control:
-           Hohmann | Inclination | Polar RAAN | Combined
-    Row 2: Play/Pause, Restart, timeline slider (section 6.4), speed buttons
-    Row 3: the sliders for the chosen type (section 4), two per row on wide
-           screens. Each slider shows its value beside its label, like the
-           speed slider in the template.
-    Row 4: checkboxes: Velocity vectors, Angles, Labels
-
-Each line of controls takes height from the view. Keep the panel compact. If the
-sliders for one type do not fit at 1366x650, put them in two columns rather than
-hiding them.
-
-The template's .tool-hud sits over the view. Use it for one short sentence about
-the current part of the timeline, for example "Burn 1: a prograde burn speeds
-the spacecraft onto the transfer orbit." Follow test-1-practice.html, which moves
-the HUD below the view so it never covers the drawing.
-
---------------------------------------------------------------------------------
-4. MANEUVER TYPES AND SLIDERS
---------------------------------------------------------------------------------
-All radii are from Earth's center, in km, never altitudes. Show values with a
-thousands comma ("24,000 km") and angles with a degree sign. Show Earth's
-radius (6,378 km) as a faint mark or note near the radius sliders, so it is
-clear that the minimum is just above the surface.
-
-Hohmann
-    R1   initial orbit radius    6,700 to 45,000 km, step 100, default 9,600
-    R2   target orbit radius     6,700 to 45,000 km, step 100, default 24,000
-    R2 < R1 is allowed: the maneuver lowers the orbit and both burns are
-    retrograde. If R1 = R2, show "No transfer needed" in the HUD and draw only
-    the one orbit. Optional: a small "LEO to GEO" preset button
-    (6,678 km to 42,164 km).
-
-Inclination
-    r    orbit radius            6,700 to 45,000 km, step 100, default 12,000
-    i1   initial inclination     0 to 90°, step 0.5, default 28.5
-    i2   target inclination      0 to 90°, step 0.5, default 55.0
-    Ω    RAAN, for both orbits   0 to 355°, step 5, default 45
-    u    spacecraft position     0 to 355°, step 5, default 270
-         (argument of latitude, from the ascending node)
-
-Polar RAAN (i = 90° for both orbits, shown as a fixed value, not a slider)
-    r    orbit radius            6,700 to 45,000 km, step 100, default 12,000
-    Ω1   initial RAAN            0 to 180°, step 5, default 30
-    Ω2   target RAAN             0 to 180°, step 5, default 60
-    u    spacecraft position     0 to 355°, step 5, default 30
-
-Combined
-    R1, R2 as in Hohmann, defaults 9,600 and 24,000
-    i1, i2 as in Inclination, defaults 28.5 and 0.0
-    "Plane change at", segmented: Higher orbit | Lower orbit | Separate burn
-        Higher orbit (default) is the method taught in Test 1.
-        Lower orbit puts the whole plane change in the burn at the lower orbit.
-        Separate burn does a Hohmann transfer and then a simple plane change
-        at the higher orbit as a third burn.
-    The point is to compare costs: the Delta-V Budget panel (section 8) shows
-    the total for all three choices, with the chosen one highlighted, so the
-    reader sees that the plane change is cheapest where the spacecraft is
-    slowest.
-
-When the type changes, keep each type's last slider values, so that switching
-back does not lose the reader's setup. The Restart button only restarts the
-timeline; it does not reset sliders. Add a small "Reset values" button that
-restores the defaults for the current type.
-
-Snap the plane change angle readout to zero when i1 = i2 or Ω1 = Ω2, and draw no
-burn in that case (HUD: "The planes match, so no burn is needed.").
-
---------------------------------------------------------------------------------
-5. PHYSICS
---------------------------------------------------------------------------------
-Use the solvers in practice/maneuvers-problems.js through window.ManeuversProblems.
-They are pure functions and match the class formulas:
-    solveHohmann(R1, R2)
-        returns a_tx, v1, v_tx1, v_tx2, v2, dv1, dv2, dv_total, tof_s, tof_min, isRaise
-    solveInclinationChange(alt, i1, i2, raan, u_sc)
-        returns v, delta_theta, dv, period_s, next_node, delta_u_to_node,
-        u_burn, time_to_burn_s
-    solvePolarRaanChange(alt, raan1, raan2, u_sc)
-        returns v, delta_theta, dv, period_s, next_pole, delta_u_to_pole, u_burn,
-        time_to_burn_min
-    solveCombined(R1, R2, i1, i2)
-        returns the Hohmann values plus v_initial, v_final, dv_combined,
-        dv_separate, and dv1, dv2, dv_total with the plane change at the
-        higher orbit
-    constants: { MU: 398600.4418, R_EARTH: 6378.137 }
-
-The plane change solvers take an ALTITUDE. Pass r - constants.R_EARTH, the same
-as test-1-maneuver-problems.js does (altitudeFor).
-
-Add one small function in orbital-maneuvers.js for the "Lower orbit" choice of
-the combined maneuver, which the solvers do not cover. At the lower orbit, with
-V_a the speed before the burn and V_b the speed after it:
-    Delta V = sqrt(V_a^2 + V_b^2 - 2 V_a V_b cos(Delta theta))
-For a raise, the lower-orbit burn is burn 1 (V_a = v1, V_b = v_tx1) and burn 2 is
-the plain Hohmann dv2. For a lowering, the lower-orbit burn is burn 2
-(V_a = v_tx2, V_b = v2) and burn 1 is the plain Hohmann dv1. The "Separate burn"
-total is solveCombined(...).dv_separate plus the other Hohmann burn; check that
-total against a hand calculation before using it, and write the check in the
-final report.
-
-Position along the transfer: the timeline (section 6.4) needs the spacecraft's
-place on the half ellipse at a given time, so that it moves faster near perigee
-and slower near apogee. Write a small Kepler solver: mean anomaly M = π t / TOF,
-solve M = E - e sin E by Newton's method (about 6 iterations, start at E = M),
-then true anomaly from E. The transfer's e = |R2 - R1| / (R1 + R2).
-
-Check displayed numbers against the solvers, and the solvers against one worked
-example from the lesson (maneuvers-problems.js has PRESETS for lecture examples).
-
---------------------------------------------------------------------------------
-6. THE 3D SCENE (orbits/orbital-maneuvers-scene.js)
---------------------------------------------------------------------------------
-6.1 Approach
-practice/test-1-maneuver-scene.js draws exactly these maneuvers, but it is
-built around walkthrough stages (parts appear, focus, and dim step by step).
-This page needs the opposite: every part visible at once, rebuilt whenever a
-slider moves. Write a new, simpler scene with no stage machine. Use the old
-maneuvers-scene.js (section 1.1) for the overall structure: one builder per
-type, a trajectory(prog) function, and a playback state. Then copy these
-pieces from test-1-maneuver-scene.js for the drawing style, since it is newer
-and matches the rest of the site:
-    - the "ghosted" draw method (solid object plus a dim copy drawn without
-      depth testing, so orbits behind Earth stay faintly visible)
-    - createArrow / placeArrow, createTube / drawTube, createMarker, turnArc
-    - orbitPoint(r, inc, raan, u) and orbitTangent(inc, raan, u)
-    - frame(reach): sizing the view and axes from the largest orbit
-    - burnAt(): where to draw the velocity before and after a burn, and delta-V
-      from the tip of the old velocity to the tip of the new one
-    - the COLORS table, so this page matches Test 1 Practice:
-        eci axes #60a5fa, orbit1 #e0b64f, orbit2 #34d399, transfer #ff8a3d,
-        dv #f87171, node #fbbf24, theta #38bdf8, tof #c4a1ff
-
-Units: Earth's radius = 1 scene unit (assets/earth-scene.js uses radius 1, Z
-north). Divide km by constants.R_EARTH. The largest orbit (45,000 km) is about
-7 Earth radii.
-
-Public interface:
-    ManeuverScene.create(THREE, dom, constants) returns
-        setModel(model)     Rebuild geometry for new slider values (section 6.3)
-        setTime(t)          Place the spacecraft and burns at timeline t (0 to 1)
-        setShown({ vectors, angles, labels })
-        resetView()
-        resize()
-
-6.2 What is drawn, by type
-Hohmann
-    - orbit 1 and orbit 2 as circles in the equatorial plane
-    - the transfer half ellipse, with the unused half dashed and faint
-    - burn markers at perigee and apogee of the transfer
-    - at each burn, velocity arrows before (old orbit color) and after (new orbit
-      color), and the delta-V arrow (dv color) between their tips
-    - a faint line through both burns (the line of apsides)
-    - labels: R1, R2, a_tx (half of the long axis), ΔV1, ΔV2
-Inclination
-    - the initial and target orbits, same radius, same Ω, different tilt
-    - the line of nodes, with both nodes marked; the burn node is highlighted
-    - an arc for Δθ at the burn node, between the two orbit planes
-    - at the node: the velocity before and after (same length), and ΔV
-    - an arc along the initial orbit from the spacecraft (at u) to the burn
-      node, labeled Δu
-    - the equatorial plane as a faint disc, and Ω as an arc from the I axis
-Polar RAAN
-    - same as Inclination, but the orbits cross over the poles, so the burn
-      point is a pole and the crossing line is Earth's spin axis
-    - Ω1 and Ω2 arcs in the equatorial plane, with the ΔΩ between them
-Combined
-    - everything from Hohmann, but orbit 2 (and the transfer after the plane
-      change) is tilted by Δθ about the line of apsides
-    - at the burn that carries the plane change, the velocity triangle: old
-      velocity, new velocity in the new plane, ΔV across the tips, and the Δθ arc
-      between the old and new velocities. Draw it larger than the other burn
-      so the triangle is readable.
-    - "Separate burn" shows a third burn marker at the higher orbit
-
-Arrow lengths: scale velocities so the fastest velocity at a burn is drawn half
-as long as the radius there (the rule in test-1-maneuver-scene.js transferData),
-and use the same scale for every arrow of that maneuver, so lengths compare
-honestly. ΔV arrows use the same scale. If a ΔV arrow would be shorter than about
-0.08 scene units, draw it at that minimum length and say so in its label
-("ΔV (enlarged)"), so it stays visible.
-
-6.3 Rebuilding on slider input
-Sliders fire "input" many times a second. Mark the model dirty and rebuild at
-most once per animation frame (Kit.startLoop already gives one callback per
-frame). Reuse geometries and update their position buffers rather than creating
-new meshes; dispose any geometry that is replaced. Keep the camera where the
-reader left it when sliders move, but ease its distance when the largest orbit
-grows or shrinks by more than about 15%, so the orbits stay in view. Switching
-maneuver type moves the camera to that type's home view (Hohmann and Combined:
-mostly from above the plane; plane changes: looking along the crossing line,
-like aboveView/homeView in test-1-maneuver-scene.js, so the angle between the
-planes is visible and not edge-on).
-
-Interaction: drag to rotate, scroll or pinch to zoom, a Reset View button, and
-touch-action: none on the canvas, as in the other 3D tools.
-
-6.4 Timeline
-One timeline slider, 0 to 1, with Play/Pause. Playing moves it at the chosen
-speed and loops after a short pause at the end. Dragging the slider holds the
-animation still; base the controls on the old page's playback bar
-(section 1.1).
-
-Phases for Hohmann and Combined:
-    0.00 to 0.20   coast on orbit 1 to burn 1
-    0.20 to 0.25   burn 1 (arrows and ΔV1 brighten, spacecraft flashes)
-    0.25 to 0.75   fly the transfer half ellipse (Kepler timing, section 5)
-    0.75 to 0.80   burn 2
-    0.80 to 1.00   coast on orbit 2
-    (Separate burn adds a short third burn phase after burn 2.)
-Phases for the plane changes:
-    0.00 to 0.45   coast from u to the burn point, covering Δu
-    0.45 to 0.55   burn: the velocity swings from the old plane into the new
-                   one, sweeping the Δθ arc as it goes
-    0.55 to 1.00   coast on the new orbit
-
-Before a burn, the arrows for it are dim; during the burn they brighten; after
-it, they stay at normal brightness. The current phase is sent to the equations
-panel (section 7) so the matching equation is highlighted, and to the HUD.
-
-Respect prefers-reduced-motion: start paused (Kit.prefersReducedMotion()).
-
-6.5 Labels
-Use ToolKit.LabelLayer, as in the template. Labels are KaTeX symbols through
-PracticeMath.math() with the value beside them, for example "ΔV1  1.234 km/s".
-Mark minor labels (Ω, Δu, axis names) as optional so they drop first when
-crowded. Hide a label when Earth blocks the view of its point (isBlocked() in
-the template).
-
---------------------------------------------------------------------------------
-7. EQUATIONS PANEL
---------------------------------------------------------------------------------
-Off to the side of the view, one card per equation for the current type. Each
-card has three lines:
-    1. the formula in symbols
-    2. the formula with the current numbers in it
-    3. the result with units
-Render with PracticeMath.math(). Use the same TeX style as
-maneuvers-problems.js (398{,}600.44 for μ, \sqrt{\frac{...}{...}}).
-Color each symbol to match its object in the 3D view (orbit 1 gold, orbit 2
-green, transfer orange, ΔV red, angles blue, time violet), using \textcolor in
-the TeX, or CSS tokens on :root like --param-* in test-1-practice.html.
-
-Cards by type:
-Hohmann
-    a_tx = (R1 + R2) / 2
-    V1 = sqrt(μ / R1),  V2 = sqrt(μ / R2)
-    V_tx1 = sqrt(μ (2 / R1 - 1 / a_tx)),  V_tx2 = sqrt(μ (2 / R2 - 1 / a_tx))
-    ΔV1 = |V_tx1 - V1|,  ΔV2 = |V2 - V_tx2|
-    ΔV_total = ΔV1 + ΔV2
-    TOF = π sqrt(a_tx^3 / μ)   (show minutes and h:mm:ss; formatHms exists in
-                                 maneuvers-problems.js but is not exported, so
-                                 copy it)
-Inclination and Polar RAAN
-    V = sqrt(μ / r)
-    Δθ = |i2 - i1|   or   Δθ = |Ω2 - Ω1|
-    ΔV = 2 V sin(Δθ / 2)
-    Where to burn: the next node (or pole), Δu, and the time to get there,
-        Δu / 360° times the period
-Combined
-    The Hohmann cards, with the plane change burn replaced by
-    ΔV = sqrt(V_a^2 + V_b^2 - 2 V_a V_b cos(Δθ))
-    using the speeds of whichever burn carries the plane change
-
-Highlight the card that matches the current timeline phase (left border in the
-accent color, brighter text). Clicking a card jumps the timeline to that phase.
-
-Re-render only the cards whose numbers changed, once per frame at most, because
-KaTeX rendering on every slider event is slow on phones.
-
-Writing rules for this panel and the whole page:
-    - Division is written with a slash or as a \frac. Never ÷ or \div,
-      anywhere on the page.
-    - Explain angles by inspection, not with vector formulas. For example: the
-      two inclination orbits cross at the nodes, so the angle between them there
-      is Δi; polar orbits all pass over both poles, so the angle between them
-      there is ΔΩ. Do not introduce angular momentum vectors or dot products.
-      If a direction needs explaining, use the right-hand rule.
-    - Keep text short. One sentence per card note at most.
-
---------------------------------------------------------------------------------
-8. LIVE VALUES, DELTA-V BUDGET, WHAT TO NOTICE
---------------------------------------------------------------------------------
-Live Values (stat-grid from the template): the key results for the type, such as
-a_tx, ΔV1, ΔV2, ΔV_total, TOF for Hohmann; V, Δθ, ΔV, Δu, time to burn for the
-plane changes. Speeds to 3 decimals in km/s with m/s in small text after.
-
-Delta-V Budget: a horizontal bar per burn, stacked into the total, drawn with
-plain HTML/CSS (no chart library), in the dv color. For Combined, show three
-total bars (Higher orbit, Lower orbit, Separate burn) on one shared scale, with
-the chosen one highlighted, so the comparison is visible at a glance. For the
-plane changes, show ΔV as a share of the orbital speed V (ΔV / V), to show how
-quickly plane changes get expensive.
-
-Optional, only if it fits at 1366x650 without shrinking the view: a small
-ΔV-versus-Δθ curve (0 to 90°) for the plane changes, with a dot at the current
-value, drawn on a 2D canvas sized with ToolKit.observeSize.
-
-What to Notice, one or two sentences per type, for example:
-    Hohmann: "The two burns are on opposite sides of Earth. The transfer takes
-              half a lap of the transfer orbit."
-    Plane changes: "The burn turns the velocity without changing its speed.
-              The faster the orbit, the more that turn costs."
-    Combined: "Turning the plane where the spacecraft is slowest costs least."
-
---------------------------------------------------------------------------------
-9. PHONES AND SMALL SCREENS
---------------------------------------------------------------------------------
-Follow the "Phone Design Rules" in _template/README.md. In particular: the view
-stays pinned at the top of an upright phone and on the left of a rotated one;
-only the controls and panels scroll; the top bar shows only the back button and
-the title; phone-only rules stay inside the two phone media queries, so laptops
-and desktops do not change. Range sliders need a touch target at least 28px
-tall on phones.
-
---------------------------------------------------------------------------------
-10. TECHNICAL RULES
---------------------------------------------------------------------------------
-    - No build step, no frameworks, no new libraries beyond Three.js and KaTeX.
-    - Size the canvas with ToolKit.observeSize and draw inside its callback
-      (see "Rules That Prevent Known Problems" in _template/README.md).
-    - Shared styles go in assets/tool-theme.css only if another tool already
-      needs them. Otherwise keep them in this page's <style>.
-    - Show a status message in the view if Three.js or WebGL fails, as in the
-      template; the equations and values panels must still work without 3D.
-    - No identifying information on the page (no names, emails, or course
-      details beyond what other pages already show).
-
---------------------------------------------------------------------------------
-11. REGISTERING THE TOOL
---------------------------------------------------------------------------------
-index.html: add a card for this tool in the Tools tab (the #tools view), next
-to the Orbital Equation Explorer entry. Copy that entry's markup, which has both
-the desktop card and the compact phone row. Mark it as Work in Progress with
-a <span class="status-pill wip">Work in Progress</span> pill and a locked
-launch button (<span class="btn-launch disabled" aria-disabled="true">), until
-the user says it is ready. The old Orbital Maneuvers Practice card used this
-pattern; see it in git history (commit 0f959b7, index.html) if needed.
-
-README.md: add one line under "Current Status", in the same style as the
-others. Mention that it loads KaTeX from a CDN.
-
---------------------------------------------------------------------------------
-12. TESTING BEFORE HANDING BACK
---------------------------------------------------------------------------------
-Preview with the "pages" server in .claude/launch.json (python http.server on
-port 8765), and also open the file from disk.
-    - Test sizes: 1920x1080, 1536x730, 1366x768, 1366x650, 1100x800, 820x1180,
-      390x844, 844x390.
-    - Every type, every slider at its minimum, maximum, and default; R1 = R2;
-      i1 = i2; lowering transfers; Δθ = 90°.
-    - Play, pause, scrub, restart, change type and resize while playing, zoom
-      all the way in and out.
-    - No console errors, no sideways scrolling, no cut-off text, no labels on
-      top of each other, the top of the scene not clipped.
-    - Numbers: for the defaults of each type, compare every displayed value
-      with the solver output and with a hand calculation. Check the "Lower orbit"
-      and "Separate burn" totals especially (section 5).
-    - Search the page source for ÷ and \div; there must be none.
-    - Confirm that git diff shows no changes in practice/.
-
---------------------------------------------------------------------------------
-13. DEFAULTS CHOSEN IN THIS PLAN (change if the user says otherwise)
---------------------------------------------------------------------------------
-    - Location orbits/ (it sits with the other orbit tools) rather than
-      practice/, since this page has no problems or grading.
-    - Page title "Orbital Maneuvers"; listed on the Tools tab, not Study.
-    - Combined maneuver offers three plane change locations for comparison,
-      with "Higher orbit" (the Test 1 method) as the default.
-    - All computed values are shown live. The rule that hides answers until
-      grading applies to the practice pages, not to this tool.
-================================================================================
--->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex">
     <title>Orbital Maneuvers | OTC OW</title>
-    <meta name="description" content="Move sliders to change a Hohmann transfer, a simple plane change, or a combined plane change, and watch the orbits, burns, and equations update.">
+    <meta name="description" content="Interactive 3D visualizer and live equations for Hohmann Transfers, Simple Plane Changes (Inclination and Polar Orbit RAAN), and Combined Plane Changes.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <style>
+        :root {
+            --param-a: #ff8a3d;
+            --param-v: #38bdf8;
+            --param-dv: #f87171;
+            --param-inc: #38bdf8;
+            --param-raan: #a3e635;
+            --param-tof: #c4a1ff;
+            --orbit1: #e0b64f;
+            --orbit2: #34d399;
+            --transfer: #ff8a3d;
+        }
+
+        /* Two side columns on wide screens */
+        @media (min-width: 1300px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 40rem; }
+            .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        /* Math */
+        .katex { font-size: 1.05em; }
+        .tex-source { font-family: var(--font-mono); font-size: 0.85em; overflow-wrap: anywhere; }
+
+        /* Caption below view */
+        .tool-hud {
+            position: static;
+            max-width: none;
+            margin-top: 0.45rem;
+            padding: 0;
+            min-height: 2.7em;
+            background: none;
+            border: 0;
+            border-radius: 0;
+            font-size: 0.84rem;
+            line-height: 1.35;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .tool-hud b { font-weight: 600; color: #ffffff; }
+        .tool-hud .katex { color: #ffffff; }
+
+        .view-reset {
+            position: absolute;
+            top: 0.6rem;
+            right: 0.6rem;
+            z-index: 2;
+            padding: 0.28rem 0.6rem;
+            font-size: 0.74rem;
+        }
+
+        /* Labels in 3D View */
+        .tool-label { z-index: 1; }
+        .tool-label.word { color: var(--text-muted); font-size: 0.72rem; }
+        .tool-label.axis .katex { color: #93c5fd; font-weight: 600; }
+
+        .tool-label.measure {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+            background: rgba(6, 11, 20, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px);
+        }
+
+        .tool-label.measure .val {
+            margin-left: 0.35rem;
+            color: #ffffff;
+            font-weight: 400;
+        }
+
+        .tool-label.measure .val:empty { display: none; }
+
+        /* Playback bar */
+        .playback-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.38rem 0.65rem;
+            background: var(--surface-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            font-size: 0.82rem;
+            margin-bottom: 0.45rem;
+        }
+
+        .playback-btn {
+            background: none;
+            border: 0;
+            color: var(--text-main);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: color 0.15s, background 0.15s;
+        }
+
+        .playback-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .scrub-slider {
+            flex: 1 1 auto;
+            accent-color: var(--accent-blue);
+            cursor: pointer;
+            height: 6px;
+        }
+
+        .speed-pill {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            padding: 0.18rem 0.45rem;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            border: 1px solid var(--border-subtle);
+            transition: color 0.15s, border-color 0.15s;
+        }
+
+        .speed-pill:hover {
+            color: #ffffff;
+            border-color: var(--border-accent);
+        }
+
+        /* Controls Panel */
+        .controls {
+            padding: 0.75rem 0.9rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+
+        .controls .ctl-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            margin-top: 0;
+        }
+
+        .ctl-checks-row {
+            padding-top: 0.35rem;
+            border-top: 1px solid var(--border-subtle);
+            margin-top: 0.2rem;
+        }
+
+        .ctl-checks {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+        }
+
+        .ctl-checks .check {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .ctl-checks .check input {
+            accent-color: var(--accent-blue);
+            cursor: pointer;
+        }
+
+        .ctl-label-inline {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .combined-location-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-top: 0.4rem;
+            padding-top: 0.35rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        /* Sliders Grid */
+        .sliders-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.4rem 0.85rem;
+        }
+
+        @media (max-width: 680px) {
+            .sliders-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .slider-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .slider-field .control-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .slider-field .control-value {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: #ffffff;
+            font-size: 0.82rem;
+        }
+
+        .slider-field .control-value.fixed-badge {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.12);
+            padding: 0.1rem 0.35rem;
+            border-radius: 4px;
+            font-size: 0.74rem;
+        }
+
+        .slider-field input[type="range"] {
+            accent-color: var(--accent-blue);
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .earth-radius-hint {
+            font-size: 0.7rem;
+            color: var(--text-dim, #64748b);
+        }
+
+        .slider-presets {
+            display: flex;
+            margin-top: 0.15rem;
+        }
+
+        .btn-preset-pill {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            border-radius: 4px;
+            font-size: 0.72rem;
+            padding: 0.12rem 0.45rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-preset-pill:hover {
+            color: #ffffff;
+            border-color: var(--border-accent);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-sm {
+            padding: 0.28rem 0.6rem;
+            font-size: 0.76rem;
+        }
+
+        /* Equations Panel */
+        .equations-panel {
+            padding: 0.75rem 0.9rem;
+        }
+
+        .equation-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            margin-top: 0.35rem;
+        }
+
+        .equation-card {
+            border-left: 3px solid transparent;
+            background: var(--surface-card);
+            border-radius: 6px;
+            padding: 0.5rem 0.65rem;
+            cursor: pointer;
+            transition: border-color 0.15s, background-color 0.15s;
+            border: 1px solid var(--border-subtle);
+            border-left-width: 3px;
+        }
+
+        .equation-card:hover {
+            background: var(--surface-hover);
+            border-color: var(--border-accent);
+        }
+
+        .equation-card.active {
+            border-left-color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.08);
+            border-top-color: rgba(56, 189, 248, 0.3);
+            border-right-color: rgba(56, 189, 248, 0.3);
+            border-bottom-color: rgba(56, 189, 248, 0.3);
+        }
+
+        .eq-title {
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .equation-card.active .eq-title {
+            color: var(--accent-blue);
+        }
+
+        .eq-sym {
+            color: #ffffff;
+            font-size: 0.92rem;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 0.1rem 0;
+        }
+
+        .eq-num {
+            color: var(--text-muted);
+            font-size: 0.84rem;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 0.1rem 0;
+        }
+
+        .eq-res {
+            color: #34d399;
+            font-weight: 600;
+            font-size: 0.88rem;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 0.1rem 0;
+        }
+
+        /* Live Values */
+        .stat-grid {
+            margin-top: 0.35rem;
+            gap: 0.45rem 0.6rem;
+        }
+
+        .stat-item {
+            padding: 0.35rem 0.5rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .unit-sub {
+            font-size: 0.74rem;
+            font-weight: normal;
+            color: var(--text-muted);
+        }
+
+        /* Delta-V Budget */
+        .dv-budget-box {
+            margin-top: 0.35rem;
+        }
+
+        .dv-bar-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 0.3rem;
+        }
+
+        .dv-bar-track {
+            height: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .dv-bar-fill {
+            height: 100%;
+            transition: width 0.15s ease-out;
+        }
+
+        .dv-bar-fill.b1 { background: #f87171; }
+        .dv-bar-fill.b2 { background: #fb7185; }
+        .dv-bar-fill.b3 { background: #e11d48; }
+
+        .dv-legend {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.4rem 0.8rem;
+            margin-top: 0.45rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .dv-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.35rem;
+        }
+
+        .dv-dot.b1 { background: #f87171; }
+        .dv-dot.b2 { background: #fb7185; }
+
+        .dv-total-tag {
+            color: #ffffff;
+            font-family: var(--font-mono);
+        }
+
+        .dv-curve-container {
+            margin-top: 0.75rem;
+            display: flex;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 6px;
+            padding: 0.3rem;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .dv-compare-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            margin-top: 0.35rem;
+        }
+
+        .dv-compare-row {
+            padding: 0.45rem 0.6rem;
+            border-radius: 6px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-subtle);
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+
+        .dv-compare-row.selected {
+            border-color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        /* Phone layout */
+        @media (max-width: 640px) and (orientation: portrait) {
+            .playback-bar { flex-wrap: wrap; gap: 0.4rem; }
+            #maneuver-type { flex-wrap: wrap; }
+            .tool-hud { font-size: 0.8rem; min-height: 0; }
+            input[type="range"] { min-height: 28px; }
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+            .playback-bar { flex-wrap: wrap; }
+            input[type="range"] { min-height: 28px; }
+        }
+    </style>
 </head>
 <body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Orbital Maneuvers</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../index.html#study" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <!-- Stage column: 3D View and Controls -->
+            <div class="col tool-stage-col">
+                <p class="tool-intro">Move sliders to change a Hohmann transfer, a simple plane change, or a combined plane change, and watch the orbits, velocity vectors, and equations update.</p>
+
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view">
+                        <canvas id="scene" aria-label="3D Orbital Maneuvers Visualization" style="touch-action: none;"></canvas>
+                        <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                        <button type="button" class="btn view-reset" id="reset-view">Reset View</button>
+                        <div class="tool-hint" id="view-hint">Drag to rotate. Scroll or pinch to zoom.</div>
+                        <div class="tool-status" id="status" style="display: none;"></div>
+                    </div>
+                    <div class="tool-hud" id="hud" aria-live="polite"></div>
+                </div>
+
+                <div class="panel controls">
+                    <!-- Row 1: Maneuver Type Selector -->
+                    <div class="ctl-row">
+                        <div class="segmented compact" id="maneuver-type" role="group" aria-label="Select maneuver category">
+                            <button type="button" data-type="hohmann" aria-pressed="true">Hohmann</button>
+                            <button type="button" data-type="inclination" aria-pressed="false">Inclination</button>
+                            <button type="button" data-type="polar_raan" aria-pressed="false">Polar RAAN</button>
+                            <button type="button" data-type="combined" aria-pressed="false">Combined</button>
+                        </div>
+                        <button type="button" class="btn btn-sm" id="btn-reset-values" title="Restore default slider values for current maneuver">Reset Values</button>
+                    </div>
+
+                    <!-- Row 2: Playback Timeline -->
+                    <div class="playback-bar" id="playback-bar">
+                        <button type="button" class="playback-btn" id="btn-play" title="Play or Pause" aria-label="Play or Pause">
+                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" id="icon-play">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
+                        </button>
+                        <button type="button" class="playback-btn" id="btn-rewind" title="Restart timeline" aria-label="Restart timeline">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                <polygon points="11 19 2 12 11 5 11 19"></polygon>
+                                <polygon points="22 19 13 12 22 5 22 19"></polygon>
+                            </svg>
+                        </button>
+                        <input type="range" class="scrub-slider" id="timeline-slider" min="0" max="1000" value="0" aria-label="Scrub maneuver animation timeline">
+                        <button type="button" class="speed-pill" id="btn-speed" title="Toggle animation speed">1.0x</button>
+                    </div>
+
+                    <!-- Row 3: Sliders per Maneuver Type -->
+                    <div id="sliders-container"></div>
+
+                    <!-- Row 4: View Checkboxes -->
+                    <div class="ctl-row ctl-checks-row">
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="check-vectors" checked>Velocity vectors</label>
+                            <label class="check"><input type="checkbox" id="check-angles" checked>Angles</label>
+                            <label class="check"><input type="checkbox" id="check-labels" checked>Labels</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Two Side Columns on Desktop -->
+            <aside class="tool-side">
+                <!-- Column 1: Equations Panel -->
+                <div class="col">
+                    <div class="panel equations-panel">
+                        <div class="panel-title">Equations</div>
+                        <div class="equation-cards" id="equation-cards"></div>
+                    </div>
+                </div>
+
+                <!-- Column 2: Live Values, Delta-V Budget, What to Notice -->
+                <div class="col">
+                    <div class="panel">
+                        <div class="panel-title">Live Values</div>
+                        <div class="stat-grid" id="live-values-grid"></div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Delta-V Budget</div>
+                        <div id="dv-budget-content"></div>
+                    </div>
+
+                    <div class="panel accent">
+                        <div class="panel-title">What to Notice</div>
+                        <p class="panel-text" id="what-to-notice-text"></p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
+    <script src="../assets/tool-kit.js"></script>
+    <script src="../assets/earth-land.js"></script>
+    <script src="../assets/earth-scene.js"></script>
+    <script src="../practice/practice-math.js"></script>
+    <script src="../practice/maneuvers-problems.js"></script>
+    <script src="orbital-maneuvers-scene.js"></script>
+    <script src="orbital-maneuvers.js"></script>
 </body>
 </html>
