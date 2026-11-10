@@ -31,13 +31,12 @@
         aBar: { from: 'a', until: 'a', focus: ['a'], seconds: 1.2, after: 'majorAxis' },
         apsides: { from: 'a', focus: ['a', 'e'], seconds: 0.4, after: 'majorAxis', dimmed: 0.6 },
         orbit: { from: 'e', focus: ['e', 'i'], seconds: 4.2, dimmed: 0.6 },
-        perigeeSpan: { from: 'e', until: 'e', focus: ['e'], seconds: 0.9, after: 'orbit' },
         thumb: { from: 'i', focus: ['i', 'argp', 'nu'], seconds: 1.5 },
         curlOrbit: { from: 'i', focus: ['i', 'argp', 'nu'], seconds: 1.3, after: 'thumb' },
         equator: { from: 'i', focus: ['i', 'raan'], seconds: 1.6, dimmed: 0.45 },
         arcI: { from: 'i', focus: ['i'], seconds: 1.6, after: 'equator' },
         curlEarth: { from: 'raan', until: 'raan', focus: ['raan'], seconds: 1.2 },
-        node: { from: 'raan', focus: ['raan', 'argp'], seconds: 1.4 },
+        node: { from: 'raan', focus: ['raan', 'argp'], seconds: 0.5 },
         northHalf: { from: 'raan', until: 'raan', focus: ['raan'], seconds: 1.3, after: 'node' },
         arcRaan: { from: 'raan', focus: ['raan'], seconds: 1.9, after: 'northHalf' },
         arcArgp: { from: 'argp', focus: ['argp'], seconds: 2 },
@@ -50,7 +49,7 @@
     // Some parts do not exist for some orbits. A circle has no perigee, for example.
     function partExists(name, S) {
         switch (name) {
-            case 'majorAxis': case 'apsides': case 'perigeeSpan': return !S.circular;
+            case 'majorAxis': case 'apsides': return !S.circular;
             case 'node': case 'northHalf': case 'curlEarth': return !S.equatorial;
             case 'arcI': return S.i > 0.5;
             case 'arcRaan': return !S.raanUndefined && S.raan > 0.5;
@@ -76,7 +75,6 @@
         const MAX_TILT = 74;            // Steepest camera angle a step uses, in degrees
         const FRAME_MARGIN = 1.18;      // Room left around what a step frames
         const EARTH_EDGE = 1.03;
-        const SHORTEST_ARROW = 1.6;     // The arrow to the node is at least this long, to clear Earth
         const TIP_CLEARANCE = 3.2;      // The camera stays this many tip distances from the center
         const CURL_SWEEP = 300 * D2R;   // How far a ring of curled fingers goes around its axis
 
@@ -348,7 +346,6 @@
         const arrowR = createArrow(COLORS.r);
         const arrowV = createArrow(COLORS.v);
         const arrowThumb = createArrow(COLORS.hand);
-        const arrowNode = createArrow(COLORS.raan);
 
         const barA = createBar(COLORS.a);
         const majorAxis = createBar(COLORS.a);
@@ -366,7 +363,6 @@
         const arcRaan = createArc(COLORS.raan);
         const arcArgp = createArc(COLORS.argp);
         const arcNu = createArc(COLORS.nu);
-        const perigeeSpan = createArc(COLORS.e, { arrowhead: false });
         const northHalf = createArc(COLORS.raan, { arrowhead: false });
         const curlOrbit = createArc(COLORS.hand);
         const curlEarth = createArc(COLORS.hand);
@@ -496,7 +492,6 @@
                 jTip: new THREE.Vector3(0, axisBase * 1.08, 0),
                 kTip: new THREE.Vector3(0, 0, kLength),
                 hTip: W.clone().multiplyScalar(thumbLength),
-                nTip: n ? n.clone().multiplyScalar(Math.max(rNode, SHORTEST_ARROW)) : new THREE.Vector3(),
                 nodePoint: n ? n.clone().multiplyScalar(rNode) : new THREE.Vector3(),
                 curlCenter: W.clone().multiplyScalar(thumbLength * 0.8),
                 curlRadius: thumbLength * 0.18,
@@ -692,11 +687,11 @@
                         swept.push(new THREE.Vector3(Math.cos(angle) * d.arcRadiusRaan, Math.sin(angle) * d.arcRadiusRaan, 0));
                     }
                     const northSide = sampleOrbit(d.thetaNode, d.thetaNode + Math.PI, 16);
-                    return fit(fromAngles(S.raan / 2, 64), [d.iTip, d.nTip, d.kTip, ...swept, ...northSide]);
+                    return fit(fromAngles(S.raan / 2, 64), [d.iTip, d.nodePoint, d.kTip, ...swept, ...northSide]);
                 }
                 case 'argp':
                     if (S.argpUndefined || S.argp < 0.5) return fit(above, d.wholeOrbit);
-                    return fit(above, [...sampleOrbit(-d.argp, 0, 16), d.nTip, d.perigee]);
+                    return fit(above, [...sampleOrbit(-d.argp, 0, 16), d.nodePoint, d.perigee]);
                 case 'nu':
                     if (S.nuUndefined || S.nu < 0.5) return fit(above, d.wholeOrbit);
                     return fit(above, [...sampleOrbit(0, S.nu * D2R, 16), d.r, d.vTip, d.perigee]);
@@ -773,12 +768,11 @@
             placeMarker(markerPerigee, apsisOpacity, d.perigee, 0.46 * sz);
             placeMarker(markerApogee, apsisOpacity, d.apogee, 0.46 * sz);
 
-            // The right hand on the orbit's axis, the equator, and the way to the ascending node
+            // The right hand on the orbit's axis, the equator, and the ascending node
             placeArrow(arrowThumb, parts.thumb, ORIGIN, d.hTip, sz, 1.2);
             drawArc(curlOrbit, parts.curlOrbit, arcKey('curlOrbit'), curl(d.curlCenter, d.curlRadius, d.rHat, d.vDir), sz, null);
             drawArc(curlEarth, parts.curlEarth, arcKey('curlEarth'), curl(d.earthCurlCenter, d.earthCurlRadius, X_AXIS, Y_AXIS), sz, null);
             placeDisc(equatorDisc, parts.equator, d.equatorRadius);
-            placeArrow(arrowNode, parts.node, ORIGIN, d.nTip, sz, 1.2);
             placeMarker(markerNode, parts.node.level * (parts.node.grow > 0.9 ? 1 : 0), d.nodePoint, 0.46 * sz);
 
             // Angles and stretches of the orbit
@@ -796,8 +790,6 @@
             drawArc(arcArgp, parts.arcArgp, arcKey('argp'), (t, out) => d.orbitPoint(-d.argp * (1 - t), out), sz, anchors.argp);
             const nuRad = S.nu * D2R;
             drawArc(arcNu, parts.arcNu, arcKey('nu'), (t, out) => d.orbitPoint(nuRad * t, out), sz, anchors.nu);
-            const span = 28 * D2R;
-            drawArc(perigeeSpan, parts.perigeeSpan, arcKey('span'), (t, out) => d.orbitPoint((2 * t - 1) * span, out), sz, null);
             drawArc(northHalf, parts.northHalf, arcKey('north'), (t, out) => d.orbitPoint(d.thetaNode + t * Math.PI, out), sz, null);
         }
 
