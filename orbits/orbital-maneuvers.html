@@ -62,109 +62,45 @@
             font-size: 0.74rem;
         }
 
-        /* Labels in 3D View */
+        /* Labels in the view, as on the Test 1 Practice page */
         .tool-label { z-index: 1; }
         .tool-label.word { color: var(--text-muted); font-size: 0.72rem; }
-        .tool-label.axis .katex { color: #93c5fd; font-weight: 600; }
 
         .tool-label.measure {
             font-family: var(--font-mono);
-            font-size: 0.78rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            padding: 0.1rem 0.3rem;
-            border-radius: 4px;
-            background: rgba(6, 11, 20, 0.78);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(4px);
+            padding: 0 0.25rem;
+            border-radius: 3px;
+            background: rgba(6, 11, 20, 0.72);
         }
 
-        .tool-label.measure .val {
-            margin-left: 0.35rem;
-            color: #ffffff;
-            font-weight: 400;
-        }
-
+        .tool-label.measure .val { margin-left: 0.35rem; color: #ffffff; }
         .tool-label.measure .val:empty { display: none; }
 
-        /* Playback bar */
-        .playback-bar {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            padding: 0.38rem 0.65rem;
-            background: var(--surface-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            font-size: 0.82rem;
-            margin-bottom: 0.45rem;
-        }
-
-        .btn-play {
-            padding: 0.32rem 0.75rem;
-            font-size: 0.8rem;
-            gap: 0.4rem;
-            min-width: 5.4rem;
-            flex-shrink: 0;
-            cursor: pointer;
-        }
-
-        .playback-btn {
-            background: none;
-            border: 0;
-            color: var(--text-main);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.3rem;
-            border-radius: 4px;
-            transition: color 0.15s, background 0.15s;
-        }
-
-        .playback-btn:hover {
+        .tool-label.axis {
+            z-index: 0;
+            font-size: 1.05rem;
+            padding: 0 0.3rem;
+            border-radius: 3px;
             color: #ffffff;
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(6, 11, 20, 0.72);
         }
 
-        .scrub-slider {
-            flex: 1 1 auto;
-            accent-color: var(--accent-blue);
-            cursor: pointer;
-            height: 6px;
-        }
-
-        .speed-pill {
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            padding: 0.18rem 0.45rem;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.05);
-            cursor: pointer;
-            border: 1px solid var(--border-subtle);
-            transition: color 0.15s, border-color 0.15s;
-        }
-
-        .speed-pill:hover {
-            color: #ffffff;
-            border-color: var(--border-accent);
-        }
+        .tool-label.axis .katex { color: #93c5fd; }
+        .tool-label .katex { font-size: 1.12em; }
 
         /* Controls Panel */
         .controls {
-            padding: 0.75rem 0.9rem;
             display: flex;
             flex-direction: column;
-            gap: 0.45rem;
+            gap: 0.5rem;
         }
 
-        .controls .ctl-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.6rem;
-            margin-top: 0;
-        }
+        #maneuver-type { flex: 1 1 22rem; }
+        .timeline-grow { flex: 3 1 14rem; }
+        .speed-grow { flex: 1 1 7rem; min-width: 7rem; }
+        #btn-play { min-width: 4.6rem; }
 
         .ctl-checks-row {
             padding-top: 0.35rem;
@@ -250,11 +186,6 @@
             font-size: 0.74rem;
         }
 
-        .slider-field input[type="range"] {
-            accent-color: var(--accent-blue);
-            cursor: pointer;
-            width: 100%;
-        }
 
         .earth-radius-hint {
             font-size: 0.7rem;
@@ -317,24 +248,19 @@
         }
 
         .equation-card.active {
-            border-left-color: var(--accent-blue);
-            background: rgba(56, 189, 248, 0.08);
-            border-top-color: rgba(56, 189, 248, 0.3);
-            border-right-color: rgba(56, 189, 248, 0.3);
-            border-bottom-color: rgba(56, 189, 248, 0.3);
+            border-left-color: var(--accent-gold);
+            background: var(--gold-glow);
         }
 
         .eq-title {
-            font-size: 0.76rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            color: var(--text-muted);
+            color: var(--text-main);
             margin-bottom: 0.25rem;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
         }
 
         .equation-card.active .eq-title {
-            color: var(--accent-blue);
+            color: var(--accent-gold);
         }
 
         .eq-sym {
@@ -354,7 +280,7 @@
         }
 
         .eq-res {
-            color: #34d399;
+            color: #ffffff;
             font-weight: 600;
             font-size: 0.88rem;
             overflow-x: auto;
@@ -471,14 +397,14 @@
 
         /* Phone layout */
         @media (max-width: 640px) and (orientation: portrait) {
-            .playback-bar { flex-wrap: wrap; gap: 0.4rem; }
-            #maneuver-type { flex-wrap: wrap; }
+            #maneuver-type { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            #maneuver-type button:nth-child(2) { border-right: 0; }
+            #maneuver-type button:nth-child(-n + 2) { border-bottom: 1px solid var(--border-subtle); }
             .tool-hud { font-size: 0.8rem; min-height: 0; }
             input[type="range"] { min-height: 28px; }
         }
 
         @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-            .playback-bar { flex-wrap: wrap; }
             input[type="range"] { min-height: 28px; }
         }
     </style>
@@ -536,7 +462,7 @@
         <div class="tool-layout">
             <!-- Stage column: 3D View and Controls -->
             <div class="col tool-stage-col">
-                <p class="tool-intro">Move sliders to change a Hohmann transfer, a simple plane change, or a combined plane change, and watch the orbits, velocity vectors, and equations update.</p>
+                <p class="tool-intro">Move the sliders and watch the orbits, burns, and equations change.</p>
 
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view">
@@ -552,7 +478,7 @@
                 <div class="panel controls">
                     <!-- Row 1: Maneuver Type Selector -->
                     <div class="ctl-row">
-                        <div class="segmented compact" id="maneuver-type" role="group" aria-label="Select maneuver category">
+                        <div class="segmented" id="maneuver-type" role="group" aria-label="Select maneuver category">
                             <button type="button" data-type="hohmann" aria-pressed="true">Hohmann</button>
                             <button type="button" data-type="inclination" aria-pressed="false">Inclination</button>
                             <button type="button" data-type="polar_raan" aria-pressed="false">Polar RAAN</button>
@@ -561,23 +487,26 @@
                         <button type="button" class="btn btn-sm" id="btn-reset-values" title="Restore default slider values for current maneuver">Reset Values</button>
                     </div>
 
-                    <!-- Row 2: Playback Timeline -->
-                    <div class="playback-bar" id="playback-bar">
-                        <button type="button" class="btn btn-sm btn-play primary" id="btn-play" title="Pause animation" aria-label="Pause animation">
-                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" id="icon-play" aria-hidden="true">
-                                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
-                                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
-                            </svg>
-                            <span id="text-play">Pause</span>
-                        </button>
-                        <button type="button" class="playback-btn" id="btn-rewind" title="Restart timeline" aria-label="Restart timeline">
-                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                                <polygon points="11 19 2 12 11 5 11 19"></polygon>
-                                <polygon points="22 19 13 12 22 5 22 19"></polygon>
-                            </svg>
-                        </button>
-                        <input type="range" class="scrub-slider" id="timeline-slider" min="0" max="1000" value="0" aria-label="Scrub maneuver animation timeline">
-                        <button type="button" class="speed-pill" id="btn-speed" title="Toggle animation speed">1.0x</button>
+                    <!-- Row 2: Playback -->
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button type="button" class="btn primary" id="btn-play">Pause</button>
+                            <button type="button" class="btn" id="btn-rewind">Restart</button>
+                        </div>
+                        <div class="ctl-grow timeline-grow">
+                            <div class="control-label">
+                                <label for="timeline-slider">Timeline</label>
+                                <span class="control-value" id="timeline-value"></span>
+                            </div>
+                            <input type="range" id="timeline-slider" min="0" max="1000" value="0">
+                        </div>
+                        <div class="ctl-grow speed-grow">
+                            <div class="control-label">
+                                <label for="speed">Speed</label>
+                                <span class="control-value" id="speed-value">Normal</span>
+                            </div>
+                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                        </div>
                     </div>
 
                     <!-- Row 3: Sliders per Maneuver Type -->

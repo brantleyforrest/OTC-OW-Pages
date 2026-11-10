@@ -32,6 +32,10 @@
     const fmtKms = (v) => `${Number(v).toFixed(3)} km/s`;
     const fmtMs = (v) => `${Math.round(Number(v) * 1000).toLocaleString('en-US')} m/s`;
     const fmtDeg = (v) => `${Number(v).toFixed(1)}°`;
+    // The same, for use inside TeX, where units are upright text
+    const kmsTex = (v) => `${Number(v).toFixed(3)}\\text{ km/s}`;
+    const msTex = (v) => `${Math.round(Number(v) * 1000).toLocaleString('en-US')}\\text{ m/s}`;
+    const degTex = (v) => `${Number(v).toFixed(1)}°`;
 
     function formatHms(seconds) {
         const total = Math.max(0, Math.round(seconds));
@@ -58,8 +62,9 @@
         type: 'hohmann',
         values: JSON.parse(JSON.stringify(DEFAULTS)),
         playing: !Kit.prefersReducedMotion(),
-        speedIndex: 1, // 0: 0.5x, 1: 1.0x, 2: 2.0x
-        speeds: [0.5, 1.0, 2.0],
+        speedIndex: 1,
+        speeds: [{ rate: 0.5, label: 'Slow' }, { rate: 1, label: 'Normal' }, { rate: 2, label: 'Fast' }],
+        endHold: 0,
         timeline: 0,
         draggingTimeline: false,
         activePhase: '',
@@ -175,11 +180,11 @@
     /* ------------------------------------------------------------------ */
     const typeButtons = document.querySelectorAll('#maneuver-type button');
     const btnPlay = $('btn-play');
-    const iconPlay = $('icon-play');
-    const textPlay = $('text-play');
     const btnRewind = $('btn-rewind');
     const timelineSlider = $('timeline-slider');
-    const btnSpeed = $('btn-speed');
+    const timelineValueEl = $('timeline-value');
+    const speedSlider = $('speed');
+    const speedValueEl = $('speed-value');
     const btnResetValues = $('btn-reset-values');
     const slidersContainer = $('sliders-container');
 
@@ -226,12 +231,12 @@
             $('sl-r1').addEventListener('input', (e) => {
                 vals.R1 = Number(e.target.value);
                 $('val-r1').textContent = fmtKm(vals.R1);
-                updateAll();
+                scheduleUpdate();
             });
             $('sl-r2').addEventListener('input', (e) => {
                 vals.R2 = Number(e.target.value);
                 $('val-r2').textContent = fmtKm(vals.R2);
-                updateAll();
+                scheduleUpdate();
             });
             const leoGeoBtn = $('btn-leo-geo');
             if (leoGeoBtn) {
@@ -289,7 +294,7 @@
                 $(id).addEventListener('input', (e) => {
                     vals[key] = Number(e.target.value);
                     $(valId).textContent = fmt(vals[key]);
-                    updateAll();
+                    scheduleUpdate();
                 });
             };
             bind('sl-r', 'val-r', 'r', fmtKm);
@@ -341,7 +346,7 @@
                 $(id).addEventListener('input', (e) => {
                     vals[key] = Number(e.target.value);
                     $(valId).textContent = fmt(vals[key]);
-                    updateAll();
+                    scheduleUpdate();
                 });
             };
             bind('sl-r', 'val-r', 'r', fmtKm);
@@ -394,7 +399,7 @@
                 $(id).addEventListener('input', (e) => {
                     vals[key] = Number(e.target.value);
                     $(valId).textContent = fmt(vals[key]);
-                    updateAll();
+                    scheduleUpdate();
                 });
             };
             bind('sl-r1', 'val-r1', 'R1', fmtKm);
@@ -429,8 +434,8 @@
         const type = model.type;
         const math = MathRenderer.math;
 
-        const card = (key, title, sym, num, res, targetT = 0) => `
-            <div class="equation-card ${state.activePhase === key ? 'active' : ''}" data-key="${key}" data-target-t="${targetT}">
+        const card = (key, title, sym, num, res) => `
+            <div class="equation-card ${state.activePhase === key ? 'active' : ''}" data-key="${key}" data-target-t="${timeForCard(model, key)}">
                 <div class="eq-title">${title}</div>
                 <div class="eq-sym">${math(sym)}</div>
                 <div class="eq-num">${math(num)}</div>
@@ -458,7 +463,7 @@
                 'Circular Speeds',
                 `\\textcolor{${C_O1}}{V_1} = \\sqrt{\\frac{\\mu}{\\textcolor{${C_O1}}{R_1}}}, \\quad \\textcolor{${C_O2}}{V_2} = \\sqrt{\\frac{\\mu}{\\textcolor{${C_O2}}{R_2}}}`,
                 `= \\sqrt{\\frac{398{,}600.44}{\\textcolor{${C_O1}}{${Math.round(R1).toLocaleString('en-US')}}}}, \\quad \\sqrt{\\frac{398{,}600.44}{\\textcolor{${C_O2}}{${Math.round(R2).toLocaleString('en-US')}}}}`,
-                `= \\textcolor{${C_O1}}{${fmtKms(v1)}}, \\quad \\textcolor{${C_O2}}{${fmtKms(v2)}}`,
+                `= \\textcolor{${C_O1}}{${kmsTex(v1)}}, \\quad \\textcolor{${C_O2}}{${kmsTex(v2)}}`,
                 0.0
             );
 
@@ -467,7 +472,7 @@
                 'Transfer Speeds (Vis-Viva)',
                 `\\textcolor{${C_TX}}{V_{\\text{tx}_1}} = \\sqrt{\\mu\\left(\\frac{2}{\\textcolor{${C_O1}}{R_1}} - \\frac{1}{\\textcolor{${C_TX}}{a_{\\text{tx}}}}\\right)}, \\quad \\textcolor{${C_TX}}{V_{\\text{tx}_2}} = \\sqrt{\\mu\\left(\\frac{2}{\\textcolor{${C_O2}}{R_2}} - \\frac{1}{\\textcolor{${C_TX}}{a_{\\text{tx}}}}\\right)}`,
                 `= \\sqrt{398{,}600.44\\left(\\frac{2}{${Math.round(R1).toLocaleString('en-US')}} - \\frac{1}{${Math.round(a_tx).toLocaleString('en-US')}}\\right)}, \\; \\dots`,
-                `= \\textcolor{${C_TX}}{${fmtKms(v_tx1)}}, \\quad \\textcolor{${C_TX}}{${fmtKms(v_tx2)}}`,
+                `= \\textcolor{${C_TX}}{${kmsTex(v_tx1)}}, \\quad \\textcolor{${C_TX}}{${kmsTex(v_tx2)}}`,
                 0.22
             );
 
@@ -476,7 +481,7 @@
                 'Burn 1 Impulse (ΔV₁)',
                 `\\textcolor{${C_DV}}{\\Delta V_1} = |\\textcolor{${C_TX}}{V_{\\text{tx}_1}} - \\textcolor{${C_O1}}{V_1}|`,
                 `= |\\textcolor{${C_TX}}{${v_tx1.toFixed(3)}} - \\textcolor{${C_O1}}{${v1.toFixed(3)}}|`,
-                `= \\textcolor{${C_DV}}{${fmtKms(dv1)}} \\; (${fmtMs(dv1)})`,
+                `= \\textcolor{${C_DV}}{${kmsTex(dv1)}} \\; (${msTex(dv1)})`,
                 0.22
             );
 
@@ -485,7 +490,7 @@
                 'Burn 2 Impulse (ΔV₂)',
                 `\\textcolor{${C_DV}}{\\Delta V_2} = |\\textcolor{${C_O2}}{V_2} - \\textcolor{${C_TX}}{V_{\\text{tx}_2}}|`,
                 `= |\\textcolor{${C_O2}}{${v2.toFixed(3)}} - \\textcolor{${C_TX}}{${v_tx2.toFixed(3)}}|`,
-                `= \\textcolor{${C_DV}}{${fmtKms(dv2)}} \\; (${fmtMs(dv2)})`,
+                `= \\textcolor{${C_DV}}{${kmsTex(dv2)}} \\; (${msTex(dv2)})`,
                 0.77
             );
 
@@ -494,7 +499,7 @@
                 'Total Maneuver Delta-V',
                 `\\textcolor{${C_DV}}{\\Delta V_{\\text{total}}} = \\textcolor{${C_DV}}{\\Delta V_1} + \\textcolor{${C_DV}}{\\Delta V_2}`,
                 `= \\textcolor{${C_DV}}{${dv1.toFixed(3)}} + \\textcolor{${C_DV}}{${dv2.toFixed(3)}}`,
-                `= \\textcolor{${C_DV}}{${fmtKms(dv_total)}} \\; (${fmtMs(dv_total)})`,
+                `= \\textcolor{${C_DV}}{${kmsTex(dv_total)}} \\; (${msTex(dv_total)})`,
                 0.85
             );
 
@@ -518,7 +523,7 @@
                 'Circular Orbital Speed',
                 `\\textcolor{${C_O1}}{V} = \\sqrt{\\frac{\\mu}{\\textcolor{${C_O1}}{r}}}`,
                 `= \\sqrt{\\frac{398{,}600.44}{\\textcolor{${C_O1}}{${Math.round(r).toLocaleString('en-US')}}}}`,
-                `= \\textcolor{${C_O1}}{${fmtKms(v)}}`,
+                `= \\textcolor{${C_O1}}{${kmsTex(v)}}`,
                 0.0
             );
 
@@ -527,7 +532,7 @@
                 'Plane Change Angle (Δθ)',
                 isPolar ? `\\textcolor{${C_TH}}{\\Delta \\theta} = |\\textcolor{${C_O2}}{\\Omega_2} - \\textcolor{${C_O1}}{\\Omega_1}|` : `\\textcolor{${C_TH}}{\\Delta \\theta} = |\\textcolor{${C_O2}}{i_2} - \\textcolor{${C_O1}}{i_1}|`,
                 isPolar ? `= |\\textcolor{${C_O2}}{${model.raan2.toFixed(1)}^\\circ} - \\textcolor{${C_O1}}{${model.raan1.toFixed(1)}^\\circ}|` : `= |\\textcolor{${C_O2}}{${model.i2.toFixed(1)}^\\circ} - \\textcolor{${C_O1}}{${model.i1.toFixed(1)}^\\circ}|`,
-                `= \\textcolor{${C_TH}}{${fmtDeg(delta_theta)}}`,
+                `= \\textcolor{${C_TH}}{${degTex(delta_theta)}}`,
                 0.0
             );
 
@@ -536,14 +541,14 @@
                 'Required Delta-V Impulse',
                 `\\textcolor{${C_DV}}{\\Delta V} = 2 \\textcolor{${C_O1}}{V} \\sin\\left(\\frac{\\textcolor{${C_TH}}{\\Delta \\theta}}{2}\\right)`,
                 `= 2 (\\textcolor{${C_O1}}{${v.toFixed(3)}}) \\sin\\left(\\frac{\\textcolor{${C_TH}}{${delta_theta.toFixed(1)}^\\circ}}{2}\\right)`,
-                `= \\textcolor{${C_DV}}{${fmtKms(dv)}} \\; (${fmtMs(dv)})`,
+                `= \\textcolor{${C_DV}}{${kmsTex(dv)}} \\; (${msTex(dv)})`,
                 0.48
             );
 
             html += card(
                 'location',
                 'Burn Location & Timing',
-                `\\text{Target: } \\textcolor{${C_TH}}{${burnSite}}, \\quad \\textcolor{${C_TM}}{\\Delta u} = \\textcolor{${C_TH}}{u_{\\text{burn}}} - u_{\\text{sc}}`,
+                `\\text{Target: } \\textcolor{${C_TH}}{\\text{${burnSite}}}, \\quad \\textcolor{${C_TM}}{\\Delta u} = \\textcolor{${C_TH}}{u_{\\text{burn}}} - u_{\\text{sc}}`,
                 `= \\textcolor{${C_TM}}{${Math.round(deltaU)}^\\circ} \\text{ travel angle}`,
                 `\\textcolor{${C_TM}}{t_{\\text{burn}}} = \\left(\\frac{\\textcolor{${C_TM}}{${Math.round(deltaU)}^\\circ}}{360^\\circ}\\right)(${period_min.toFixed(1)}\\text{ min}) = \\textcolor{${C_TM}}{${time_to_burn_min.toFixed(1)}\\text{ min}}`,
                 0.0
@@ -573,40 +578,61 @@
                 0.0
             );
 
-            // Combined burn equation
-            const combBurnNum = planeChangeLocation === 'lower' ? (isRaise ? 1 : 2) : (isRaise ? 2 : 1);
-            const vi = combBurnNum === 1 ? (isRaise ? v1 : v_tx1) : (isRaise ? v_tx2 : v_tx2);
-            const vf = combBurnNum === 1 ? (isRaise ? v_tx1 : v1) : (isRaise ? v2 : v2);
+            // Speeds before and after each burn
+            const burnSpeeds = { 1: [v1, v_tx1, 'V_1', 'V_{tx_1}'], 2: [v_tx2, v2, 'V_{tx_2}', 'V_2'] };
+            const plainCard = (n, value) => {
+                const [vi, vf, si, sf] = burnSpeeds[n];
+                html += card(
+                    `plain_burn_${n}`,
+                    `Burn ${n}, Same Plane (ΔV${n === 1 ? '₁' : '₂'})`,
+                    `\\textcolor{${C_DV}}{\\Delta V_${n}} = |${sf} - ${si}|`,
+                    `= |${vf.toFixed(3)} - ${vi.toFixed(3)}|`,
+                    `= \\textcolor{${C_DV}}{${kmsTex(value)}} \\; (${msTex(value)})`
+                );
+            };
 
-            html += card(
-                'comb_burn',
-                `Combined Burn (${combBurnNum === 1 ? 'Burn 1' : 'Burn 2'})`,
-                `\\textcolor{${C_DV}}{\\Delta V} = \\sqrt{V_{\\text{initial}}^2 + V_{\\text{final}}^2 - 2 V_{\\text{initial}} V_{\\text{final}} \\cos\\textcolor{${C_TH}}{\\Delta\\theta}}`,
-                `= \\sqrt{(${vi.toFixed(3)})^2 + (${vf.toFixed(3)})^2 - 2(${vi.toFixed(3)})(${vf.toFixed(3)})\\cos(\\textcolor{${C_TH}}{${theta}^\\circ})}`,
-                `= \\textcolor{${C_DV}}{${fmtKms(combBurnNum === 1 ? dv1 : dv2)}} \\; (${fmtMs(combBurnNum === 1 ? dv1 : dv2)})`,
-                combBurnNum === 1 ? 0.22 : 0.77
-            );
-
-            // Plain burn
-            const plainBurnNum = combBurnNum === 1 ? 2 : 1;
-            const plainVal = plainBurnNum === 1 ? dv1 : dv2;
-            html += card(
-                'plain_burn',
-                `Coplanar Burn (${plainBurnNum === 1 ? 'Burn 1' : 'Burn 2'})`,
-                `\\textcolor{${C_DV}}{\\Delta V} = |V_{\\text{final}} - V_{\\text{initial}}|`,
-                `= |${(plainBurnNum === 1 ? (isRaise ? v_tx1 : v1) : (isRaise ? v2 : v_tx2)).toFixed(3)} - ${(plainBurnNum === 1 ? (isRaise ? v1 : v_tx1) : (isRaise ? v_tx2 : v2)).toFixed(3)}|`,
-                `= \\textcolor{${C_DV}}{${fmtKms(plainVal)}} \\; (${fmtMs(plainVal)})`,
-                plainBurnNum === 1 ? 0.22 : 0.77
-            );
-
-            html += card(
-                'dv_total',
-                'Total Maneuver Delta-V',
-                `\\textcolor{${C_DV}}{\\Delta V_{\\text{total}}} = \\textcolor{${C_DV}}{\\Delta V_1} + \\textcolor{${C_DV}}{\\Delta V_2}`,
-                `= \\textcolor{${C_DV}}{${dv1.toFixed(3)}} + \\textcolor{${C_DV}}{${dv2.toFixed(3)}}`,
-                `= \\textcolor{${C_DV}}{${fmtKms(dv_total)}} \\; (${fmtMs(dv_total)})`,
-                0.85
-            );
+            if (planeChangeLocation === 'separate') {
+                // A Hohmann transfer, then a simple plane change at the higher orbit
+                const vHigh = isRaise ? v2 : v1;
+                const dv3 = 2 * vHigh * Math.sin((delta_theta / 2) * D2R);
+                plainCard(1, dv1);
+                plainCard(2, dv2);
+                html += card(
+                    'comb_burn',
+                    'Plane Change at the Higher Orbit (ΔV₃)',
+                    `\\textcolor{${C_DV}}{\\Delta V_3} = 2 V \\sin\\left(\\frac{\\textcolor{${C_TH}}{\\Delta \\theta}}{2}\\right)`,
+                    `= 2 (${vHigh.toFixed(3)}) \\sin\\left(\\frac{\\textcolor{${C_TH}}{${theta}^\\circ}}{2}\\right)`,
+                    `= \\textcolor{${C_DV}}{${kmsTex(dv3)}} \\; (${msTex(dv3)})`
+                );
+                html += card(
+                    'dv_total',
+                    'Total Maneuver Delta-V',
+                    `\\textcolor{${C_DV}}{\\Delta V_{\\text{total}}} = \\textcolor{${C_DV}}{\\Delta V_1} + \\textcolor{${C_DV}}{\\Delta V_2} + \\textcolor{${C_DV}}{\\Delta V_3}`,
+                    `= ${dv1.toFixed(3)} + ${dv2.toFixed(3)} + ${dv3.toFixed(3)}`,
+                    `= \\textcolor{${C_DV}}{${kmsTex(dv_total)}} \\; (${msTex(dv_total)})`
+                );
+            } else {
+                // The burn that also turns the plane uses the law of cosines.
+                const combBurnNum = planeChangeLocation === 'lower' ? (isRaise ? 1 : 2) : (isRaise ? 2 : 1);
+                const [vi, vf, si, sf] = burnSpeeds[combBurnNum];
+                const combValue = combBurnNum === 1 ? dv1 : dv2;
+                html += card(
+                    'comb_burn',
+                    `Burn ${combBurnNum}, Combined (ΔV${combBurnNum === 1 ? '₁' : '₂'})`,
+                    `\\textcolor{${C_DV}}{\\Delta V_${combBurnNum}} = \\sqrt{${si}^2 + ${sf}^2 - 2 ${si} ${sf} \\cos\\textcolor{${C_TH}}{\\Delta\\theta}}`,
+                    `= \\sqrt{(${vi.toFixed(3)})^2 + (${vf.toFixed(3)})^2 - 2(${vi.toFixed(3)})(${vf.toFixed(3)})\\cos(\\textcolor{${C_TH}}{${theta}^\\circ})}`,
+                    `= \\textcolor{${C_DV}}{${kmsTex(combValue)}} \\; (${msTex(combValue)})`
+                );
+                const plainNum = combBurnNum === 1 ? 2 : 1;
+                plainCard(plainNum, plainNum === 1 ? dv1 : dv2);
+                html += card(
+                    'dv_total',
+                    'Total Maneuver Delta-V',
+                    `\\textcolor{${C_DV}}{\\Delta V_{\\text{total}}} = \\textcolor{${C_DV}}{\\Delta V_1} + \\textcolor{${C_DV}}{\\Delta V_2}`,
+                    `= \\textcolor{${C_DV}}{${dv1.toFixed(3)}} + \\textcolor{${C_DV}}{${dv2.toFixed(3)}}`,
+                    `= \\textcolor{${C_DV}}{${kmsTex(dv_total)}} \\; (${msTex(dv_total)})`
+                );
+            }
 
             html += card(
                 'tof',
@@ -623,11 +649,10 @@
         // Card click jumpers
         equationCardsEl.querySelectorAll('.equation-card').forEach((cardEl) => {
             cardEl.addEventListener('click', () => {
-                const targetT = Number(cardEl.dataset.targetT || 0);
-                state.timeline = targetT;
-                timelineSlider.value = Math.round(targetT * 1000);
-                if (sceneController) sceneController.setTime(targetT);
-                updateHudAndHighlight();
+                // Pauses on the part of the maneuver this equation describes.
+                setPlaying(false);
+                state.endHold = 0;
+                setTimeline(Number(cardEl.dataset.targetT || 0));
             });
         });
     }
@@ -866,84 +891,91 @@
     /* ------------------------------------------------------------------ */
     /* HUD & Active Phase Highlighting                                    */
     /* ------------------------------------------------------------------ */
+    // The timeline is shared with the scene, so that the caption and the picture agree.
+    const Timeline = window.ManeuverScene;
+
+    const PHASE_NAMES = {
+        transfer: { coast1: 'Initial orbit', burn1: 'Burn 1', transfer: 'Transfer', burn2: 'Burn 2', burn3: 'Plane change', coast2: 'Target orbit' },
+        plane: { coast1: 'Coast to burn', burn: 'Burn', coast2: 'New orbit' }
+    };
+
+    function phaseName(m, key) {
+        if (m.type === 'hohmann' && m.R1 === m.R2) return 'Initial orbit';
+        if ((m.type === 'inclination' || m.type === 'polar_raan') && m.delta_theta < 0.01) return 'Coast';
+        const family = m.type === 'hohmann' || m.type === 'combined' ? 'transfer' : 'plane';
+        return PHASE_NAMES[family][key] || '';
+    }
+
+    function speedChange(raise, where) {
+        return raise
+            ? `A prograde burn at ${where} speeds the spacecraft up.`
+            : `A retrograde burn at ${where} slows the spacecraft down.`;
+    }
+
+    // The caption under the view, and the equation that goes with it, for the current phase.
+    function phaseText(m, key) {
+        if (m.type === 'hohmann' || m.type === 'combined') {
+            if (m.R1 === m.R2) return { hud: 'R₁ and R₂ are the same, so no transfer is needed.', card: 'atx' };
+            const combined = m.type === 'combined';
+            const turn = Timeline.planeBurn(m);
+            switch (key) {
+                case 'coast1': return { hud: `<b>Initial orbit.</b> The spacecraft coasts on R₁${combined ? ' at i₁' : ''} toward the first burn.`, card: combined ? 'speeds' : 'v_circ' };
+                case 'burn1': return turn === 'burn1'
+                    ? { hud: '<b>Burn 1, combined.</b> This burn also turns the velocity into the new plane.', card: 'comb_burn' }
+                    : { hud: `<b>Burn 1.</b> ${speedChange(m.isRaise, 'R₁')}`, card: combined ? 'plain_burn_1' : 'dv1' };
+                case 'transfer': return { hud: '<b>Transfer.</b> The spacecraft flies half of the transfer ellipse. It moves fastest near perigee.', card: 'tof' };
+                case 'burn2': return turn === 'burn2'
+                    ? { hud: '<b>Burn 2, combined.</b> This burn also turns the velocity into the new plane.', card: 'comb_burn' }
+                    : { hud: `<b>Burn 2.</b> ${speedChange(m.isRaise, 'R₂')}`, card: combined ? 'plain_burn_2' : 'dv2' };
+                case 'burn3': return { hud: '<b>Plane change.</b> A separate burn at the higher orbit turns the velocity into the new plane.', card: 'comb_burn' };
+                default: return { hud: `<b>Target orbit.</b> The spacecraft is now on R₂${combined ? ' at i₂' : ''}.`, card: 'dv_total' };
+            }
+        }
+        const polar = m.type === 'polar_raan';
+        if (m.delta_theta < 0.01) return { hud: 'The planes match, so no burn is needed.', card: 'angle' };
+        const site = polar ? 'pole' : 'node';
+        const du = Math.round(polar ? m.delta_u_to_pole : m.delta_u_to_node);
+        switch (key) {
+            case 'coast1': return { hud: `<b>Coast.</b> The spacecraft travels Δu = ${du}° to the next ${site}, where the two orbits cross.`, card: 'location' };
+            case 'burn': return { hud: '<b>Burn.</b> The velocity turns by Δθ into the new plane. Its length does not change.', card: 'dv' };
+            default: return { hud: `<b>New orbit.</b> The spacecraft continues in the new plane, at the same speed.`, card: 'angle' };
+        }
+    }
+
+    // A time on the timeline that shows the given equation card.
+    function timeForCard(m, cardKey) {
+        const list = Timeline.segments(m);
+        const at = (seg, k = 0.5) => {
+            const s = list.find((x) => x.key === seg);
+            return s ? s.from + (s.to - s.from) * k : 0;
+        };
+        const turn = Timeline.planeBurn(m);
+        switch (cardKey) {
+            case 'v_circ': case 'speeds': case 'location': return at('coast1', 0.4);
+            case 'atx': case 'tof': return at('transfer');
+            case 'v_tx': case 'dv1': case 'plain_burn_1': return at('burn1', 0.9);
+            case 'dv2': case 'plain_burn_2': return at('burn2', 0.9);
+            case 'comb_burn': return at(turn || 'burn2', 0.9);
+            case 'angle': case 'dv': return at('burn', 0.9);
+            case 'dv_total': return at('coast2', 0.3);
+            default: return 0;
+        }
+    }
+
     function updateHudAndHighlight() {
         if (!currentSolved) return;
         const m = currentSolved;
-        const t = state.timeline;
-        let hudText = '';
-        let phase = '';
-
-        if (m.type === 'hohmann') {
-            if (m.R1 === m.R2) {
-                hudText = 'No transfer needed: initial and target orbits have identical radii.';
-                phase = 'atx';
-            } else if (t < 0.20) {
-                hudText = `Coasting on initial orbit (R₁ = ${fmtKm(m.R1)}) toward the first burn point.`;
-                phase = 'v_circ';
-            } else if (t < 0.25) {
-                hudText = m.isRaise
-                    ? `Burn 1: A prograde burn of ΔV₁ = ${fmtKms(m.dv1)} speeds the spacecraft onto the transfer ellipse.`
-                    : `Burn 1: A retrograde burn of ΔV₁ = ${fmtKms(m.dv1)} slows the spacecraft onto the transfer ellipse.`;
-                phase = 'dv1';
-            } else if (t < 0.75) {
-                hudText = `Transferring: Spacecraft flies half an ellipse connecting R₁ and R₂ (TOF = ${m.tof_min.toFixed(1)} min).`;
-                phase = 'tof';
-            } else if (t < 0.80) {
-                hudText = m.isRaise
-                    ? `Burn 2: A prograde burn of ΔV₂ = ${fmtKms(m.dv2)} circularizes the orbit at R₂ = ${fmtKm(m.R2)}.`
-                    : `Burn 2: A retrograde burn of ΔV₂ = ${fmtKms(m.dv2)} circularizes the orbit at R₂ = ${fmtKm(m.R2)}.`;
-                phase = 'dv2';
-            } else {
-                hudText = `Coasting on target circular orbit (R₂ = ${fmtKm(m.R2)}). Total ΔV: ${fmtKms(m.dv_total)}.`;
-                phase = 'dv_total';
+        const phase = Timeline.phaseAt(m, state.timeline);
+        const text = phaseText(m, phase.key);
+        if (hudEl && hudEl.innerHTML !== text.hud) hudEl.innerHTML = text.hud;
+        if (timelineValueEl) timelineValueEl.textContent = phaseName(m, phase.key);
+        if (state.activePhase !== text.card) {
+            state.activePhase = text.card;
+            if (equationCardsEl) {
+                equationCardsEl.querySelectorAll('.equation-card').forEach((card) => {
+                    card.classList.toggle('active', card.dataset.key === text.card);
+                });
             }
-        } else if (m.type === 'inclination' || m.type === 'polar_raan') {
-            const isPolar = m.type === 'polar_raan';
-            const site = isPolar ? m.next_pole : m.next_node;
-            if (m.delta_theta < 0.01) {
-                hudText = 'The planes match, so no burn is needed.';
-                phase = 'angle';
-            } else if (t < 0.45) {
-                hudText = `Coasting from position u = ${Math.round(m.u_sc)}° to the burn point at ${site} (Δu = ${Math.round(isPolar ? m.delta_u_to_pole : m.delta_u_to_node)}°).`;
-                phase = 'location';
-            } else if (t < 0.55) {
-                hudText = `Engine firing at ${site}: ΔV = ${fmtKms(m.dv)} turns the velocity vector by Δθ = ${fmtDeg(m.delta_theta)}.`;
-                phase = 'dv';
-            } else {
-                hudText = `Coasting on new orbit plane (${isPolar ? `Ω₂ = ${fmtDeg(m.raan2)}` : `i₂ = ${fmtDeg(m.i2)}`}).`;
-                phase = 'v_circ';
-            }
-        } else if (m.type === 'combined') {
-            const loc = m.planeChangeLocation;
-            if (t < 0.20) {
-                hudText = `Coasting on initial orbit (R₁ = ${fmtKm(m.R1)}, i₁ = ${fmtDeg(m.i1)}) toward burn 1.`;
-                phase = 'speeds';
-            } else if (t < 0.25) {
-                hudText = loc === 'lower'
-                    ? `Burn 1: Combined injection + plane change at lower orbit (ΔV₁ = ${fmtKms(m.dv1)}).`
-                    : `Burn 1: Coplanar Hohmann injection into transfer orbit (ΔV₁ = ${fmtKms(m.dv1)}).`;
-                phase = loc === 'lower' ? 'comb_burn' : 'plain_burn';
-            } else if (t < 0.75) {
-                hudText = `Transferring: Flying elliptical transfer arc to R₂ (TOF = ${m.tof_min.toFixed(1)} min).`;
-                phase = 'tof';
-            } else if (t < 0.80) {
-                hudText = loc === 'higher'
-                    ? `Burn 2: Combined circularization + plane change at higher orbit (ΔV₂ = ${fmtKms(m.dv2)}).`
-                    : `Burn 2: Coplanar circularization at R₂ (ΔV₂ = ${fmtKms(m.dv2)}).`;
-                phase = loc === 'higher' ? 'comb_burn' : 'plain_burn';
-            } else {
-                hudText = `Coasting on final target orbit (R₂ = ${fmtKm(m.R2)}, i₂ = ${fmtDeg(m.i2)}). Total cost: ${fmtKms(m.dv_total)}.`;
-                phase = 'dv_total';
-            }
-        }
-
-        if (hudEl) hudEl.textContent = hudText;
-        state.activePhase = phase;
-
-        if (equationCardsEl) {
-            equationCardsEl.querySelectorAll('.equation-card').forEach((card) => {
-                card.classList.toggle('active', card.dataset.key === phase);
-            });
         }
     }
 
@@ -971,29 +1003,37 @@
     /* ------------------------------------------------------------------ */
     /* Playback & Animation Loop                                          */
     /* ------------------------------------------------------------------ */
-    let lastAnimTime = performance.now();
+    const CYCLE_SECONDS = 14;   // One pass through the maneuver at Normal speed
+    const END_HOLD = 1.2;       // Pause at the end before starting again, in seconds
 
-    function animLoop(now) {
-        requestAnimationFrame(animLoop);
-        const dt = Math.min(0.1, (now - lastAnimTime) / 1000);
-        lastAnimTime = now;
-
-        if (state.playing && !state.draggingTimeline) {
-            const speed = state.speeds[state.speedIndex];
-            // One full cycle takes ~14 seconds at 1.0x
-            const rate = (1 / 14) * speed;
-            state.timeline += dt * rate;
-            if (state.timeline >= 1.0) {
-                state.timeline = 0.0;
-            }
-            timelineSlider.value = Math.round(state.timeline * 1000);
-            if (sceneController) {
-                sceneController.setTime(state.timeline);
-            }
-            updateHudAndHighlight();
-        }
+    function setTimeline(t) {
+        state.timeline = Math.max(0, Math.min(1, t));
+        timelineSlider.value = Math.round(state.timeline * 1000);
+        if (sceneController) sceneController.setTime(state.timeline);
+        updateHudAndHighlight();
     }
-    requestAnimationFrame(animLoop);
+
+    // Slider changes are applied once per frame, because the equations are slow to redraw.
+    let updatePending = false;
+    function scheduleUpdate() {
+        updatePending = true;
+    }
+
+    Kit.startLoop((dt) => {
+        if (updatePending) {
+            updatePending = false;
+            updateAll();
+        }
+        if (!state.playing || state.draggingTimeline) return;
+        if (state.timeline >= 1) {
+            state.endHold += dt;
+            if (state.endHold < END_HOLD) return;
+            state.endHold = 0;
+            setTimeline(0);
+            return;
+        }
+        setTimeline(state.timeline + (dt * state.speeds[state.speedIndex].rate) / CYCLE_SECONDS);
+    });
 
     /* ------------------------------------------------------------------ */
     /* UI Event Bindings                                                  */
@@ -1018,18 +1058,14 @@
     });
 
     // Play/Pause state and alternation
+    // The button names what it will do: Pause while playing, Play while paused.
     function setPlaying(val) {
         state.playing = Boolean(val);
-        btnPlay.classList.toggle('primary', state.playing);
-        btnPlay.title = state.playing ? 'Pause animation' : 'Play animation';
-        btnPlay.setAttribute('aria-label', state.playing ? 'Pause animation' : 'Play animation');
-        if (iconPlay) {
-            iconPlay.innerHTML = state.playing
-                ? '<rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect>'
-                : '<polygon points="7 4 19 12 7 20 7 4"></polygon>';
-        }
-        if (textPlay) {
-            textPlay.textContent = state.playing ? 'Pause' : 'Play';
+        btnPlay.textContent = state.playing ? 'Pause' : 'Play';
+        // Playing from the end starts the maneuver again.
+        if (state.playing && state.timeline >= 1) {
+            state.endHold = 0;
+            setTimeline(0);
         }
     }
 
@@ -1037,19 +1073,15 @@
         setPlaying(!state.playing);
     });
 
-    // Rewind / Restart
     btnRewind.addEventListener('click', () => {
-        state.timeline = 0;
-        timelineSlider.value = 0;
-        if (sceneController) sceneController.setTime(0);
-        updateHudAndHighlight();
+        state.endHold = 0;
+        setTimeline(0);
     });
 
     // Scrub slider
     timelineSlider.addEventListener('input', (e) => {
-        state.timeline = Number(e.target.value) / 1000;
-        if (sceneController) sceneController.setTime(state.timeline);
-        updateHudAndHighlight();
+        state.endHold = 0;
+        setTimeline(Number(e.target.value) / 1000);
     });
 
     timelineSlider.addEventListener('pointerdown', () => {
@@ -1060,11 +1092,9 @@
     window.addEventListener('pointerup', stopDrag);
     window.addEventListener('pointercancel', stopDrag);
 
-    // Speed toggle
-    btnSpeed.addEventListener('click', () => {
-        state.speedIndex = (state.speedIndex + 1) % state.speeds.length;
-        const spd = state.speeds[state.speedIndex];
-        btnSpeed.textContent = `${spd.toFixed(1)}x`;
+    speedSlider.addEventListener('input', () => {
+        state.speedIndex = Number(speedSlider.value);
+        speedValueEl.textContent = state.speeds[state.speedIndex].label;
     });
 
     // Checkboxes
