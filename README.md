@@ -26,11 +26,10 @@ The web portal is established at `index.html`. The following tools are available
 * **[Orbital Equation Explorer](orbits/orbit-equation.html):** A 3D view of an orbit around Earth, with each parameter of the orbit equation set by hand or animated through its range.
 * **[Ground Track Visualizer](orbits/ground-track.html):** A split view of an orbit in 3D and its ground track on a world map.
 * **[Sun-Synchronous Orbit](orbits/sun-synchronous.html):** A 3D view of a year of orbit motion, comparing a sun-synchronous orbit with a polar orbit.
-* **[Orbital Maneuvers Visualizer & Practice](practice/maneuvers-practice.html):** A 3D interactive visualization, step-by-step math walkthrough, and practice suite for Hohmann transfers, simple plane changes (inclination and polar RAAN), and combined plane changes.
 
 The Study tab links to:
 * **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems for classical orbital elements from state vectors with answer checking and a 3D orbit construction walkthrough.
-* **[Orbital Maneuvers Practice](practice/maneuvers-practice.html):** Practice mode and test mode for Hohmann transfers, simple plane changes, and combined plane changes with classroom-style 5-column math solutions.
+* **[Orbital Maneuvers Practice](practice/maneuvers-practice.html):** Practice mode and test mode for Hohmann transfers, simple plane changes, and combined plane changes with classroom-style 5-column math solutions. This page is a work in progress, so its Study tab link is locked.
 
 ---
 
