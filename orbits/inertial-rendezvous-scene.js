@@ -298,26 +298,84 @@
             }
         }
 
-        function createTube(color, { arc = false, radius = arc ? 0.3 : 0.2, ghost = arc ? 0.35 : 0.28 } = {}) {
+        // Orbits are thick, continuous tubes. Angle arcs are thinner, end in an
+        // arrowhead, and can be dashed, so the two never read as the same thing.
+        function createTube(color, { arc = false, dashed = false, radius = arc ? 0.13 : 0.24, ghost = arc ? 0.35 : 0.28 } = {}) {
             const tube = ghosted(new THREE.BufferGeometry(), color, ghost);
             Object.assign(tube.userData.solidMat, { polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+            if (dashed) {
+                tube.userData.solidMat.vertexColors = true;
+                tube.userData.ghostMat.vertexColors = true;
+            }
             scene.add(track(tube));
             const t = {
                 tube,
                 radius,
+                dashed,
                 key: '',
                 curve: null,
                 segments: arc ? ARC_SEGMENTS : ORBIT_SEGMENTS,
                 sides: arc ? ARC_SIDES : ORBIT_SIDES
             };
             if (arc) {
-                t.glowMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+                t.glowMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: dashed });
                 t.glow = new THREE.Mesh(new THREE.BufferGeometry(), t.glowMat);
                 t.glow.frustumCulled = false;
                 t.head = ghosted(HEAD, color);
                 scene.add(track(t.glow), track(t.head));
             }
             return t;
+        }
+
+        // Dash a tube by fading alternate runs of rings to transparent (RGBA vertex colors)
+        const DASH_RINGS = 3;
+        function dashTube(geometry, segments, sides) {
+            const colors = new Float32Array(geometry.attributes.position.count * 4);
+            for (let i = 0; i <= segments; i++) {
+                const alpha = Math.floor(i / DASH_RINGS) % 2 === 0 ? 1 : 0;
+                for (let j = 0; j <= sides; j++) {
+                    colors.set([1, 1, 1, alpha], (i * (sides + 1) + j) * 4);
+                }
+            }
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+            return geometry;
+        }
+
+        // Shaded angle wedge: an annular sector in the orbital plane (z = 0)
+        function createSector(color) {
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+            const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+            mesh.renderOrder = ORDER.planes;
+            mesh.frustumCulled = false;
+            scene.add(track(mesh));
+            return { mesh, mat, key: '' };
+        }
+
+        function placeSector(sec, opacity, key, start, sweep, rIn, rOut) {
+            sec.mesh.visible = opacity > 0.01 && sweep > 0.004 && rOut > rIn;
+            if (!sec.mesh.visible) return;
+            if (sec.key !== key) {
+                sec.key = key;
+                const n = Math.max(6, Math.ceil((sweep / (2 * Math.PI)) * 120));
+                const pos = new Float32Array((n + 1) * 2 * 3);
+                const idx = [];
+                for (let i = 0; i <= n; i++) {
+                    const a = start + (sweep * i) / n;
+                    const c = Math.cos(a), s = Math.sin(a);
+                    pos.set([rIn * c, rIn * s, 0, rOut * c, rOut * s, 0], i * 6);
+                    if (i < n) {
+                        const v = i * 2;
+                        idx.push(v, v + 1, v + 3, v, v + 3, v + 2);
+                    }
+                }
+                const geom = new THREE.BufferGeometry();
+                geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                geom.setIndex(idx);
+                sec.mesh.geometry.dispose();
+                sec.mesh.geometry = geom;
+            }
+            // Lighter as the sweep grows, so a near-full wedge reads as an angle, not a disc
+            sec.mat.opacity = opacity * Math.min(1, Math.sqrt(Math.PI / sweep));
         }
 
         function drawTube(t, k, opacity, key, pointAt, sz, anchor) {
@@ -332,10 +390,12 @@
             if (t.key !== key) {
                 t.key = key;
                 t.curve = new PathCurve(pointAt);
-                setGeometry(t.tube, new THREE.TubeGeometry(t.curve, t.segments, t.radius * sz, t.sides, false));
+                const geom = new THREE.TubeGeometry(t.curve, t.segments, t.radius * sz, t.sides, false);
+                setGeometry(t.tube, t.dashed ? dashTube(geom, t.segments, t.sides) : geom);
                 if (t.glow) {
                     t.glow.geometry.dispose();
-                    t.glow.geometry = new THREE.TubeGeometry(t.curve, t.segments, 0.85 * sz, t.sides, false);
+                    const glow = new THREE.TubeGeometry(t.curve, t.segments, 0.45 * sz, t.sides, false);
+                    t.glow.geometry = t.dashed ? dashTube(glow, t.segments, t.sides) : glow;
                 }
             }
 
@@ -371,8 +431,14 @@
 
         // Arcs
         const phiArc = createTube(COLORS.theta, { arc: true });
-        const phiDesiredArc = createTube(COLORS.theta, { arc: true, radius: 0.22 });
+        const phiDesiredArc = createTube(COLORS.theta, { arc: true, dashed: true });
         const nuTravelArc = createTube(COLORS.tof, { arc: true });
+
+        // Angle wedges (shaded between Earth and the arc) and the radial legs that
+        // bound each angle at Earth's center, as in the lesson figures
+        const phiSector = createSector(COLORS.theta);
+        const nuSector = createSector(COLORS.tof);
+        const legs = [0, 1, 2].map(() => createBar(COLORS.radius));
 
         // Radius lines
         const rChaseBar = createBar(COLORS.orbit1);
@@ -452,13 +518,49 @@
         const signedKmsText = (x) => `${x < 0 ? '−' : '+'}${Math.abs(x).toFixed(3)} km/s`;
         const degText = (x) => `${Number(x).toFixed(1)}°`;
 
-        // Radii (scene units) for the two phase angle arcs: between Earth and the inner
-        // orbit when there is room, otherwise just outside the outer orbit, so Earth
-        // never hides them.
-        function angleArcRadii(rIn, rOut) {
+        // Where the angle arcs sit (scene units), so none of them lies on an orbit:
+        //   nu    the target's travel, a clear gap outside the orbit it measures
+        //   live  the phase angle; between Earth and the inner orbit when there is
+        //         room, otherwise outside everything (beyond nu)
+        //   desired  the desired phase angle, just inside (or outside) the live arc
+        function angleLayout(rIn, rOut, rNu) {
+            const step = Math.max(0.16, 0.06 * rOut);
+            const nu = Math.max(rNu, rOut) + step;
             const gap = rIn - 1;
-            if (gap > 0.45) return { live: 1 + 0.64 * gap, desired: 1 + 0.34 * gap };
-            return { live: rOut + 0.16, desired: rOut + 0.3 };
+            if (gap > 0.45) {
+                return { inside: true, live: 1 + 0.64 * gap, desired: 1 + 0.34 * gap, nu, lap: 0.6 * step, fillIn: 1.02 };
+            }
+            return { inside: false, live: nu + 1.4 * step, desired: nu + 2.4 * step, nu, lap: 0.6 * step, fillIn: rOut + 0.25 * step };
+        }
+
+        // Largest radius drawn (scene units): the orbits, plus the angle arcs when
+        // they are set off outside them. The camera frames and the axes reach this.
+        function sceneExtent(m) {
+            const rC = m.Rchase / R_E;
+            const rT = (m.Rtarget || m.Rchase) / R_E;
+            let ext = Math.max(rC, rT);
+            const turns = Math.max(0, m.nu_travel || 0) / (2 * Math.PI);
+            if (m.mode === 'coplanar') {
+                const lay = angleLayout(Math.min(rC, rT), ext, rT);
+                ext = Math.max(ext, lay.nu + lay.lap * turns, lay.inside ? 0 : lay.desired);
+            } else if (m.mode === 'coorbital' && m.phi0 > 0) {
+                const outer = Math.max(rC, m.r_a / R_E);
+                const lay = angleLayout(Math.min(rC, m.r_p / R_E), outer, outer);
+                ext = Math.max(ext, outer, lay.nu + lay.lap * turns, lay.inside ? 0 : lay.live);
+            }
+            return ext;
+        }
+
+        function axisLength(m) {
+            return Math.max(Math.max(m.Rchase, m.Rtarget || m.Rchase) / R_E * 1.35, sceneExtent(m) * 1.1);
+        }
+
+        // Thin radial leg from Earth's center out through a point to at least `reach`
+        function placeLeg(leg, opacity, point, reach, sz) {
+            const len = Math.hypot(point.x, point.y, point.z);
+            if (len < 1e-6) { leg.visible = false; return; }
+            const end = tmpEnd.copy(point).multiplyScalar(Math.max(len, reach) / len);
+            placeBar(leg, opacity, ORIGIN, end, 0.05 * sz);
         }
 
         // One velocity scale per scenario: the fastest speed at any burn is drawn
@@ -504,7 +606,12 @@
         let currentModel = null;
         let modelSeq = 0;
         let timelineTl = 0;
-        let shown = { vectors: true, angles: true, labels: true, compareHohmann: false };
+        // values: false labels computed quantities by symbol only (a practice page hides them
+        // until the answers are graded); the given radii and initial phase angle keep theirs.
+        // reveal: null draws everything; an object draws only the parts of the solution set in
+        // it (transfer, phasing, nu, desired, burns), so that a walkthrough can build them up.
+        let shown = { vectors: true, angles: true, labels: true, values: true, reveal: null, compareHohmann: false };
+        const revealed = (part) => !shown.reveal || Boolean(shown.reveal[part]);
         let dirty = true;
         let viewW = 1, viewH = 1;
         let flight = null;
@@ -569,8 +676,7 @@
             }
 
             const target = right.multiplyScalar(midX).addScaledVector(up, midY);
-            const maxR = currentModel ? Math.max(currentModel.Rchase, currentModel.Rtarget || currentModel.Rchase) / R_E : 4;
-            const baseDist = Math.max(3.9, maxR * 2.8);
+            const baseDist = Math.max(3.9, (currentModel ? sceneExtent(currentModel) : 4) * 2.8);
             const zoom = Math.min(MAX_ZOOM, (distance * Math.min(1, aspect)) / baseDist);
             return { az, el, zoom, x: target.x, y: target.y, z: target.z };
         }
@@ -721,7 +827,7 @@
             for (const o of everything) o.visible = false;
 
             // Coordinate axes
-            const axisLen = maxRScene * 1.35;
+            const axisLen = axisLength(m);
             placeArrow(axisI, 0.45, ORIGIN, new THREE.Vector3(axisLen, 0, 0), sz);
             placeArrow(axisJ, 0.45, ORIGIN, new THREE.Vector3(0, axisLen, 0), sz);
             placeArrow(axisK, 0.45, ORIGIN, new THREE.Vector3(0, 0, axisLen), sz);
@@ -747,6 +853,7 @@
             anchors.phiText = '';
             anchors.phiDesiredText = '';
             anchors.phiIsInitial = false;
+            anchors.nuShown = false;
 
             const same = sameOrbit(m);
 
@@ -776,7 +883,7 @@
                     return out.set(rTargetScene * Math.cos(ang), rTargetScene * Math.sin(ang), 0);
                 }, sz);
 
-                if (!same) {
+                if (!same && revealed('transfer')) {
                     // Hohmann transfer: always prograde. Departure is perigee when
                     // raising and apogee when lowering, so the true anomaly at the
                     // departure point is 0 or 180 degrees.
@@ -800,47 +907,66 @@
                     placeRing(markerRendezvous, 0.9, anchors.rendezvousPos, sz * 2.4);
                 }
 
-                const radii = angleArcRadii(Math.min(rChaseScene, rTargetScene), Math.max(rChaseScene, rTargetScene));
+                const rIn = Math.min(rChaseScene, rTargetScene);
+                const rOut = Math.max(rChaseScene, rTargetScene);
+                const lay = angleLayout(rIn, rOut, rTargetScene);
                 const waiting = !same && p.key === 'wait';
+                const desiredShown = waiting && revealed('desired');
 
                 // Ghost target: where the target must be at the departure burn
                 const theta_target_dep = -m.phi0_rad + m.n_target * m.WT;
-                if (waiting) {
-                    placeRing(ghostTarget, 0.75, tmpA.set(rTargetScene * Math.cos(theta_target_dep), rTargetScene * Math.sin(theta_target_dep), 0), sz * 2.2);
-                }
+                const ghostPos = tmpA.set(rTargetScene * Math.cos(theta_target_dep), rTargetScene * Math.sin(theta_target_dep), 0);
+                if (desiredShown) placeRing(ghostTarget, 0.75, ghostPos, sz * 2.2);
 
                 if (shown.angles) {
                     // Live phase angle: from the target's radial line to the chase's,
-                    // in the direction of motion (the long way when over 180 degrees)
+                    // in the direction of motion (the long way when over 180 degrees).
+                    // A shaded wedge between its radial lines marks it as an angle.
                     const tAng = Math.atan2(anchors.targetPos.y, anchors.targetPos.x);
                     const curPhiRad = global.RendezvousMath.wrap2Pi(Math.atan2(anchors.chasePos.y, anchors.chasePos.x) - tAng);
                     if (curPhiRad > 0.004 && p.key !== 'together') {
-                        drawTube(phiArc, 1, 0.9, `${mid}_phi_${curPhiRad.toFixed(3)}`, (t, out) => {
+                        const key = `${mid}_phi_${curPhiRad.toFixed(3)}`;
+                        drawTube(phiArc, 1, 0.95, key, (t, out) => {
                             const ang = tAng + t * curPhiRad;
-                            return out.set(radii.live * Math.cos(ang), radii.live * Math.sin(ang), 0);
-                        }, sz * 0.8, anchors.phiAnchor);
+                            return out.set(lay.live * Math.cos(ang), lay.live * Math.sin(ang), 0);
+                        }, sz, anchors.phiAnchor);
+                        placeSector(phiSector, 0.16, key, tAng, curPhiRad, lay.fillIn, lay.live);
                         anchors.phiText = degText(curPhiRad * R2D);
+                        if (!lay.inside) {
+                            // Arcs outside the orbits: carry the radial lines out to them
+                            placeLeg(rChaseBar, 0.35, anchors.chasePos, lay.live, sz);
+                            placeLeg(rTargetBar, 0.35, anchors.targetPos, lay.live, sz);
+                        }
                     }
 
-                    // Desired phase angle at the departure burn: target-at-departure to the
-                    // departure point, shown while the chase waits for it
-                    if (waiting && m.phi_desired > 0.004) {
-                        drawTube(phiDesiredArc, 1, 0.5, `${mid}_phides`, (t, out) => {
+                    // Desired phase angle at the departure burn (dashed: a goal, not yet
+                    // reached), between the target-at-departure and departure-point legs
+                    if (desiredShown && m.phi_desired > 0.004) {
+                        drawTube(phiDesiredArc, 1, 0.75, `${mid}_phides`, (t, out) => {
                             const ang = theta_target_dep + t * m.phi_desired;
-                            return out.set(radii.desired * Math.cos(ang), radii.desired * Math.sin(ang), 0);
-                        }, sz * 0.7, anchors.phiDesiredAnchor);
+                            return out.set(lay.desired * Math.cos(ang), lay.desired * Math.sin(ang), 0);
+                        }, sz, anchors.phiDesiredAnchor);
                         anchors.phiDesiredText = degText(m.phi_desired_deg);
+                        placeLeg(legs[1], 0.3, depPos, lay.desired, sz);
                     }
 
                     // Target angular travel during the transfer, from the target at
-                    // departure to the rendezvous point (a slow spiral if over 360 degrees)
-                    if (!same) {
-                        const nuLevel = p.key === 'transfer' ? 1.0 : p.key === 'burn2' || p.key === 'together' ? 0.7 : 0.4;
+                    // departure to the rendezvous point, set off from the target orbit
+                    // (spiraling outward if it passes 360 degrees)
+                    if (!same && revealed('nu')) {
+                        anchors.nuShown = true;
+                        const nuLevel = p.key === 'transfer' ? 1.0 : p.key === 'burn2' || p.key === 'together' ? 0.75 : 0.5;
+                        const nuEnd = lay.nu + lay.lap * (m.nu_travel / (2 * Math.PI));
                         drawTube(nuTravelArc, 1, nuLevel, `${mid}_nu_trav`, (t, out) => {
                             const ang = theta_target_dep + t * m.nu_travel;
-                            const r = rTargetScene * (1.025 + 0.045 * (t * m.nu_travel) / (2 * Math.PI));
+                            const r = lay.nu + lay.lap * ((t * m.nu_travel) / (2 * Math.PI));
                             return out.set(r * Math.cos(ang), r * Math.sin(ang), 0);
-                        }, sz * 0.8, anchors.nuAnchor);
+                        }, sz, anchors.nuAnchor);
+                        if (p.key === 'transfer') {
+                            placeSector(nuSector, 0.09, `${mid}_nusec`, theta_target_dep, Math.min(m.nu_travel, 2 * Math.PI), rTargetScene, lay.nu);
+                        }
+                        placeLeg(legs[0], 0.3, ghostPos, Math.max(lay.nu, desiredShown ? lay.desired : 0), sz);
+                        if (anchors.hasRendezvous) placeLeg(legs[2], 0.3, anchors.rendezvousPos, nuEnd, sz);
                     }
                 }
 
@@ -865,7 +991,7 @@
                 phasingTube.tube.userData.solidMat.color.set(isDangerous ? COLORS.dv : COLORS.phase);
                 phasingTube.tube.userData.ghostMat.color.set(isDangerous ? COLORS.dv : COLORS.phase);
 
-                if (m.phi0 > 0) {
+                if (m.phi0 > 0 && revealed('phasing')) {
                     const phasingLevel = p.key === 'phasing' ? 0.95 : 0.7;
                     drawTube(phasingTube, 1, phasingLevel, `${mid}_co_phasing_${a_p_scene.toFixed(4)}`, (t, out) => {
                         const nu = t * 2 * Math.PI;
@@ -875,30 +1001,46 @@
                 }
 
                 if (shown.angles && m.phi0 > 0) {
-                    const outer = Math.max(rChaseScene, (2 * m.a_phasing - rChaseKm) / R_E);
-                    const radii = angleArcRadii(Math.min(rChaseScene, m.r_p / R_E), outer);
-                    // Initial phase angle: target to chase, in the direction of motion
+                    const outer = Math.max(rChaseScene, m.r_a / R_E);
+                    const lay = angleLayout(Math.min(rChaseScene, m.r_p / R_E), outer, outer);
+                    // Initial phase angle: target to chase, in the direction of motion,
+                    // shaded between its radial lines
                     const tStartAng = -m.phi0_rad;
-                    drawTube(phiArc, 1, p.key === 'together' ? 0.45 : 0.85, `${mid}_co_phi`, (t, out) => {
+                    const phiLevel = p.key === 'together' ? 0.45 : 0.9;
+                    drawTube(phiArc, 1, phiLevel, `${mid}_co_phi`, (t, out) => {
                         const ang = tStartAng + t * m.phi0_rad;
-                        return out.set(radii.live * Math.cos(ang), radii.live * Math.sin(ang), 0);
-                    }, sz * 0.8, anchors.phiAnchor);
+                        return out.set(lay.live * Math.cos(ang), lay.live * Math.sin(ang), 0);
+                    }, sz, anchors.phiAnchor);
+                    placeSector(phiSector, 0.16 * phiLevel, `${mid}_co_phisec`, tStartAng, m.phi0_rad, lay.fillIn, lay.live);
                     anchors.phiText = degText(m.phi0);
                     anchors.phiIsInitial = true;
 
-                    // Target travel during ONE phasing orbit; past 360 degrees (chase ahead)
-                    // the arc spirals outward for the extra turn, as in the lesson figure
+                    // Target travel during ONE phasing orbit, set off outside both orbits;
+                    // past 360 degrees (chase ahead) it spirals outward for the extra turn,
+                    // as in the lesson figure
                     const nuLevel = p.key === 'phasing' ? 1.0 : 0.6;
-                    drawTube(nuTravelArc, 1, nuLevel, `${mid}_co_nu1`, (t, out) => {
-                        const ang = tStartAng + t * m.nu_travel;
-                        const r = rChaseScene * (1.03 + 0.05 * (t * m.nu_travel) / (2 * Math.PI));
-                        return out.set(r * Math.cos(ang), r * Math.sin(ang), 0);
-                    }, sz * 0.8, anchors.nuAnchor);
+                    const nuOn = revealed('nu');
+                    const nuEnd = lay.nu + lay.lap * (m.nu_travel / (2 * Math.PI));
+                    if (nuOn) {
+                        anchors.nuShown = true;
+                        drawTube(nuTravelArc, 1, nuLevel, `${mid}_co_nu1`, (t, out) => {
+                            const ang = tStartAng + t * m.nu_travel;
+                            const r = lay.nu + lay.lap * ((t * m.nu_travel) / (2 * Math.PI));
+                            return out.set(r * Math.cos(ang), r * Math.sin(ang), 0);
+                        }, sz, anchors.nuAnchor);
+                    }
+
+                    // Radial legs: the target's start (where phi_0 and nu_travel begin)
+                    // and the burn point (where both end)
+                    const reach = Math.max(nuOn ? nuEnd : 0, lay.inside ? 0 : lay.live);
+                    placeLeg(legs[0], 0.3, tmpA.set(Math.cos(tStartAng), Math.sin(tStartAng), 0).multiplyScalar(rChaseScene), reach, sz);
+                    placeLeg(legs[1], 0.3, tmpB.set(rChaseScene, 0, 0), reach, sz);
                 }
             }
 
             // Burn velocity & Delta-V arrows
-            if (shown.vectors && m.events && m.events.length > 0 && !same) {
+            anchors.burns.forEach((b) => { b.shown = false; });
+            if (shown.vectors && m.events && m.events.length > 0 && !same && revealed('burns')) {
                 const vScale = velocityScale(m);
                 const minDv = 2 * sz;
 
@@ -979,8 +1121,7 @@
             layer.begin();
             axisSpots.length = 0;
 
-            const maxR = Math.max(currentModel.Rchase, currentModel.Rtarget || currentModel.Rchase) / R_E;
-            const axisLen = maxR * 1.35;
+            const axisLen = axisLength(currentModel);
             showAxisName(labels.I, new THREE.Vector3(axisLen * 1.05, 0, 0), X_AXIS);
             showAxisName(labels.J, new THREE.Vector3(0, axisLen * 1.05, 0), Y_AXIS);
             showAxisName(labels.K, new THREE.Vector3(0, 0, axisLen * 1.05), Z_AXIS);
@@ -1009,19 +1150,20 @@
                     project(labels.rendezvous, anchors.rendezvousPos, 0.85);
                 }
 
-                // Angles
+                // Angles. At the start, the live phase angle is the given phi_0.
                 if (shown.angles) {
                     if (anchors.phiText && anchors.phiAnchor.lengthSq() > 1e-4) {
                         const lbl = anchors.phiIsInitial ? labels.phi0 : labels.phi;
-                        setLabelValue(lbl, anchors.phiText);
+                        const given = anchors.phiIsInitial || clockAt(currentModel, timelineTl) <= 0;
+                        setLabelValue(lbl, shown.values || given ? anchors.phiText : '');
                         project(lbl, anchors.phiAnchor, 0.85);
                     }
                     if (anchors.phiDesiredText && anchors.phiDesiredAnchor.lengthSq() > 1e-4) {
-                        setLabelValue(labels.phiDesired, anchors.phiDesiredText);
+                        setLabelValue(labels.phiDesired, shown.values ? anchors.phiDesiredText : '');
                         project(labels.phiDesired, anchors.phiDesiredAnchor, 0.8);
                     }
-                    if (currentModel.nu_travel_deg && !same && currentModel.phi0 !== 0 && anchors.nuAnchor.lengthSq() > 1e-4) {
-                        setLabelValue(labels.nuTravel, degText(currentModel.nu_travel_deg));
+                    if (anchors.nuShown && currentModel.nu_travel_deg && !same && currentModel.phi0 !== 0 && anchors.nuAnchor.lengthSq() > 1e-4) {
+                        setLabelValue(labels.nuTravel, shown.values ? degText(currentModel.nu_travel_deg) : '');
                         project(labels.nuTravel, anchors.nuAnchor, 0.85);
                     }
                 }
@@ -1036,8 +1178,8 @@
                         const s = burnState(`burn${idx + 1}`, p.key, p.k);
                         if (s.level >= DONE - 0.01 && s.grow > 0.02) {
                             const lbl = labels.burns[idx].dv;
-                            const text = (b.signed ? signedKmsText(b.dvVal) : kmsText(b.dvVal)) + (b.enlarged ? ' (enlarged)' : '');
-                            setLabelValue(lbl, text);
+                            const value = shown.values ? (b.signed ? signedKmsText(b.dvVal) : kmsText(b.dvVal)) : '';
+                            setLabelValue(lbl, [value, b.enlarged ? '(enlarged)' : ''].filter(Boolean).join(' '));
                             project(lbl, b.pos, s.level);
                         }
                     });
@@ -1051,8 +1193,7 @@
         /* Camera Update & Render Frame                                       */
         /* ------------------------------------------------------------------ */
         function updateCamera() {
-            const maxR = currentModel ? Math.max(currentModel.Rchase, currentModel.Rtarget || currentModel.Rchase) / R_E : 4;
-            const baseDist = Math.max(3.9, maxR * 2.8);
+            const baseDist = Math.max(3.9, (currentModel ? sceneExtent(currentModel) : 4) * 2.8);
             const distance = baseDist * camView.zoom;
             const el = camView.el * D2R, az = camView.az * D2R;
             const lookTarget = new THREE.Vector3(camView.x, camView.y, camView.z);

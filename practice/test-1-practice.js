@@ -1,9 +1,10 @@
-// Test 1 Practice: two sections on one page, the R-V problems and the orbital maneuver
-// problems, with the same two modes, answer form, and walkthrough for both.
+// Test 1 Practice: three sections on one page, the R-V problems, the orbital maneuver
+// problems, and the rendezvous problems, with the same two modes, answer form, and walkthrough
+// for all of them.
 // Practice mode shows the view from the start and lets the student walk through the steps.
 // Test mode shows only the problem and the answer form until the answers are graded.
-// Problem types supply the numbers and the worked steps. See rv-coe-problems.js and
-// test-1-maneuver-problems.js.
+// Problem types supply the numbers and the worked steps. See rv-coe-problems.js,
+// test-1-maneuver-problems.js, and test-1-rendezvous-problems.js.
 (function () {
     'use strict';
 
@@ -13,6 +14,7 @@
     const { math, prose } = window.PracticeMath;
     const RvCoe = window.RvCoeProblems;
     const Maneuvers = window.Test1ManeuverProblems;
+    const Rendezvous = window.Test1RendezvousProblems;
 
     // The R-V problems keep the satellite at least 1.5 Earth radii from Earth's center, so that
     // the orbit has room in the view.
@@ -23,12 +25,14 @@
         test: 'Enter your answers and submit. The view and the walkthrough open after grading.'
     };
 
-    // The page has two sections. Each section has its own problems, and a link can open either
-    // one (#rv or #maneuvers).
+    // The page has three sections. Each section has its own problems, and a link can open any
+    // one (#rv, #maneuvers, or #rendezvous).
+    const SECTIONS = ['rv', 'maneuvers', 'rendezvous'];
     const state = {
         mode: 'practice',
-        section: location.hash === '#maneuvers' ? 'maneuvers' : 'rv',
+        section: SECTIONS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'rv',
         maneuverType: 'random',  // In the maneuvers section: one kind of maneuver, or any of them
+        rendezvousType: 'random', // In the rendezvous section: coplanar, co-orbital, or either
         problem: null,
         submitted: false,
         blankWarned: false,
@@ -77,8 +81,26 @@
         };
     }
 
+    function rendezvousProblem(type) {
+        const p = Rendezvous.generate(type);
+        return {
+            view: 'rendezvous',
+            title: p.title,
+            prompt: p.prompt,
+            limitsHtml: p.limitsHtml,
+            overviewCaption: p.overviewCaption,
+            fields: p.fields,
+            statement: p.statement,
+            answers: p.answers,
+            steps: p.steps,
+            source: p,
+            grade: (field, text) => Rendezvous.grade(field.tolerance, text, p.answers[field.key].value, field.unitType)
+        };
+    }
+
     function generate() {
         if (state.section === 'rv') return rvProblem();
+        if (state.section === 'rendezvous') return rendezvousProblem(state.rendezvousType);
         const types = Maneuvers.types;
         const type = state.maneuverType === 'random' ? types[Math.floor(Math.random() * types.length)] : state.maneuverType;
         return maneuverProblem(type);
@@ -341,6 +363,7 @@
 
     function showSection() {
         $('topic').hidden = state.section !== 'maneuvers';
+        $('rendezvous-topic').hidden = state.section !== 'rendezvous';
         for (const button of $('section').querySelectorAll('button')) {
             button.setAttribute('aria-pressed', String(button.dataset.value === state.section));
         }
@@ -355,6 +378,11 @@
 
     Kit.bindSegmented($('topic'), (type) => {
         state.maneuverType = type;
+        newProblem();
+    });
+
+    Kit.bindSegmented($('rendezvous-topic'), (type) => {
+        state.rendezvousType = type;
         newProblem();
     });
 
@@ -378,7 +406,8 @@
         const hud = $('hud');
         const views = {
             rv: { make: () => window.RvCoeScene, canvas: $('scene-rv'), labels: $('labels-rv'), constants: RvCoe.constants, live: null },
-            maneuver: { make: () => window.Test1ManeuverScene, canvas: $('scene-maneuver'), labels: $('labels-maneuver'), constants: Maneuvers.constants, live: null }
+            maneuver: { make: () => window.Test1ManeuverScene, canvas: $('scene-maneuver'), labels: $('labels-maneuver'), constants: Maneuvers.constants, live: null },
+            rendezvous: { make: () => window.Test1RendezvousScene, canvas: $('scene-rendezvous'), labels: $('labels-rendezvous'), constants: Rendezvous.constants, live: null }
         };
         const pending = { view: 'rv', problem: null, stage: 'given', answersShown: false };
 
@@ -417,7 +446,7 @@
                     showStatus
                 }, v.constants, { moveSatellite: true });
             }
-            if (!views.rv.live && !views.maneuver.live) return;
+            if (!Object.values(views).some((v) => v.live)) return;
             statusEl.style.display = 'none';
             const live = current();
             if (!live || !pending.problem) return;

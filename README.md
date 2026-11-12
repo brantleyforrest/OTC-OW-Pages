@@ -30,7 +30,7 @@ The web portal is established at `index.html`. The following tools are available
 * **[Inertial Rendezvous](orbits/inertial-rendezvous.html):** An interactive 3D visualizer for coplanar and co-orbital orbital rendezvous in the inertial (ECI) frame with live equations and a trade panel (loads KaTeX from a CDN).
 
 The Study tab links to:
-* **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems in two sections, classical orbital elements from state vectors and orbital maneuvers (Hohmann transfers, simple plane changes, and combined plane changes), with answer checking and a 3D walkthrough in which the satellite moves along with the steps.
+* **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems in three sections, classical orbital elements from state vectors, orbital maneuvers (Hohmann transfers, simple plane changes, and combined plane changes), and coplanar and co-orbital rendezvous, with answer checking and a 3D walkthrough in which the satellite moves along with the steps.
 
 ---
 
