@@ -392,6 +392,10 @@
             color: var(--text-main);
         }
 
+        /* Ground track section: a flat map with nothing to rotate or zoom */
+        body.flat-view #reset-view,
+        body.flat-view #view-hint { display: none !important; }
+
         /* Laws section: no view, one wider centered column */
         body.laws-only .tool-stage-col { display: none; }
         body.laws-only .tool-layout { grid-template-columns: minmax(0, 52rem); justify-content: center; }
@@ -593,10 +597,12 @@
                         <canvas id="scene-maneuver" aria-label="A 3D view of Earth, the initial and target orbits, the transfer, and the velocity change at each burn." hidden></canvas>
                         <canvas id="scene-rendezvous" aria-label="A 3D view of Earth, the chase and target orbits, the phase angles, and the rendezvous as it plays out." hidden></canvas>
                         <canvas id="scene-tof" aria-label="A 3D view of Earth, the circular orbit, and the angle the satellite sweeps during the flight." hidden></canvas>
+                        <canvas id="scene-groundtrack" aria-label="A world map with the satellite's ground track, its direction of travel, the labeled ascending nodes, the latitude peaks, and where the satellite is now." hidden></canvas>
                         <div class="tool-labels" id="labels-rv" aria-hidden="true"></div>
                         <div class="tool-labels" id="labels-maneuver" aria-hidden="true" hidden></div>
                         <div class="tool-labels" id="labels-rendezvous" aria-hidden="true" hidden></div>
                         <div class="tool-labels" id="labels-tof" aria-hidden="true" hidden></div>
+                        <div class="tool-labels" id="labels-groundtrack" aria-hidden="true" hidden></div>
                         <button type="button" class="btn view-reset" id="reset-view">Reset View</button>
                         <div class="tool-hint" id="view-hint">Drag to rotate. Scroll or pinch to zoom.</div>
                         <div class="tool-status" id="status" style="display: none;"></div>
@@ -621,6 +627,7 @@
                             <button type="button" data-value="maneuvers" aria-pressed="false">Orbital Maneuvers</button>
                             <button type="button" data-value="rendezvous" aria-pressed="false">Rendezvous</button>
                             <button type="button" data-value="tof" aria-pressed="false">Time of Flight</button>
+                            <button type="button" data-value="groundtrack" aria-pressed="false">Ground Tracks</button>
                             <button type="button" data-value="propulsion" aria-pressed="false">Propulsion</button>
                             <button type="button" data-value="laws" aria-pressed="false">Laws</button>
                         </div>
@@ -641,7 +648,12 @@
                             <button type="button" data-value="time" aria-pressed="false">Find Time</button>
                             <button type="button" data-value="position" aria-pressed="false">Find Position</button>
                         </div>
-                        <div class="segmented topics" id="propulsion-topic" role="group" aria-label="Choose a difficulty" hidden>
+                        <div class="segmented topics" id="groundtrack-topic" role="group" aria-label="Choose a kind of orbit" hidden>
+                            <button type="button" data-value="random" aria-pressed="true">Random</button>
+                            <button type="button" data-value="circular" aria-pressed="false">Circular</button>
+                            <button type="button" data-value="elliptical" aria-pressed="false">Elliptical</button>
+                        </div>
+                        <div class="segmented topics" id="propulsion-topic"role="group" aria-label="Choose a difficulty" hidden>
                             <button type="button" data-value="random" aria-pressed="true">Any Level</button>
                             <button type="button" data-value="foundational" aria-pressed="false">Foundational</button>
                             <button type="button" data-value="intermediate" aria-pressed="false">Intermediate</button>
@@ -724,6 +736,8 @@
     <script src="test-1-rendezvous-scene.js"></script>
     <script src="test-1-tof-problems.js"></script>
     <script src="test-1-tof-scene.js"></script>
+    <script src="test-1-ground-track-problems.js"></script>
+    <script src="test-1-ground-track-scene.js"></script>
     <script src="test-1-propulsion-problems.js"></script>
     <script src="test-1-law-matching.js"></script>
     <script src="test-1-practice.js"></script>

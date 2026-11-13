@@ -126,7 +126,7 @@
     const TEXT = {
         hohmann: (d) => ({
             title: 'Hohmann Transfer',
-            prompt: 'Both orbits are circular and in the same plane. Find the transfer orbit, each burn, the total, and the transfer time.',
+            prompt: 'Both orbits are circular and in the same plane. Find the transfer semi-major axis, each burn $\\Delta V$, total $\\Delta V$, and the transfer time.',
             statement: item(`R_1 = ${km(d.R1)}\\text{ km}`) + item(`R_2 = ${km(d.R2)}\\text{ km}`),
             overview: `<b>The problem as given.</b> The spacecraft is on the initial orbit, $R_1$. The target orbit, $R_2$, is in the same plane, ${d.isRaise ? 'farther out' : 'closer in'}.`,
             limits: TRANSFER_LIMITS,
@@ -134,7 +134,7 @@
         }),
         combined: (d) => ({
             title: 'Combined Plane Change',
-            prompt: 'A Hohmann transfer between these circular orbits also changes the inclination. Put the plane change in the burn at the higher orbit.',
+            prompt: 'Find the transfer semi-major axis, each burn $\\Delta V$, total $\\Delta V$, and the transfer time. Combine the plane change with the burn at the most efficient location.',
             statement: item(`R_1 = ${km(d.R1)}\\text{ km}`) + item(`i_1 = ${one(d.i1)}°`) + item(`R_2 = ${km(d.R2)}\\text{ km}`) + item(`i_2 = ${one(d.i2)}°`),
             overview: '<b>The problem as given.</b> The two orbits differ in size and in tilt. Their planes cross along the line through both burns.',
             limits: TRANSFER_LIMITS,
@@ -142,7 +142,7 @@
         }),
         inclination: (d) => ({
             title: 'Simple Plane Change: Inclination',
-            prompt: 'A circular orbit changes inclination, with $\\Omega$ unchanged. Find the speed, the plane change angle, and $\\Delta V$. $u$ is measured from the ascending node.',
+            prompt: 'A circular orbit changes inclination, with $\\Omega$ unchanged. Find the speed, the plane change angle, and $\\Delta V$.',
             statement: item(`r = ${km(d.r)}\\text{ km}`) + item(`i_1 = ${one(d.i1)}°`) + item(`i_2 = ${one(d.i2)}°`) + item(`\\Omega = ${one(d.raan)}°`) + item(`u = ${Math.round(d.u_sc)}°`),
             overview: '<b>The problem as given.</b> The spacecraft is on the initial orbit at $u$. The target orbit is the same size, with the same $\\Omega$, tilted to $i_2$.',
             limits: PLANE_LIMITS,
@@ -150,7 +150,7 @@
         }),
         polar_raan: (d) => ({
             title: 'Simple Plane Change: Polar RAAN',
-            prompt: 'A circular polar orbit changes its RAAN. Find the speed, the plane change angle, and $\\Delta V$. $u$ is measured from the ascending node.',
+            prompt: 'A circular polar orbit changes its RAAN. Find the speed, the plane change angle, and $\\Delta V$.',
             statement: item(`r = ${km(d.r)}\\text{ km}`) + item('i = 90°') + item(`\\Omega_1 = ${one(d.raan1)}°`) + item(`\\Omega_2 = ${one(d.raan2)}°`) + item(`u = ${Math.round(d.u_sc)}°`),
             overview: '<b>The problem as given.</b> The spacecraft is on the initial polar orbit at $u$. The target orbit is the same size, also polar, turned to $\\Omega_2$.',
             limits: PLANE_LIMITS,
@@ -177,9 +177,7 @@
         problem.overviewCaption = prose(text.overview);
         problem.limitsHtml = text.limits;
         problem.fields = problem.fields.map((field) => {
-            let name = FIELD_NAMES[field.key] || field.name;
-            const combinedBurn = d.type === 'combined' && ((field.key === 'dv1' && !d.isRaise) || (field.key === 'dv2' && d.isRaise));
-            if (combinedBurn) name += ', combined';
+            const name = FIELD_NAMES[field.key] || field.name;
             return { ...field, name };
         });
         problem.steps = problem.steps.map((step) => {

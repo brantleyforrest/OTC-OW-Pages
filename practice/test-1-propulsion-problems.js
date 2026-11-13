@@ -42,27 +42,27 @@
     const VEHICLES = {
         leo: {
             names: ['a LEO Earth-imaging satellite', 'a LEO weather satellite', 'a small LEO reconnaissance satellite'],
-            engine: 'hydrazine thrusters', dry: [150, 700], prop: [0.06, 0.3],
+            engine: 'engine', dry: [150, 700], prop: [0.06, 0.3],
             isp: [220, 225, 230, 235], thrust: [1, 4, 5, 10, 22]
         },
         geo: {
             names: ['a GEO communications satellite', 'a GEO missile-warning satellite', 'a GEO weather satellite'],
-            engine: 'bipropellant engine', dry: [1500, 3500], prop: [0.1, 0.45],
+            engine: 'engine', dry: [1500, 3500], prop: [0.1, 0.45],
             isp: [300, 310, 315, 320], thrust: [400, 440, 490]
         },
         geoRcs: {
             names: ['a GEO communications satellite', 'a GEO missile-warning satellite', 'a GEO weather satellite'],
-            engine: 'bipropellant thrusters', dry: [1500, 3500], prop: [0.08, 0.3],
+            engine: 'engine', dry: [1500, 3500], prop: [0.08, 0.3],
             isp: [285, 290, 295, 300], thrust: [10, 22]
         },
         servicer: {
             names: ['a satellite-servicing vehicle', 'an on-orbit inspector spacecraft', 'a GEO space tug'],
-            engine: 'bipropellant engine', dry: [600, 2000], prop: [0.15, 0.5],
+            engine: 'engine', dry: [600, 2000], prop: [0.15, 0.5],
             isp: [290, 300, 310], thrust: [100, 200, 220, 440]
         },
         electric: {
             names: ['an all-electric GEO satellite', 'a MEO navigation satellite', 'an electric orbit-transfer vehicle'],
-            engine: 'Hall-effect thrusters', dry: [800, 2500], prop: [0.05, 0.25], electric: true,
+            engine: 'engine', dry: [800, 2500], prop: [0.05, 0.25], electric: true,
             isp: [1500, 1600, 1800, 2000], thrust: [0.08, 0.1, 0.15, 0.2, 0.25, 0.3]
         }
     };
@@ -457,7 +457,7 @@
         const thrust = thrustGiven(v.F);
         return {
             scenario: 'Performance Assessment', difficulty: 5.5,
-            prompt: prose(`An operations crew is assessing ${v.name}. If it burned all of its remaining propellant in one maneuver with its ${v.engine}, how much $\\Delta V$ would it gain, what would its acceleration be at ignition, and about how long would the burn last?`),
+            prompt: prose(`An operations crew is assessing ${v.name}. If it burned all of its remaining propellant in one maneuver with its ${v.engine}, find the $\\Delta V$ it gains, its acceleration at ignition, and the burn duration (estimated with the mass at ignition).`),
             statement: item(`m_{\\text{dry}} = ${mass(v.dry)}\\text{ kg}`) + item(`m_p = ${mass(v.prop)}\\text{ kg}`) + item(`${ISP} = ${v.isp}\\text{ s}`) + item(thrust.tex),
             fields: [F_.dv('dv', 'ΔV available'), F_.accel('a0', 'a_0', 'Acceleration at ignition'), F_.time()],
             answers: { dv: A.dv(dv), a0: A.accel(a0), dt: A.time(dt) },
@@ -509,7 +509,7 @@
         const thrust = thrustGiven(v.F);
         return {
             scenario: 'Orbit Raising', difficulty: 6,
-            prompt: prose(`${cap(v.name)} makes an orbit-raising burn of $\\Delta V$ with its ${v.engine}. The flight dynamics team needs the propellant it uses, its mass at burnout, and its acceleration at burnout, when the spacecraft is lightest.`),
+            prompt: prose(`${cap(v.name)} makes an orbit-raising burn of $\\Delta V$ with its ${v.engine}. Find the propellant it uses, its mass at burnout, and its acceleration at burnout (when the spacecraft is lightest).`),
             statement: item(`m_i = ${mass(mi)}\\text{ kg}`) + item(`${ISP} = ${v.isp}\\text{ s}`) + item(thrust.tex) + item(`\\Delta V = ${group(dv)}\\text{ m/s}`),
             fields: [F_.mass('m_p', 'm_p', 'Propellant used'), F_.mass('m_f', 'm_f', 'Mass at burnout'), F_.accel('a_f', 'a_f', 'Acceleration at burnout')],
             answers: { m_p: A.mass(mp), m_f: A.mass(mf), a_f: A.accel(af) },
@@ -537,7 +537,7 @@
             : 'lower its perigee so that it reenters the atmosphere';
         return {
             scenario: 'End-of-Life Disposal', difficulty: 6.5,
-            prompt: prose(`At the end of its mission, ${v.name} must keep enough propellant to ${where}, a burn of $\\Delta V$ with its ${v.engine}. The burn may use the tanks to empty. Find the minimum propellant reserve, the spacecraft's mass when the burn starts, and how long the burn takes.`),
+            prompt: prose(`At the end of its mission, ${v.name} must keep enough propellant to ${where}, a burn of $\\Delta V$ with its ${v.engine}. The burn may use the tanks to empty. Find the minimum propellant reserve, the spacecraft's mass when the burn starts, and the burn duration (estimated with the mass at ignition).`),
             statement: item(`m_{\\text{dry}} = ${mass(v.dry)}\\text{ kg}`) + item(`${ISP} = ${v.isp}\\text{ s}`) + item(`F = ${v.F}\\text{ N}`) + item(`\\Delta V = ${dv}\\text{ m/s}`),
             fields: [F_.mass('m_p', 'm_p', 'Minimum propellant reserve'), F_.mass('m_i', 'm_i', 'Mass at the start of the burn'), F_.time()],
             answers: { m_p: A.mass(mp), m_i: A.mass(mi), dt: A.time(dt) },
@@ -682,7 +682,7 @@
         const B_ = side(elec);
         return {
             scenario: 'Propulsion Trade Study', difficulty: 7,
-            prompt: prose(`A spacecraft of mass $m_i$ must ${op}, a burn of $\\Delta V$. Option A is a chemical engine and Option B is a set of Hall-effect thrusters. For each option, find the propellant used and estimate the burn duration with the mass at ignition.`),
+            prompt: prose(`A spacecraft of mass $m_i$ must ${op}, a burn of $\\Delta V$. Option A is a chemical engine and Option B is an electric engine. For each option, find the propellant used and estimate the burn duration with the mass at ignition.`),
             statement: item(`m_i = ${mass(mi)}\\text{ kg}`) + item(`\\Delta V = ${dv}\\text{ m/s}`)
                 + item(`\\text{A: } ${ISP} = ${chem.isp}\\text{ s},\\; ${A_.thrust.tex}`)
                 + item(`\\text{B: } ${ISP} = ${elec.isp}\\text{ s},\\; ${B_.thrust.tex}`),

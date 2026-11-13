@@ -1,5 +1,6 @@
-// Test 1 Practice: five problem sections on one page, the R-V problems, the orbital maneuver
-// problems, the rendezvous problems, the time of flight problems, and the propulsion problems,
+// Test 1 Practice: six problem sections on one page, the R-V problems, the orbital maneuver
+// problems, the rendezvous problems, the time of flight problems, the ground track problems,
+// and the propulsion problems,
 // with the same two modes, answer form, and walkthrough for all of them.
 // Practice mode shows the view from the start and lets the student walk through the steps.
 // Test mode shows only the problem and the answer form until the answers are graded.
@@ -17,6 +18,7 @@
     const Rendezvous = window.Test1RendezvousProblems;
     const Tof = window.Test1TofProblems;
     const Propulsion = window.Test1PropulsionProblems;
+    const GroundTrack = window.Test1GroundTrackProblems;
 
     // The R-V problems keep the satellite at least 1.5 Earth radii from Earth's center, so that
     // the orbit has room in the view.
@@ -33,10 +35,11 @@
         test: 'Pair every card, then submit. Pick a paired card to undo its pair before submitting.'
     };
 
-    // The page has six sections. The first five have their own problems, and the last is the
+    // The page has seven sections. The first six have their own problems, and the last is the
     // laws matching drill. A link can open any one (#rv, #maneuvers, #rendezvous, #tof,
-    // #propulsion, or #laws). The propulsion problems have no 3D view.
-    const SECTIONS = ['rv', 'maneuvers', 'rendezvous', 'tof', 'propulsion', 'laws'];
+    // #groundtrack, #propulsion, or #laws). The propulsion problems have no view. The ground
+    // track problems draw a flat map, which is part of the problem, so it shows in test mode too.
+    const SECTIONS = ['rv', 'maneuvers', 'rendezvous', 'tof', 'groundtrack', 'propulsion', 'laws'];
     const state = {
         mode: 'practice',
         section: SECTIONS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'rv',
@@ -44,6 +47,7 @@
         rendezvousType: 'random', // In the rendezvous section: coplanar, co-orbital, or either
         tofType: 'random',      // In the time of flight section: find the time, the position, or either
         propulsionType: 'random', // In the propulsion section: one difficulty level, or any level
+        groundTrackType: 'random', // In the ground track section: circular, elliptical, or either
         problem: null,
         submitted: false,
         blankWarned: false,
@@ -133,6 +137,25 @@
         };
     }
 
+    // The map is the problem, so it stays in view in test mode (viewIsGiven).
+    function groundTrackProblem(type) {
+        const p = GroundTrack.generate(type);
+        return {
+            view: 'groundtrack',
+            viewIsGiven: true,
+            title: p.title,
+            prompt: p.prompt,
+            limitsHtml: p.limitsHtml,
+            overviewCaption: p.overviewCaption,
+            fields: p.fields,
+            statement: p.statement,
+            answers: p.answers,
+            steps: p.steps,
+            source: p,
+            grade: (field, text) => GroundTrack.grade(field.tolerance, text, p.answers[field.key].value, field.unitType)
+        };
+    }
+
     // No view: the page shows only the answer form and the walkthrough.
     function propulsionProblem(type) {
         const p = Propulsion.generate(type);
@@ -156,6 +179,7 @@
         if (state.section === 'propulsion') return propulsionProblem(state.propulsionType);
         if (state.section === 'rendezvous') return rendezvousProblem(state.rendezvousType);
         if (state.section === 'tof') return tofProblem(state.tofType);
+        if (state.section === 'groundtrack') return groundTrackProblem(state.groundTrackType);
         const types = Maneuvers.types;
         const type = state.maneuverType === 'random' ? types[Math.floor(Math.random() * types.length)] : state.maneuverType;
         return maneuverProblem(type);
@@ -190,9 +214,10 @@
             const input = document.createElement('input');
             input.id = `answer-${field.key}`;
             input.type = 'text';
-            // A yes/no answer needs letters; every other answer is a number.
-            input.inputMode = field.unitType === 'yesno' ? 'text' : 'decimal';
+            // A yes/no answer, or one that may be a word, needs letters; every other answer is a number.
+            input.inputMode = field.unitType === 'yesno' || field.textOk ? 'text' : 'decimal';
             input.spellcheck = false;
+            if (field.placeholder) input.placeholder = field.placeholder;
             const unit = document.createElement('span');
             unit.className = 'answer-unit';
             unit.textContent = field.unit;
@@ -405,9 +430,10 @@
             return;
         }
 
-        const answersOnly = state.mode === 'test' && !state.submitted;
+        const ungraded = state.mode === 'test' && !state.submitted;
+        const answersOnly = ungraded && !(state.problem && state.problem.viewIsGiven);
         document.body.classList.toggle('answers-only', answersOnly);
-        $('walk-panel').hidden = answersOnly;
+        $('walk-panel').hidden = ungraded;
         $('check').hidden = state.submitted;
         $('check').textContent = state.mode === 'test' ? 'Submit Answers' : 'Check Answers';
         $('new-problem').classList.toggle('primary', state.submitted);
@@ -445,6 +471,7 @@
         $('rendezvous-topic').hidden = state.section !== 'rendezvous';
         $('tof-topic').hidden = state.section !== 'tof';
         $('propulsion-topic').hidden = state.section !== 'propulsion';
+        $('groundtrack-topic').hidden = state.section !== 'groundtrack';
         for (const button of $('section').querySelectorAll('button')) {
             button.setAttribute('aria-pressed', String(button.dataset.value === state.section));
         }
@@ -474,6 +501,11 @@
 
     Kit.bindSegmented($('propulsion-topic'), (type) => {
         state.propulsionType = type;
+        newProblem();
+    });
+
+    Kit.bindSegmented($('groundtrack-topic'), (type) => {
+        state.groundTrackType = type;
         newProblem();
     });
 
@@ -515,14 +547,22 @@
             rv: { make: () => window.RvCoeScene, canvas: $('scene-rv'), labels: $('labels-rv'), constants: RvCoe.constants, live: null },
             maneuver: { make: () => window.Test1ManeuverScene, canvas: $('scene-maneuver'), labels: $('labels-maneuver'), constants: Maneuvers.constants, live: null },
             rendezvous: { make: () => window.Test1RendezvousScene, canvas: $('scene-rendezvous'), labels: $('labels-rendezvous'), constants: Rendezvous.constants, live: null },
-            tof: { make: () => window.Test1TofScene, canvas: $('scene-tof'), labels: $('labels-tof'), constants: Tof.constants, live: null }
+            tof: { make: () => window.Test1TofScene, canvas: $('scene-tof'), labels: $('labels-tof'), constants: Tof.constants, live: null },
+            // A flat map, drawn without the 3D library, so it is made at once.
+            groundtrack: { flat: true, canvas: $('scene-groundtrack'), labels: $('labels-groundtrack'), live: null }
         };
         const pending = { view: 'rv', problem: null, stage: 'given', answersShown: false };
+        let status3d = '';      // The 3D library's loading or error message, or '' once it is ready
 
+        // The message covers only the 3D views. A flat view does not wait for the library.
         function showStatus(text) {
-            statusEl.style.display = 'flex';
+            status3d = text;
+            const v = views[pending.view];
+            statusEl.style.display = text && !(v && v.flat) ? 'flex' : 'none';
             statusEl.textContent = text;
         }
+
+        views.groundtrack.live = window.Test1GroundTrackScene.create({ view: $('view'), canvas: views.groundtrack.canvas });
 
         // A problem with no view (view: null) leaves every canvas hidden.
         function current() {
@@ -535,6 +575,9 @@
                 v.canvas.hidden = key !== name;
                 v.labels.hidden = key !== name;
             }
+            const flat = Boolean(views[name] && views[name].flat);
+            document.body.classList.toggle('flat-view', flat);
+            statusEl.style.display = status3d && !flat ? 'flex' : 'none';
         }
 
         (async () => {
@@ -547,6 +590,7 @@
                 return;
             }
             for (const v of Object.values(views)) {
+                if (v.flat) continue;
                 v.live = v.make().create(THREE, {
                     view: $('view'),
                     canvas: v.canvas,
@@ -556,10 +600,10 @@
                     showStatus
                 }, v.constants, { moveSatellite: true });
             }
-            if (!Object.values(views).some((v) => v.live)) return;
-            statusEl.style.display = 'none';
+            if (!Object.values(views).some((v) => v.live && !v.flat)) return;
+            showStatus('');
             const live = current();
-            if (!live || !pending.problem) return;
+            if (!live || !pending.problem || views[pending.view].flat) return;
             live.setProblem(pending.problem.source);
             if (live.setAnswersShown) live.setAnswersShown(pending.answersShown);
             live.setStage(pending.stage);
@@ -573,6 +617,7 @@
                 showView(problem.view);
                 const live = current();
                 if (live) live.setProblem(problem.source);
+                if (live && views[problem.view].flat) live.resize();
             },
             setStage(stage, caption) {
                 pending.stage = stage;

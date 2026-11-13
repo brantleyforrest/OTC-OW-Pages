@@ -31,7 +31,7 @@ The web portal is established at `index.html`. The following tools are available
 * **[Inertial Rendezvous](orbits/inertial-rendezvous.html):** An interactive 3D visualizer for coplanar and co-orbital orbital rendezvous in the inertial (ECI) frame with live equations and a trade panel (loads KaTeX from a CDN).
 
 The Study tab links to:
-* **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems in four sections, classical orbital elements from state vectors, orbital maneuvers (Hohmann transfers, simple plane changes, and combined plane changes), coplanar and co-orbital rendezvous, and time of flight with D = RT (time to sweep an angle, or position after a time), with answer checking and a 3D walkthrough in which the satellite moves along with the steps. A fifth section matches Kepler's three laws and Newton's four laws to their statements or equations on cards.
+* **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems in five sections, classical orbital elements from state vectors, orbital maneuvers (Hohmann transfers, simple plane changes, and combined plane changes), coplanar and co-orbital rendezvous, time of flight with D = RT (time to sweep an angle, or position after a time), and ground tracks (the period, semi-major axis, eccentricity, inclination, argument of perigee, and true anomaly read from the ground track of a standard orbit on a world map), with answer checking and a 3D walkthrough in which the satellite moves along with the steps. A fifth section matches Kepler's three laws and Newton's four laws to their statements or equations on cards.
 
 ---
 

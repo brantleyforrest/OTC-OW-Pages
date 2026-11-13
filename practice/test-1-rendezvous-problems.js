@@ -476,7 +476,7 @@
             model: m,
             positions: pos,
             title: 'Co-orbital Rendezvous',
-            prompt: prose(`The chase and the target share one circular orbit. The chase flies ${kText} and meets the target where it started. Find the initial phase angle, the target’s travel during one phasing orbit, the time to rendezvous, the phasing orbit’s size, its perigee altitude, the first burn, and the total $\\Delta V$.`),
+            prompt: prose(`The chase and the target share one circular orbit. The chase flies ${kText} and meets the target back at the burn point. Find the initial phase angle, the target’s travel during one phasing orbit, the time to rendezvous, the phasing orbit’s size, its perigee altitude, the first burn, and the total $\\Delta V$.`),
             statement: item(`R = ${km(R)}\\text{ km}`) + positionItems(pos) + item(`k = ${k}`) + item(`R_\\oplus = ${km(R_EARTH)}\\text{ km}`),
             overviewCaption: prose(`<b>The problem as given.</b> The chase and the target share one circular orbit. ${POSITION_DEF}`),
             limitsHtml: prose(`Accepted: $\\phi_0$ and $\\nu_{\\text{travel}}$ within 0.5°, $TOF_{\\text{rendezvous}}$ within 0.5% (${TIME_FORMS}), $a_{\\text{phasing}}$ within 0.5%, $h_p$ within 10 km, each $\\Delta V$ within 2% (km/s or m/s). Give $\\Delta V_1$ its sign: negative for a retrograde burn. ${MU_NOTE}`),

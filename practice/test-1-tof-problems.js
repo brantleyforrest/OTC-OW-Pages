@@ -285,7 +285,7 @@
             title: 'Orbit Prediction',
             prompt: prose('A satellite is on a circular orbit. Use $D = RT$ to find where it is after flying for time $T$: the rate (mean motion), the distance (angle swept, in degrees), and its new position $u_1$.'),
             statement: orbitGiven(o) + item(`u_0 = ${u0}°`) + item(timeGiven),
-            overviewCaption: prose(`<b>The problem as given.</b> The satellite starts at $u_0 = ${u0}°$ and flies for $${timeGiven}$. $u$ is measured from the ascending node.`),
+            overviewCaption: prose(`<b>The problem as given.</b> The satellite starts at $u_0 = ${u0}°$ and flies for ${inMinutes ? `${T / 60} minutes` : `${group(T)} seconds`}. $u$ is measured from the ascending node.`),
             limitsHtml: prose(`Accepted: $n$ within 0.5% (rad/s or °/s), $D$ within 0.5% (° or rad), $u_1$ within 0.5°. ${MU_NOTE}`),
             fields,
             answers,
