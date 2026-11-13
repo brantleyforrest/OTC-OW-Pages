@@ -444,6 +444,7 @@
         const nuSector = createSector(COLORS.tof);
         const legs = [0, 1, 2].map(() => createBar(COLORS.radius));
         const thetaLegs = [0, 1].map(() => createBar(COLORS.radius));
+        const perigeeBar = createBar(COLORS.node);
 
         // Radius lines
         const rChaseBar = createBar(COLORS.orbit1);
@@ -504,6 +505,7 @@
             phiDesired: measureLabel('\\phi_{\\text{desired}}', COLORS.theta, 1),
             thetaChase: measureLabel('\\theta_{\\text{chase}}', COLORS.orbit1, 1),
             thetaTarget: measureLabel('\\theta_{\\text{target}}', COLORS.orbit2, 1),
+            hp: measureLabel('h_p', COLORS.node, 1),
             nuTravel: measureLabel('\\nu_{\\text{travel}}', COLORS.tof, 1),
             rendezvous: wordLabel('Rendezvous', 2, true),
             r1: measureLabel('R_{\\text{chase}}', COLORS.orbit1, 2),
@@ -573,7 +575,8 @@
         // What the camera keeps in view: the given-position arcs too, when there are any,
         // so the framing does not jump when they go away
         function viewExtent(m) {
-            return framed ? thetaRadii(m)[1] : sceneExtent(m);
+            // The arcs nearest the camera look largest, so they get a little extra room
+            return framed ? thetaRadii(m)[1] * 1.12 : sceneExtent(m);
         }
 
         // Thin radial leg from Earth's center out through a point to at least `reach`
@@ -637,7 +640,13 @@
         // until the answers are graded); the given radii and initial phase angle keep theirs.
         // reveal: null draws everything; an object draws only the parts of the solution set in
         // it (transfer, phasing, nu, desired, burns), so that a walkthrough can build them up.
-        let shown = { vectors: true, angles: true, labels: true, values: true, reveal: null, compareHohmann: false };
+        // traceNu: the coplanar nu_travel arc follows the target through the transfer instead
+        // of being drawn whole. perigee: draw the co-orbital perigee altitude bar.
+        let shown = { vectors: true, angles: true, labels: true, values: true, reveal: null, compareHohmann: false, traceNu: false, perigee: false };
+        // How much of each angle arc (and the perigee altitude bar) is drawn, 0 to 1, so that a
+        // walkthrough can sweep one in when a step finds it
+        const GROWN = { phi: 1, thetas: 1, nu: 1, desired: 1, perigee: 1 };
+        let grow = { ...GROWN };
         const revealed = (part) => !shown.reveal || Boolean(shown.reveal[part]);
         let dirty = true;
         let viewW = 1, viewH = 1;
@@ -782,6 +791,12 @@
             dirty = true;
         }
 
+        // parts: { phi, thetas, nu, desired, perigee } fractions drawn; parts left out are whole
+        function setGrow(parts) {
+            grow = { ...GROWN, ...(parts || {}) };
+            dirty = true;
+        }
+
         // deg: where the chase starts, measured from I-hat; null for no frame (chase on I-hat)
         function setFrame(deg) {
             framed = typeof deg === 'number' && Number.isFinite(deg);
@@ -832,6 +847,8 @@
             thetaTargetAnchor: new THREE.Vector3(),
             thetaChaseText: '',
             thetaTargetText: '',
+            perigeeAnchor: new THREE.Vector3(),
+            perigeeShown: false,
             burns: [
                 { pos: new THREE.Vector3(), dvVal: 0, name: 'burn1' },
                 { pos: new THREE.Vector3(), dvVal: 0, name: 'burn2' },
@@ -892,6 +909,7 @@
             anchors.phiDesiredText = '';
             anchors.phiIsInitial = false;
             anchors.nuShown = false;
+            anchors.perigeeShown = false;
 
             const same = sameOrbit(m);
 
@@ -962,14 +980,14 @@
                     // A shaded wedge between its radial lines marks it as an angle.
                     const tAng = Math.atan2(anchors.targetPos.y, anchors.targetPos.x);
                     const curPhiRad = global.RendezvousMath.wrap2Pi(Math.atan2(anchors.chasePos.y, anchors.chasePos.x) - tAng);
-                    if (curPhiRad > 0.004 && p.key !== 'together') {
+                    if (curPhiRad > 0.004 && p.key !== 'together' && grow.phi > 0.002) {
                         const key = `${mid}_phi_${curPhiRad.toFixed(3)}`;
-                        drawTube(phiArc, 1, 0.95, key, (t, out) => {
+                        drawTube(phiArc, grow.phi, 0.95, key, (t, out) => {
                             const ang = tAng + t * curPhiRad;
                             return out.set(lay.live * Math.cos(ang), lay.live * Math.sin(ang), 0);
                         }, sz, anchors.phiAnchor);
-                        placeSector(phiSector, 0.16, key, tAng, curPhiRad, lay.fillIn, lay.live);
-                        anchors.phiText = degText(curPhiRad * R2D);
+                        placeSector(phiSector, 0.16, `${key}_${grow.phi.toFixed(3)}`, tAng, curPhiRad * grow.phi, lay.fillIn, lay.live);
+                        if (grow.phi > 0.5) anchors.phiText = degText(curPhiRad * R2D);
                         if (!lay.inside) {
                             // Arcs outside the orbits: carry the radial lines out to them
                             placeLeg(rChaseBar, 0.35, anchors.chasePos, lay.live, sz);
@@ -980,11 +998,11 @@
                     // Desired phase angle at the departure burn (dashed: a goal, not yet
                     // reached), between the target-at-departure and departure-point legs
                     if (desiredShown && m.phi_desired > 0.004) {
-                        drawTube(phiDesiredArc, 1, 0.75, `${mid}_phides`, (t, out) => {
+                        drawTube(phiDesiredArc, grow.desired, 0.75, `${mid}_phides`, (t, out) => {
                             const ang = theta_target_dep + t * m.phi_desired;
                             return out.set(lay.desired * Math.cos(ang), lay.desired * Math.sin(ang), 0);
                         }, sz, anchors.phiDesiredAnchor);
-                        anchors.phiDesiredText = degText(m.phi_desired_deg);
+                        if (grow.desired > 0.5) anchors.phiDesiredText = degText(m.phi_desired_deg);
                         placeLeg(legs[1], 0.3, depPos, lay.desired, sz);
                     }
 
@@ -992,16 +1010,20 @@
                     // departure to the rendezvous point, set off from the target orbit
                     // (spiraling outward if it passes 360 degrees)
                     if (!same && revealed('nu')) {
-                        anchors.nuShown = true;
+                        // Traced: the arc follows the target through the transfer, so it is
+                        // empty before the departure burn and whole after the arrival burn
+                        const traced = p.key === 'transfer' ? p.k : (p.key === 'burn2' || p.key === 'together' ? 1 : 0);
+                        const nuK = shown.traceNu ? traced : grow.nu;
+                        anchors.nuShown = nuK > 0.5;
                         const nuLevel = p.key === 'transfer' ? 1.0 : p.key === 'burn2' || p.key === 'together' ? 0.75 : 0.5;
                         const nuEnd = lay.nu + lay.lap * (m.nu_travel / (2 * Math.PI));
-                        drawTube(nuTravelArc, 1, nuLevel, `${mid}_nu_trav`, (t, out) => {
+                        drawTube(nuTravelArc, nuK, nuLevel, `${mid}_nu_trav`, (t, out) => {
                             const ang = theta_target_dep + t * m.nu_travel;
                             const r = lay.nu + lay.lap * ((t * m.nu_travel) / (2 * Math.PI));
                             return out.set(r * Math.cos(ang), r * Math.sin(ang), 0);
                         }, sz, anchors.nuAnchor);
                         if (p.key === 'transfer') {
-                            placeSector(nuSector, 0.09, `${mid}_nusec`, theta_target_dep, Math.min(m.nu_travel, 2 * Math.PI), rTargetScene, lay.nu);
+                            placeSector(nuSector, 0.09, `${mid}_nusec_${nuK.toFixed(3)}`, theta_target_dep, Math.min(m.nu_travel, 2 * Math.PI) * nuK, rTargetScene, lay.nu);
                         }
                         placeLeg(legs[0], 0.3, ghostPos, Math.max(lay.nu, desiredShown ? lay.desired : 0), sz);
                         if (anchors.hasRendezvous) placeLeg(legs[2], 0.3, anchors.rendezvousPos, nuEnd, sz);
@@ -1045,12 +1067,12 @@
                     // shaded between its radial lines
                     const tStartAng = -m.phi0_rad;
                     const phiLevel = p.key === 'together' ? 0.45 : 0.9;
-                    drawTube(phiArc, 1, phiLevel, `${mid}_co_phi`, (t, out) => {
+                    drawTube(phiArc, grow.phi, phiLevel, `${mid}_co_phi`, (t, out) => {
                         const ang = tStartAng + t * m.phi0_rad;
                         return out.set(lay.live * Math.cos(ang), lay.live * Math.sin(ang), 0);
                     }, sz, anchors.phiAnchor);
-                    placeSector(phiSector, 0.16 * phiLevel, `${mid}_co_phisec`, tStartAng, m.phi0_rad, lay.fillIn, lay.live);
-                    anchors.phiText = degText(m.phi0);
+                    placeSector(phiSector, 0.16 * phiLevel, `${mid}_co_phisec_${grow.phi.toFixed(3)}`, tStartAng, m.phi0_rad * grow.phi, lay.fillIn, lay.live);
+                    if (grow.phi > 0.5) anchors.phiText = degText(m.phi0);
                     anchors.phiIsInitial = true;
 
                     // Target travel during ONE phasing orbit, set off outside both orbits;
@@ -1060,8 +1082,8 @@
                     const nuOn = revealed('nu');
                     const nuEnd = lay.nu + lay.lap * (m.nu_travel / (2 * Math.PI));
                     if (nuOn) {
-                        anchors.nuShown = true;
-                        drawTube(nuTravelArc, 1, nuLevel, `${mid}_co_nu1`, (t, out) => {
+                        anchors.nuShown = grow.nu > 0.5;
+                        drawTube(nuTravelArc, grow.nu, nuLevel, `${mid}_co_nu1`, (t, out) => {
                             const ang = tStartAng + t * m.nu_travel;
                             const r = lay.nu + lay.lap * ((t * m.nu_travel) / (2 * Math.PI));
                             return out.set(r * Math.cos(ang), r * Math.sin(ang), 0);
@@ -1073,6 +1095,22 @@
                     const reach = Math.max(nuOn ? nuEnd : 0, lay.inside ? 0 : lay.live);
                     placeLeg(legs[0], 0.3, tmpA.set(Math.cos(tStartAng), Math.sin(tStartAng), 0).multiplyScalar(rChaseScene), reach, sz);
                     placeLeg(legs[1], 0.3, tmpB.set(rChaseScene, 0, 0), reach, sz);
+                }
+
+                // Perigee altitude: from Earth's surface up to the phasing orbit's perigee,
+                // which is across from the burn point when the chase is behind and at the
+                // burn point when it is ahead. Red when it is too low.
+                if (shown.perigee && m.phi0 > 0 && revealed('perigee') && grow.perigee > 0.002) {
+                    const ang = isBehind ? Math.PI : 0;
+                    const rp = m.r_p / R_E;
+                    const base = tmpA.set(Math.cos(ang), Math.sin(ang), 0);
+                    const tip = tmpB.copy(base).multiplyScalar(1 + (rp - 1) * grow.perigee);
+                    const color = isDangerous ? COLORS.dv : COLORS.node;
+                    perigeeBar.userData.solidMat.color.set(color);
+                    perigeeBar.userData.ghostMat.color.set(color);
+                    placeBar(perigeeBar, 0.95, base, tip, 0.14 * sz);
+                    anchors.perigeeAnchor.copy(base).add(tip).multiplyScalar(0.5);
+                    anchors.perigeeShown = grow.perigee > 0.5;
                 }
             }
 
@@ -1090,12 +1128,17 @@
                 ];
                 arcs.forEach((a, i) => {
                     placeLeg(thetaLegs[i], 0.3, a.pos, a.r, sz);
-                    if (a.sweep < 0.004) return;
-                    drawTube(a.tube, 1, 0.9, `${mid}_theta${i}_${a.sweep.toFixed(4)}_${frameRad.toFixed(4)}`, (t, out) => {
+                    if (a.sweep < 0.004) {
+                        // On I-hat: no arc to draw, but the 0° still labeled there
+                        a.anchor.set(a.r * Math.cos(start), a.r * Math.sin(start), 0);
+                        if (grow.thetas > 0.5) anchors[a.text] = degText(0);
+                        return;
+                    }
+                    drawTube(a.tube, grow.thetas, 0.9, `${mid}_theta${i}_${a.sweep.toFixed(4)}_${frameRad.toFixed(4)}`, (t, out) => {
                         const ang = start + t * a.sweep;
                         return out.set(a.r * Math.cos(ang), a.r * Math.sin(ang), 0);
                     }, sz, a.anchor);
-                    anchors[a.text] = degText(a.sweep * R2D);
+                    if (grow.thetas > 0.5) anchors[a.text] = degText(a.sweep * R2D);
                 });
             }
 
@@ -1220,6 +1263,10 @@
                         const given = (anchors.phiIsInitial || clockAt(currentModel, timelineTl) <= 0) && revealed('phi0');
                         setLabelValue(lbl, shown.values || given ? anchors.phiText : '');
                         project(lbl, anchors.phiAnchor, 0.85);
+                    }
+                    if (anchors.perigeeShown) {
+                        setLabelValue(labels.hp, shown.values ? kmText(currentModel.h_p) : '');
+                        project(labels.hp, anchors.perigeeAnchor, 0.85);
                     }
                     if (anchors.thetaChaseText) {
                         setLabelValue(labels.thetaChase, anchors.thetaChaseText);
@@ -1390,6 +1437,7 @@
             setModel,
             setTime,
             setShown,
+            setGrow,
             setFrame,
             setFocus,
             resetView,
