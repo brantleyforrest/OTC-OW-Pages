@@ -99,6 +99,41 @@
         return Check.isAccepted(tolerance, value, truth) ? 'right' : 'wrong';
     }
 
+    /* ------------------------------------------------------------------ */
+    /* Given positions                                                    */
+    /* ------------------------------------------------------------------ */
+    // The problem gives where each spacecraft is, as an angle from one reference direction in
+    // the direction of motion, rather than phi_0 itself. phi_0 is the first thing to find.
+    function positions(phi0) {
+        const target = angleBetween(0, 355);
+        return { target, chase: (target + phi0) % 360 };
+    }
+
+    const POSITION_DEF = '$\\theta$ is measured from the same reference direction for both spacecraft, in the direction of motion.';
+
+    function phaseField() {
+        return { key: 'phi0', tex: '\\phi_0', name: 'Initial phase angle', unit: '°', tolerance: { absolute: 0.5, wrap: 360 }, unitType: 'angle' };
+    }
+
+    function phaseStep(pos, phi0, caption) {
+        const raw = pos.chase - pos.target;
+        return {
+            key: 'phase',
+            title: prose('Initial phase angle, $\\phi_0$'),
+            result: math(`\\phi_0 = ${phi0}°`),
+            caption: prose(caption),
+            methods: [{
+                name: 'Formula',
+                html: calc('\\phi_0 = \\theta_{\\text{chase}} - \\theta_{\\text{target}}', raw < 0
+                    ? [`${pos.chase}° - ${pos.target}°`, `${raw}° + 360°`]
+                    : [`${pos.chase}° - ${pos.target}°`], `${phi0}°`)
+                    + note('$\\phi_0$ is measured from the target to the chase, in the direction of motion. If the difference is negative, add $360°$.')
+            }]
+        };
+    }
+
+    const positionItems = (pos) => item(`\\theta_{\\text{chase}} = ${pos.chase}°`) + item(`\\theta_{\\text{target}} = ${pos.target}°`);
+
     const TIME_FORMS = 'seconds, minutes, hours, or h:mm:ss';
     const MU_NOTE = 'The solutions use $\\mu = 398{,}600.44\\text{ km}^3/\\text{s}^2$.';
 
@@ -123,6 +158,7 @@
         const m = coplanarModel();
         const { Rchase, Rtarget, n_chase, n_target, T_syn, a_transfer, TOF, nu_travel_deg, phi_desired_deg, WT, TOF_total } = m;
         const phi0 = m.phi0;
+        const pos = positions(phi0);
         const chaseLower = Rchase < Rtarget;
         const drift = (n_chase - n_target) * R2D;           // °/s, negative when the chase is higher
 
@@ -139,6 +175,7 @@
         const phiDText = phiD > 180 ? `${phiD.toFixed(2)}° (or −${(360 - phiD).toFixed(2)}°)` : `${phiD.toFixed(2)}°`;
 
         const answers = {
+            phi0: { value: phi0, text: `${phi0}°` },
             t_syn: { value: T_syn, text: timeText(T_syn) },
             tof: { value: TOF, text: timeText(TOF) },
             nu: { value: nu_travel_deg, text: `${nu_travel_deg.toFixed(2)}°` },
@@ -148,6 +185,7 @@
         };
 
         const fields = [
+            phaseField(),
             { key: 't_syn', tex: 'T_{\\text{syn}}', name: 'Synodic period', unit: 's', tolerance: { relative: 0.01 }, unitType: 'time_s' },
             { key: 'tof', tex: 'TOF', name: 'Transfer time', unit: 's', tolerance: { relative: 0.005 }, unitType: 'time_s' },
             { key: 'nu', tex: '\\nu_{\\text{travel}}', name: 'Target travel', unit: '°', tolerance: { absolute: 0.5 }, unitType: 'angle' },
@@ -164,6 +202,7 @@
             : `The chase is higher and slower, so $\\phi$ shrinks and the drift rate is negative. Laps are subtracted until the change is negative and less than $360°$ in size: that is the first opportunity.`;
 
         const steps = [
+            phaseStep(pos, phi0, `<b>Initial phase angle.</b> $\\phi_0$ is how far the chase is ahead of the target, measured in the direction of motion.`),
             {
                 key: 'motions',
                 title: prose('Mean motions, $n_{\\text{chase}}$ and $n_{\\text{target}}$'),
@@ -271,10 +310,10 @@
             type: 'coplanar',
             model: m,
             title: 'Coplanar Rendezvous',
-            prompt: prose('The chase and the target are on circular orbits in the same plane. The chase waits for the right phase angle, then flies a Hohmann transfer to meet the target. Find the synodic period, the transfer time, the target’s travel during the transfer, the desired phase angle, the wait for the first opportunity, and the total time.'),
-            statement: item(`R_{\\text{chase}} = ${km(Rchase)}\\text{ km}`) + item(`R_{\\text{target}} = ${km(Rtarget)}\\text{ km}`) + item(`\\phi_0 = ${phi0}°`),
-            overviewCaption: prose(`<b>The problem as given.</b> The chase is on the ${chaseLower ? 'inner' : 'outer'} orbit and the target on the ${chaseLower ? 'outer' : 'inner'} one, in the same plane. $\\phi_0$ is measured from the target to the chase, in the direction of motion.`),
-            limitsHtml: prose(`Accepted: $T_{\\text{syn}}$, $WT$, and $TOF_{\\text{total}}$ within 1%, $TOF$ within 0.5% (${TIME_FORMS}), $\\nu_{\\text{travel}}$ and $\\phi_{\\text{desired}}$ within 0.5°. $\\phi_{\\text{desired}}$ may be given as a negative angle. ${MU_NOTE}`),
+            prompt: prose('The chase and the target are on circular orbits in the same plane. The chase waits for the right phase angle, then flies a Hohmann transfer to meet the target. Find the initial phase angle, the synodic period, the transfer time, the target’s travel during the transfer, the desired phase angle, the wait for the first opportunity, and the total time.'),
+            statement: item(`R_{\\text{chase}} = ${km(Rchase)}\\text{ km}`) + item(`R_{\\text{target}} = ${km(Rtarget)}\\text{ km}`) + positionItems(pos),
+            overviewCaption: prose(`<b>The problem as given.</b> The chase is on the ${chaseLower ? 'inner' : 'outer'} orbit and the target on the ${chaseLower ? 'outer' : 'inner'} one, in the same plane. ${POSITION_DEF}`),
+            limitsHtml: prose(`Accepted: $\\phi_0$ within 0.5°, $T_{\\text{syn}}$, $WT$, and $TOF_{\\text{total}}$ within 1%, $TOF$ within 0.5% (${TIME_FORMS}), $\\nu_{\\text{travel}}$ and $\\phi_{\\text{desired}}$ within 0.5°. $\\phi_{\\text{desired}}$ may be given as a negative angle. ${MU_NOTE}`),
             fields,
             answers,
             steps
@@ -301,6 +340,7 @@
         const m = coorbitalModel();
         const { Rchase: R, phi0, phi_eff_deg, isBehind, k, n_target, nu_travel_deg, Period_phasing, TOF_rendezvous, a_phasing, V_chase, V_phasing, dv1, dv_total, r_p, r_a, h_p } = m;
         const nu = nu_travel_deg;
+        const pos = positions(phi0);
 
         // The burn is the difference of the two speeds as written, as in the lesson
         const vc = V_chase.toFixed(5);
@@ -309,6 +349,7 @@
         const safe = h_p > MIN_ALT;
 
         const answers = {
+            phi0: { value: phi0, text: `${phi0}°` },
             nu: { value: nu, text: `${nu.toFixed(2)}°` },
             tof: { value: TOF_rendezvous, text: timeText(TOF_rendezvous) },
             a_ph: { value: a_phasing, text: `${group(a_phasing, 1)} km` },
@@ -318,6 +359,7 @@
         };
 
         const fields = [
+            phaseField(),
             { key: 'nu', tex: '\\nu_{\\text{travel}}', name: 'Target travel, one phasing orbit', unit: '°', tolerance: { absolute: 0.5 }, unitType: 'angle' },
             { key: 'tof', tex: 'TOF_{\\text{rendezvous}}', name: 'Time to rendezvous', unit: 's', tolerance: { relative: 0.005 }, unitType: 'time_s' },
             { key: 'a_ph', tex: 'a_{\\text{phasing}}', name: 'Phasing orbit size', unit: 'km', tolerance: { relative: 0.005 }, unitType: 'dist' },
@@ -343,6 +385,7 @@
             : `Too low: perigee is less than ${MIN_ALT} km above the surface, inside the atmosphere. In practice, choose more phasing orbits (a larger $k$).`;
 
         const steps = [
+            phaseStep(pos, phi0, `<b>Initial phase angle.</b> $\\phi_0$ is how far the chase is ahead of the target along the shared orbit, measured in the direction of motion.`),
             {
                 key: 'nu',
                 title: prose('Target travel, $\\nu_{\\text{travel}}$'),
@@ -431,10 +474,10 @@
             type: 'coorbital',
             model: m,
             title: 'Co-orbital Rendezvous',
-            prompt: prose(`The chase and the target share one circular orbit. The chase flies ${kText} and meets the target where it started. Find the target’s travel during one phasing orbit, the time to rendezvous, the phasing orbit’s size, its perigee altitude, the first burn, and the total $\\Delta V$.`),
-            statement: item(`R = ${km(R)}\\text{ km}`) + item(`\\phi_0 = ${phi0}°`) + item(`k = ${k}`) + item(`R_\\oplus = ${km(R_EARTH)}\\text{ km}`),
-            overviewCaption: prose('<b>The problem as given.</b> The chase and the target share one circular orbit. $\\phi_0$ is measured from the target to the chase, in the direction of motion.'),
-            limitsHtml: prose(`Accepted: $\\nu_{\\text{travel}}$ within 0.5°, $TOF_{\\text{rendezvous}}$ within 0.5% (${TIME_FORMS}), $a_{\\text{phasing}}$ within 0.5%, $h_p$ within 10 km, each $\\Delta V$ within 2% (km/s or m/s). Give $\\Delta V_1$ its sign: negative for a retrograde burn. ${MU_NOTE}`),
+            prompt: prose(`The chase and the target share one circular orbit. The chase flies ${kText} and meets the target where it started. Find the initial phase angle, the target’s travel during one phasing orbit, the time to rendezvous, the phasing orbit’s size, its perigee altitude, the first burn, and the total $\\Delta V$.`),
+            statement: item(`R = ${km(R)}\\text{ km}`) + positionItems(pos) + item(`k = ${k}`) + item(`R_\\oplus = ${km(R_EARTH)}\\text{ km}`),
+            overviewCaption: prose(`<b>The problem as given.</b> The chase and the target share one circular orbit. ${POSITION_DEF}`),
+            limitsHtml: prose(`Accepted: $\\phi_0$ and $\\nu_{\\text{travel}}$ within 0.5°, $TOF_{\\text{rendezvous}}$ within 0.5% (${TIME_FORMS}), $a_{\\text{phasing}}$ within 0.5%, $h_p$ within 10 km, each $\\Delta V$ within 2% (km/s or m/s). Give $\\Delta V_1$ its sign: negative for a retrograde burn. ${MU_NOTE}`),
             fields,
             answers,
             steps

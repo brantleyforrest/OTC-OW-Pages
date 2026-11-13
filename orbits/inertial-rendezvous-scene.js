@@ -1154,7 +1154,8 @@
                 if (shown.angles) {
                     if (anchors.phiText && anchors.phiAnchor.lengthSq() > 1e-4) {
                         const lbl = anchors.phiIsInitial ? labels.phi0 : labels.phi;
-                        const given = anchors.phiIsInitial || clockAt(currentModel, timelineTl) <= 0;
+                        // A walkthrough that asks for phi_0 reveals its value with the 'phi0' part
+                        const given = (anchors.phiIsInitial || clockAt(currentModel, timelineTl) <= 0) && revealed('phi0');
                         setLabelValue(lbl, shown.values || given ? anchors.phiText : '');
                         project(lbl, anchors.phiAnchor, 0.85);
                     }

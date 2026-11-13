@@ -14,20 +14,26 @@
     const START_DELAY = 0.6;    // A step starts playing this long after the camera starts moving
 
     // The parts of the solution drawn at each step (see `reveal` in inertial-rendezvous-scene.js)
+    // The spacecraft positions are given, not phi_0, so its value is labeled from the first
+    // step on, where it is found.
     const GIVEN = {};
     const COPLANAR_REVEAL = {
-        transfer: { transfer: true, burns: true },
-        travel: { transfer: true, burns: true, nu: true },
-        desired: { transfer: true, burns: true, nu: true, desired: true },
-        wait: { transfer: true, burns: true, nu: true, desired: true },
-        total: { transfer: true, burns: true, nu: true, desired: true }
+        phase: { phi0: true },
+        motions: { phi0: true },
+        synodic: { phi0: true },
+        transfer: { phi0: true, transfer: true, burns: true },
+        travel: { phi0: true, transfer: true, burns: true, nu: true },
+        desired: { phi0: true, transfer: true, burns: true, nu: true, desired: true },
+        wait: { phi0: true, transfer: true, burns: true, nu: true, desired: true },
+        total: { phi0: true, transfer: true, burns: true, nu: true, desired: true }
     };
     const COORBITAL_REVEAL = {
-        nu: { nu: true },
-        period: { nu: true, phasing: true, burns: true },
-        size: { nu: true, phasing: true, burns: true },
-        perigee: { nu: true, phasing: true, burns: true },
-        burn: { nu: true, phasing: true, burns: true }
+        phase: { phi0: true },
+        nu: { phi0: true, nu: true },
+        period: { phi0: true, nu: true, phasing: true, burns: true },
+        size: { phi0: true, nu: true, phasing: true, burns: true },
+        perigee: { phi0: true, nu: true, phasing: true, burns: true },
+        burn: { phi0: true, nu: true, phasing: true, burns: true }
     };
 
     function create(THREE, dom, constants) {
