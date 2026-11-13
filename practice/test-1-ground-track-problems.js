@@ -32,16 +32,18 @@
     /* ------------------------------------------------------------------ */
     /* Bank of Standard Orbits                                            */
     /* ------------------------------------------------------------------ */
+    // Every angle on the map falls on its 15° grid, so the map needs no degree labels: the
+    // nodes sit on 15° longitude lines and the peaks on 15° latitude lines.
     // shifts: the westward shift between consecutive ascending nodes, in degrees, which sets
-    // the period at 15° per hour. Each inclination is the standard orbit's, rounded to the
-    // nearest 15°, so that the peaks land on the map's 15° grid lines and are read from it.
-    // No track reaches higher than 75°, so none runs off the top or bottom of the map. argp lists
-    // the arguments of perigee offered, with the standard 270° (apogee north) offered twice as
-    // often as 90°.
+    // the period at 15° per hour. It is a multiple of 15°, so a low orbit takes 2 hours (30°),
+    // the lesson's own example. Each inclination is the standard orbit's, rounded to the
+    // nearest 15°. No track reaches higher than 75°, so none runs off the top or bottom of the
+    // map. argp lists the arguments of perigee offered, with the standard 270° (apogee north)
+    // offered twice as often as 90°.
     const BANK = [
-        { id: 'iss', name: 'a mid-inclination LEO orbit, like the International Space Station’s', family: 'circular', i: 45, shifts: [23, 23.5, 24] },
-        { id: 'hubble', name: 'a low-inclination LEO orbit, like the Hubble Space Telescope’s', family: 'circular', i: 30, shifts: [23.5, 24] },
-        { id: 'retro', name: 'a retrograde LEO orbit, tilted past 90° like a sun-synchronous orbit', family: 'circular', i: 105, shifts: [24, 25, 25.5] },
+        { id: 'leo45', name: 'a mid-inclination LEO orbit', family: 'circular', i: 45, shifts: [30] },
+        { id: 'leo30', name: 'a low-inclination LEO orbit', family: 'circular', i: 30, shifts: [30] },
+        { id: 'retro', name: 'a retrograde LEO orbit, tilted past 90° like a sun-synchronous orbit', family: 'circular', i: 105, shifts: [30] },
         { id: 'gps', name: 'a semi-synchronous MEO orbit, like a GPS satellite’s', family: 'circular', i: 60, shifts: [180] },
         { id: 'igso', name: 'an inclined geosynchronous orbit', family: 'circular', i: [15, 30, 45], shifts: [360] },
         { id: 'geo', name: 'a geostationary orbit', family: 'circular', i: 0, shifts: [360] },
@@ -120,7 +122,6 @@
         180: 'the descending node, crossing the equator heading south',
         270: 'the southern peak, the lowest latitude of the track'
     };
-    const FEATURE_SHORT = { 0: 'Ascending node', 90: 'Northern peak', 180: 'Descending node', 270: 'Southern peak' };
 
     /* ------------------------------------------------------------------ */
     /* Grading                                                            */
@@ -174,7 +175,7 @@
         const retrograde = i > 90;
         const equatorial = i === 0;   // Geostationary: the track is one point, with no nodes
         const peak = retrograde ? 180 - i : i;
-        const lambda1 = 5 * Math.floor(Math.random() * 72) - 180;
+        const lambda1 = 15 * Math.floor(Math.random() * 24) - 180;
         const lambda2 = wrap180(lambda1 - shift);
 
         const model = {
@@ -350,20 +351,16 @@
             }]
         };
 
-        const satWhere = equatorial ? 'single point of the track' : FEATURE_SHORT[satU].toLowerCase();
-        const nodeLon = (lon) => lonText(lon).replace(/([EW])$/, '\\text{ $1}');
         return {
             type: entry.family,
             model,
             title: 'Ground Track',
-            prompt: prose('The view shows one satellite’s ground track, with its direction of travel and where the satellite is now. Read the track to find its period, semi-major axis, whether its eccentricity is zero, its inclination, argument of perigee, and true anomaly.'),
-            statement: (equatorial
-                ? item(`\\text{Track: one point at } ${nodeLon(lambda1)}`)
-                : item(`\\lambda_{\\text{AN}1} = ${nodeLon(lambda1)}`) + item(`\\lambda_{\\text{AN}2} = ${nodeLon(lambda2)}`))
-                + item('\\omega_\\oplus \\approx 15°/\\text{h}'),
+            prompt: prose('The view shows one period of a satellite’s ground track, with its direction of travel and where the satellite is now. Read the node longitudes and peak latitudes from the map’s grid, then find the period, semi-major axis, whether the eccentricity is zero, the inclination, argument of perigee, and true anomaly.'),
+            statement: item('\\omega_\\oplus \\approx 15°/\\text{h}')
+                + item('\\text{Grid: every } 15°'),
             overviewCaption: equatorial
                 ? prose('<b>The ground track as given.</b> One full period, drawn over a whole day. The satellite is at the single point of the track.')
-                : prose(`<b>The ground track as given.</b> One period, from ascending node 1 to node 2. Arrows show the direction of travel, and the dots are equal steps of time. The satellite is at the ${satWhere}.`),
+                : prose(`<b>The ground track as given.</b> One period: the track starts at an ascending node and ends at the next one. Arrows show the direction of travel, and the dots are equal steps of time. The nodes and peaks all fall on 15° grid lines.`),
             limitsHtml: prose(`Accepted: $P$ within 2% (a bare number is hours; or type s, min, or h), $a$ within 1%, $e$ as zero or nonzero, $i$ within 7.5° (read the peaks to the nearest 15° line), $\\omega$ and $\\nu$ within 1°. Type <i>undefined</i> or <i>n/a</i> for an angle the orbit does not have. The solutions use Earth turning $15°$/h, $\\mu = ${MU_TEX}\\text{ km}^3/\\text{s}^2$, and $R_\\oplus = 6{,}378\\text{ km}$.`),
             fields,
             answers,

@@ -16,8 +16,8 @@
     const COLORS = {
         ocean: '#123258',
         land: '#5f8a70',
-        grid: 'rgba(255, 255, 255, 0.13)',
-        gridText: '#cbd5e1',
+        grid: 'rgba(255, 255, 255, 0.2)',
+        gridText: '#e2e8f0',
         track: '#ffe08a',
         node: '#38bdf8',
         descending: '#bae6fd',
@@ -47,13 +47,15 @@
         const mono = () => getComputedStyle(document.documentElement).getPropertyValue('--font-mono') || 'monospace';
 
         /* Map ------------------------------------------------------------- */
+        // The axis labels sit outside the map: latitudes on the left, longitudes below.
+        const AXIS = { left: 46, right: 14, top: 12, bottom: 28 };
+
         function layout() {
-            const padX = 12, padTop = 12, padBottom = 12;
-            const w = Math.min(viewW - 2 * padX, (viewH - padTop - padBottom) * 2);
+            const w = Math.min(viewW - AXIS.left - AXIS.right, (viewH - AXIS.top - AXIS.bottom) * 2);
             plot.w = Math.max(10, w);
             plot.h = plot.w / 2;
-            plot.x = (viewW - plot.w) / 2;
-            plot.y = Math.max(padTop, (viewH - plot.h) / 2);
+            plot.x = AXIS.left + (viewW - AXIS.left - AXIS.right - plot.w) / 2;
+            plot.y = AXIS.top + Math.max(0, (viewH - AXIS.top - AXIS.bottom - plot.h) / 2);
         }
 
         function drawBase() {
@@ -79,7 +81,9 @@
             g.strokeStyle = COLORS.grid;
             g.lineWidth = 1;
             g.beginPath();
-            for (let lon = -150; lon <= 150; lon += 30) {
+            // Every angle in a problem falls on this 15° grid. The prime meridian and the
+            // equator are drawn brighter, as references.
+            for (let lon = -165; lon <= 165; lon += 15) {
                 g.moveTo(mapX(lon), plot.y);
                 g.lineTo(mapX(lon), plot.y + plot.h);
             }
@@ -88,32 +92,55 @@
                 g.lineTo(plot.x + plot.w, mapY(lat));
             }
             g.stroke();
-            g.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            g.strokeStyle = 'rgba(255, 255, 255, 0.4)';
             g.beginPath();
             g.moveTo(plot.x, mapY(0));
             g.lineTo(plot.x + plot.w, mapY(0));
+            g.moveTo(mapX(0), plot.y);
+            g.lineTo(mapX(0), plot.y + plot.h);
             g.stroke();
-
-            const size = plot.w < 420 ? 9 : 10;
-            g.font = `${size}px ${mono()}`;
-            g.fillStyle = COLORS.gridText;
-            g.shadowColor = '#000000';
-            g.shadowBlur = 3;
-            g.textAlign = 'center';
-            g.textBaseline = 'bottom';
-            for (let lon = -120; lon <= 120; lon += 60) {
-                g.fillText(lon === 0 ? '0°' : `${Math.abs(lon)}°${lon < 0 ? 'W' : 'E'}`, mapX(lon), plot.y + plot.h - 2);
-            }
-            g.textAlign = 'left';
-            g.textBaseline = 'middle';
-            for (let lat = -75; lat <= 75; lat += 15) {
-                if (lat === 0) continue;
-                g.fillText(`${Math.abs(lat)}°${lat < 0 ? 'S' : 'N'}`, plot.x + 4, mapY(lat));
-            }
-            g.shadowBlur = 0;
             g.restore();
-            g.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+            g.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            g.lineWidth = 1;
             g.strokeRect(plot.x + 0.5, plot.y + 0.5, plot.w - 1, plot.h - 1);
+            drawAxes();
+        }
+
+        // Axis labels outside the map, large enough to read, on every grid line that has room.
+        function drawAxes() {
+            const size = plot.w < 420 ? 11 : 12.5;
+            g.font = `500 ${size}px ${mono()}`;
+            g.fillStyle = COLORS.gridText;
+            g.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            g.lineWidth = 1;
+
+            // Longitudes: every 15° when there is room for a label, else every 30° or 60°.
+            const lonStep = [15, 30, 60].find((step) => (step / 360) * plot.w >= size * 4.2) || 90;
+            g.textAlign = 'center';
+            g.textBaseline = 'top';
+            for (let lon = -180; lon <= 180; lon += lonStep) {
+                const x = mapX(lon);
+                g.beginPath();
+                g.moveTo(x, plot.y + plot.h);
+                g.lineTo(x, plot.y + plot.h + 4);
+                g.stroke();
+                const name = lon === 0 ? '0°' : Math.abs(lon) === 180 ? '180°' : `${Math.abs(lon)}°${lon < 0 ? 'W' : 'E'}`;
+                g.fillText(name, x, plot.y + plot.h + 6);
+            }
+
+            // Latitudes: every 15° when there is room, else every 30°.
+            const latStep = (15 / 180) * plot.h >= size * 1.3 ? 15 : 30;
+            g.textAlign = 'right';
+            g.textBaseline = 'middle';
+            for (let lat = -90; lat <= 90; lat += latStep) {
+                const y = mapY(lat);
+                g.beginPath();
+                g.moveTo(plot.x - 4, y);
+                g.lineTo(plot.x, y);
+                g.stroke();
+                const name = lat === 0 ? '0°' : `${Math.abs(lat)}°${lat < 0 ? 'S' : 'N'}`;
+                g.fillText(name, plot.x - 6, Math.max(plot.y + size / 2, Math.min(plot.y + plot.h - size / 2, y)));
+            }
         }
 
         /* Track ----------------------------------------------------------- */
@@ -372,9 +399,10 @@
             drawTimeDots(stage === 'ecc');
             drawArrows();
 
-            // The two labeled ascending nodes, and the descending node between them. An
+            // The two ascending nodes, and the descending node between them. They are read from
+            // the grid, so they are marked only by the period steps or after grading. An
             // equatorial track has no nodes.
-            if (!m.equatorial) {
+            if (!m.equatorial && (stage === 'period' || stage === 'sma' || answersShown)) {
                 const node1 = { x: mapX(m.lambda1), y: mapY(0) };
                 const node2 = { x: mapX(m.lambda2), y: mapY(0) };
                 const desc = at(m.tDescending);
