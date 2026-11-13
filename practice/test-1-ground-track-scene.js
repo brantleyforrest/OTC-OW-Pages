@@ -1,9 +1,10 @@
-// The map view for ground track problems on the Test 1 Practice page. A flat world map with the
-// track of one orbit, arrows for the direction of travel, dots at equal steps of time, the two
-// labeled ascending nodes, the latitude peaks, and the satellite. Each walkthrough step adds
-// what it reads: the node shift, the peak latitudes, the time dots, perigee and apogee, and the
-// arc from perigee to the satellite. Perigee and apogee are marked only by those steps, or
-// after the answers are graded, since finding them is part of the problem.
+// The map view for ground track problems on the Test 1 Practice page. A flat world map with one
+// period of the track, from ascending node 1 to node 2, arrows for the direction of travel, dots
+// at equal steps of time, the two labeled ascending nodes, and the satellite. Latitude lines
+// every 15° let the peaks be read. Each walkthrough step adds what it reads: the node shift, the
+// peak latitudes, the time dots, perigee and apogee, and the arc u from the node to the
+// satellite. The peaks, perigee, and apogee are labeled only by those steps, or after the
+// answers are graded, since finding them is part of the problem.
 // The view is drawn on a 2D canvas, so it does not need the 3D library.
 // Load as a classic script, after test-1-ground-track-problems.js and earth-land.js.
 (function (global) {
@@ -82,7 +83,7 @@
                 g.moveTo(mapX(lon), plot.y);
                 g.lineTo(mapX(lon), plot.y + plot.h);
             }
-            for (let lat = -60; lat <= 60; lat += 30) {
+            for (let lat = -75; lat <= 75; lat += 15) {
                 g.moveTo(plot.x, mapY(lat));
                 g.lineTo(plot.x + plot.w, mapY(lat));
             }
@@ -105,7 +106,7 @@
             }
             g.textAlign = 'left';
             g.textBaseline = 'middle';
-            for (let lat = -60; lat <= 60; lat += 30) {
+            for (let lat = -75; lat <= 75; lat += 15) {
                 if (lat === 0) continue;
                 g.fillText(`${Math.abs(lat)}°${lat < 0 ? 'S' : 'N'}`, plot.x + 4, mapY(lat));
             }
@@ -350,8 +351,8 @@
             if (!problem) return;
             const m = problem.model;
 
-            if (stage === 'period' || stage === 'sma') drawShift();
-            if (stage === 'inc') drawPeaks();
+            if ((stage === 'period' || stage === 'sma') && !m.equatorial) drawShift();
+            if (stage === 'inc' && !m.equatorial) drawPeaks();
 
             g.save();
             g.beginPath();
@@ -364,39 +365,47 @@
             g.restore();
 
             if (stage === 'argp' && m.elliptical) highlight(0, m.tPerigeeAfterNode, COLORS.perigee);
-            if (stage === 'nu' && m.elliptical) highlight(m.tPerigeeBeforeSat, m.tSat, COLORS.nu);
+            // The true anomaly: the arc from the ascending node to the satellite is u, and
+            // nu = u - omega.
+            if (stage === 'nu' && !m.equatorial && m.satU > 0) highlight(0, m.tSat, COLORS.nu);
 
             drawTimeDots(stage === 'ecc');
             drawArrows();
 
-            // The two labeled ascending nodes, and the descending node between them.
-            const node1 = { x: mapX(m.lambda1), y: mapY(0) };
-            const node2 = { x: mapX(m.lambda2), y: mapY(0) };
-            const desc = at(m.tDescending);
-            triangle(mapX(desc.lon), mapY(0), false, COLORS.descending);
-            triangle(node2.x, node2.y, true, COLORS.node);
-            triangle(node1.x, node1.y, true, COLORS.node);
-            if (m.shift >= 360) {
-                tag(`Asc. node 1, 2: ${lonText(m.lambda1)}`, node1.x, node1.y, COLORS.node, 10, -16);
-            } else {
-                tag(`1: ${lonText(m.lambda1)}`, node1.x, node1.y, COLORS.node, 9, -16);
-                tag(`2: ${lonText(m.lambda2)}`, node2.x, node2.y, COLORS.node, -9, -16);
+            // The two labeled ascending nodes, and the descending node between them. An
+            // equatorial track has no nodes.
+            if (!m.equatorial) {
+                const node1 = { x: mapX(m.lambda1), y: mapY(0) };
+                const node2 = { x: mapX(m.lambda2), y: mapY(0) };
+                const desc = at(m.tDescending);
+                triangle(mapX(desc.lon), mapY(0), false, COLORS.descending);
+                triangle(node2.x, node2.y, true, COLORS.node);
+                triangle(node1.x, node1.y, true, COLORS.node);
+                if (m.shift >= 360) {
+                    tag(`Asc. node 1, 2: ${lonText(m.lambda1)}`, node1.x, node1.y, COLORS.node, 10, -16);
+                } else {
+                    tag(`1: ${lonText(m.lambda1)}`, node1.x, node1.y, COLORS.node, 9, -16);
+                    tag(`2: ${lonText(m.lambda2)}`, node2.x, node2.y, COLORS.node, -9, -16);
+                }
             }
 
-            // The latitude peaks of the first orbit.
-            const north = at(m.tNorth), south = at(m.tSouth);
-            const peakText = deg(m.peak);
-            tag(`${peakText}°N`, mapX(north.lon), mapY(north.lat), COLORS.peak, -9, -14);
-            tag(`${peakText}°S`, mapX(south.lon), mapY(south.lat), COLORS.peak, -9, 14);
+            // The latitude peaks are read from the grid, so they are labeled only by their step
+            // or after grading.
+            if (!m.equatorial && (stage === 'inc' || answersShown)) {
+                const north = at(m.tNorth), south = at(m.tSouth);
+                const peakText = deg(m.peak);
+                tag(`${peakText}°N`, mapX(north.lon), mapY(north.lat), COLORS.peak, -9, -14);
+                tag(`${peakText}°S`, mapX(south.lon), mapY(south.lat), COLORS.peak, -9, 14);
+            }
 
             if (stage === 'argp' || stage === 'nu' || answersShown) apsides(stage === 'argp' || stage === 'nu');
             if (stage === 'argp' && m.elliptical) {
                 const mid = at(m.tPerigeeAfterNode / 2);
                 tag(`ω = ${m.argp}°`, mapX(mid.lon), mapY(mid.lat), COLORS.perigee, 10, 0);
             }
-            if (stage === 'nu' && m.elliptical && m.nu > 0) {
-                const mid = at((m.tPerigeeBeforeSat + m.tSat) / 2);
-                tag(`ν = ${m.nu}°`, mapX(mid.lon), mapY(mid.lat), COLORS.nu, 10, 0);
+            if (stage === 'nu' && !m.equatorial && m.satU > 0) {
+                const mid = at(m.tSat / 2);
+                tag(`u = ${m.satU}°`, mapX(mid.lon), mapY(mid.lat), COLORS.nu, 10, 0);
             }
 
             const sat = at(m.tSat);

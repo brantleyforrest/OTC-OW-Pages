@@ -6,8 +6,9 @@
 // true anomaly from where the satellite is marked.
 // Every track comes from a bank of standard orbits, so that each one can be read from the map.
 // The track uses the course model: two-body motion with a fixed orbital plane, a spherical
-// Earth, and Earth turning 15° per hour. The satellite is always marked at an ascending node,
-// a descending node, or a latitude peak, where its argument of latitude can be read.
+// Earth, and Earth turning 15° per hour. The map shows one period, from one ascending node to
+// the next. The satellite is marked at an ascending node, a descending node, or a latitude peak,
+// where its argument of latitude can be read (a geostationary track is a single point).
 // Load as a classic script, after test-1-rendezvous-problems.js (for its time parser).
 (function (global) {
     'use strict';
@@ -24,10 +25,6 @@
     const TWO_PI = 2 * Math.PI;
     const MU_TEX = '398{,}600.44';
 
-    // Sun-synchronous inclination: J2 turns the node east once per year.
-    const J2 = 1.08263e-3;
-    const SUN_RATE = TWO_PI / (365.2422 * 86400);
-
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
     const wrap360 = (deg) => ((deg % 360) + 360) % 360;
     const wrap180 = (deg) => wrap360(deg + 180) - 180;
@@ -36,24 +33,21 @@
     /* Bank of Standard Orbits                                            */
     /* ------------------------------------------------------------------ */
     // shifts: the westward shift between consecutive ascending nodes, in degrees, which sets
-    // the period at 15° per hour. Real inclinations stay as they are. argp lists the arguments
-    // of perigee offered, with the standard 270° (apogee north) offered twice as often as 90°.
+    // the period at 15° per hour. Each inclination is the standard orbit's, rounded to the
+    // nearest 15°, so that the peaks land on the map's 15° grid lines and are read from it.
+    // No track reaches higher than 75°, so none runs off the top or bottom of the map. argp lists
+    // the arguments of perigee offered, with the standard 270° (apogee north) offered twice as
+    // often as 90°.
     const BANK = [
-        { id: 'iss', name: 'a LEO orbit like the International Space Station’s', family: 'circular', i: 51.6, shifts: [23, 23.5, 24] },
-        { id: 'hubble', name: 'a LEO orbit like the Hubble Space Telescope’s', family: 'circular', i: 28.5, shifts: [23.5, 24] },
-        { id: 'polar', name: 'a polar LEO orbit', family: 'circular', i: 90, shifts: [24, 25, 25.5] },
-        { id: 'sso', name: 'a sun-synchronous LEO orbit', family: 'circular', i: 'sso', shifts: [24, 25, 25.5] },
-        { id: 'gps', name: 'a semi-synchronous MEO orbit, like a GPS satellite’s', family: 'circular', i: 55, shifts: [180] },
-        { id: 'igso', name: 'an inclined geosynchronous orbit', family: 'circular', i: [10, 15, 20, 25, 30], shifts: [360] },
-        { id: 'molniya', name: 'a Molniya orbit', family: 'elliptical', e: 0.72, i: 63.4, argp: [270, 270, 90], shifts: [180] },
-        { id: 'tundra', name: 'a Tundra orbit', family: 'elliptical', e: 0.27, i: 63.4, argp: [270, 270, 90], shifts: [360] }
+        { id: 'iss', name: 'a mid-inclination LEO orbit, like the International Space Station’s', family: 'circular', i: 45, shifts: [23, 23.5, 24] },
+        { id: 'hubble', name: 'a low-inclination LEO orbit, like the Hubble Space Telescope’s', family: 'circular', i: 30, shifts: [23.5, 24] },
+        { id: 'retro', name: 'a retrograde LEO orbit, tilted past 90° like a sun-synchronous orbit', family: 'circular', i: 105, shifts: [24, 25, 25.5] },
+        { id: 'gps', name: 'a semi-synchronous MEO orbit, like a GPS satellite’s', family: 'circular', i: 60, shifts: [180] },
+        { id: 'igso', name: 'an inclined geosynchronous orbit', family: 'circular', i: [15, 30, 45], shifts: [360] },
+        { id: 'geo', name: 'a geostationary orbit', family: 'circular', i: 0, shifts: [360] },
+        { id: 'molniya', name: 'a Molniya orbit', family: 'elliptical', e: 0.72, i: 60, argp: [270, 270, 90], shifts: [180] },
+        { id: 'tundra', name: 'a Tundra orbit', family: 'elliptical', e: 0.27, i: 60, argp: [270, 270, 90], shifts: [360] }
     ];
-
-    function ssoInclination(a) {
-        const n = Math.sqrt(MU / (a * a * a));
-        const cosI = -SUN_RATE / (1.5 * n * J2 * (6378.137 / a) ** 2);
-        return Math.round(Math.acos(cosI) * R2D * 10) / 10;
-    }
 
     /* ------------------------------------------------------------------ */
     /* Orbit Motion                                                       */
@@ -175,25 +169,26 @@
         const a = Math.cbrt(MU * (P / TWO_PI) ** 2);
         const elliptical = entry.family === 'elliptical';
         const e = elliptical ? entry.e : 0;
-        const i = entry.i === 'sso' ? ssoInclination(a) : Array.isArray(entry.i) ? pick(entry.i) : entry.i;
+        const i = Array.isArray(entry.i) ? pick(entry.i) : entry.i;
         const argp = elliptical ? pick(entry.argp) : 0;
         const retrograde = i > 90;
-        const polar = i === 90;
-        const peak = retrograde ? Math.round((180 - i) * 10) / 10 : i;
+        const equatorial = i === 0;   // Geostationary: the track is one point, with no nodes
+        const peak = retrograde ? 180 - i : i;
         const lambda1 = 5 * Math.floor(Math.random() * 72) - 180;
         const lambda2 = wrap180(lambda1 - shift);
 
         const model = {
             id: entry.id,
             name: entry.name,
-            a, e, i, argp, n, period: P, shift, lambda1, lambda2, peak, retrograde, elliptical,
+            a, e, i, argp, n, period: P, shift, lambda1, lambda2, peak, retrograde, elliptical, equatorial,
             M0: meanFromTrue(-argp, e)
         };
 
-        // Where the satellite is marked: one of the four features, during the first orbit.
-        const satU = pick([0, 90, 180, 270]);
+        // Where the satellite is marked: one of the four features, during the one period drawn,
+        // from ascending node 1 to node 2.
+        const satU = equatorial ? null : pick([0, 90, 180, 270]);
         model.satU = satU;
-        model.tSat = satU === 0 ? P : timeAtU(model, satU, 0);
+        model.tSat = equatorial ? 0 : satU === 0 ? P : timeAtU(model, satU, 0);
         model.nu = elliptical ? wrap360(satU - argp) : null;
         model.tNorth = timeAtU(model, 90, 0);
         model.tSouth = timeAtU(model, 270, 0);
@@ -201,18 +196,16 @@
         if (elliptical) {
             model.tPerigeeAfterNode = timeAtU(model, argp, 0);
             model.tApogeeAfterNode = timeAtU(model, wrap360(argp + 180), 0);
-            // The perigee pass at or before the satellite, for the true anomaly.
-            model.tPerigeeBeforeSat = model.tSat - (model.nu === 0 ? 0 : (wrap360(meanFromTrue(model.nu, e) * R2D) * D2R) / n);
         }
-        model.tStart = Math.min(-0.25 * P, elliptical ? model.tPerigeeBeforeSat - 0.03 * P : 0);
-        model.tEnd = 1.25 * P;
+        model.tStart = 0;
+        model.tEnd = P;
 
         /* Answers ---------------------------------------------------------- */
         const answers = {
             p: { value: P, text: hoursText(periodH) },
             a: { value: a, text: `${group(a)} km` },
             e: { value: elliptical ? 1 : 0, text: elliptical ? 'Nonzero' : 'Zero' },
-            i: { value: i, text: `${deg(i)}°` },
+            i: { value: i, text: `${i}°` },
             argp: { value: elliptical ? argp : null, text: elliptical ? `${argp}°` : 'Undefined' },
             nu: { value: model.nu, text: elliptical ? `${model.nu}°` : 'Undefined' }
         };
@@ -221,7 +214,7 @@
             { key: 'p', tex: 'P', name: 'Period', unit: 'h', tolerance: { relative: 0.02 }, unitType: 'period' },
             { key: 'a', tex: 'a', name: 'Semi-major axis', unit: 'km', tolerance: { relative: 0.01 }, unitType: 'number' },
             { key: 'e', tex: 'e', name: 'Eccentricity', unit: '', placeholder: 'zero or nonzero', tolerance: { absolute: 0 }, unitType: 'zero_nonzero', textOk: true },
-            { key: 'i', tex: 'i', name: 'Inclination', unit: '°', tolerance: { absolute: 0.5 }, unitType: 'number' },
+            { key: 'i', tex: 'i', name: 'Inclination', unit: '°', tolerance: { absolute: 7.5 }, unitType: 'number' },
             { key: 'argp', tex: '\\omega', name: 'Argument of perigee', unit: '°', placeholder: 'or n/a', tolerance: { absolute: 1, wrap: 360 }, unitType: 'angle_or_undefined', textOk: true },
             { key: 'nu', tex: '\\nu', name: 'True anomaly now', unit: '°', placeholder: 'or n/a', tolerance: { absolute: 1, wrap: 360 }, unitType: 'angle_or_undefined', textOk: true }
         ];
@@ -229,7 +222,9 @@
         /* Steps ------------------------------------------------------------ */
         // Step 1: the westward shift between the two labeled ascending nodes, then the period.
         let shiftWork;
-        if (shift === 360) {
+        if (equatorial) {
+            shiftWork = rule(`The track is a single point on the equator at ${lonText(lambda1)}. The satellite keeps pace with Earth's turn, so one orbit takes exactly one turn of Earth.`, `$\\Delta N = 360°$`);
+        } else if (shift === 360) {
             shiftWork = rule(`Both ascending nodes are at ${lonText(lambda1)}: the track closes on itself after one orbit. Earth turned one full revolution under the orbit.`, `$\\Delta N = 360°$`);
         } else {
             const raw = wrap180(lambda1) - wrap180(lambda2);
@@ -243,12 +238,16 @@
             key: 'period',
             title: prose('Period from the node shift, $P$'),
             result: math(`P = ${deg(Math.round(periodH * 1e4) / 1e4)}\\text{ h}`),
-            caption: prose(`<b>Period.</b> Between two matching passes Earth turns ${deg(shift)}° east under the orbit, so the next ascending node lands ${deg(shift)}° farther west. At $15°$ per hour, that is $${deg(Math.round(periodH * 1e4) / 1e4)}$ hours.`),
+            caption: equatorial
+                ? prose('<b>Period.</b> The satellite stays over one point, so it circles Earth once each time Earth turns once: $360° / 15°$ per hour $= 24$ hours.')
+                : prose(`<b>Period.</b> Between two matching passes Earth turns ${deg(shift)}° east under the orbit, so the next ascending node lands ${deg(shift)}° farther west. At $15°$ per hour, that is $${deg(Math.round(periodH * 1e4) / 1e4)}$ hours.`),
             methods: [{
                 name: 'Node shift',
                 html: shiftWork
                     + calc('P = \\dfrac{\\Delta N}{15°/\\text{h}}', [`\\dfrac{${deg(shift)}°}{15°/\\text{h}}`], `${deg(Math.round(periodH * 1e4) / 1e4)}\\text{ h} = ${group(P)}\\text{ s}`)
-                    + note('Compare the same feature on consecutive orbits: ascending node to ascending node. Never an ascending node with a descending node.')
+                    + note(equatorial
+                        ? 'A fixed point on the equator is the signature of a geostationary orbit: one sidereal day, about 23 h 56 min, which the course rounds to 24 h.'
+                        : 'Compare the same feature on consecutive orbits: ascending node to ascending node. Never an ascending node with a descending node.')
             }]
         };
 
@@ -268,21 +267,24 @@
         };
 
         let incWork;
-        if (polar) {
-            incWork = rule(`The track runs over both poles, reaching $90°$N and $90°$S.`, '$i = 90°$');
+        if (equatorial) {
+            incWork = rule('The track never leaves the equator, so the orbit is not tilted at all.', '$i = 0°$');
         } else if (retrograde) {
-            incWork = rule(`The track peaks at ${deg(peak)}°N and ${deg(peak)}°S. The arrows show it crossing the equator heading west of north, against Earth's turn: the orbit is retrograde.`, `$i = 180° - ${deg(peak)}° = ${deg(i)}°$`);
+            incWork = rule(`The track's highest and lowest points sit on the ${peak}°N and ${peak}°S grid lines. The arrows show it crossing the equator heading west of north, against Earth's turn: the orbit is retrograde.`, `$i = 180° - ${peak}° = ${i}°$`);
         } else {
-            incWork = rule(`The track peaks at ${deg(peak)}°N and ${deg(peak)}°S. The arrows show it crossing the ascending node heading east of north, with Earth's turn: the orbit is prograde.`, `$i = ${deg(i)}°$`);
+            incWork = rule(`The track's highest and lowest points sit on the ${peak}°N and ${peak}°S grid lines. The arrows show it crossing the ascending node heading east of north, with Earth's turn: the orbit is prograde.`, `$i = ${i}°$`);
         }
         const incStep = {
             key: 'inc',
             title: prose('Inclination from the latitude peaks, $i$'),
-            result: math(`i = ${deg(i)}°`),
-            caption: prose(`<b>Inclination.</b> The highest and lowest latitudes of the track are $\\pm ${deg(peak)}°$.${retrograde ? ' The orbit is retrograde, so $i = 180°$ minus the peak.' : ''}`),
+            result: math(`i = ${i}°`),
+            caption: equatorial
+                ? prose('<b>Inclination.</b> The track stays on the equator: $i = 0°$.')
+                : prose(`<b>Inclination.</b> The highest and lowest latitudes of the track are $\\pm ${peak}°$.${retrograde ? ' The orbit is retrograde, so $i = 180°$ minus the peak.' : ''}`),
             methods: [{
                 name: 'Peaks',
-                html: incWork + note('A prograde track peaks at $\\pm i$. A retrograde track peaks at $\\pm(180° - i)$, so check the direction of travel too.')
+                html: incWork
+                    + note('Read the peak to the nearest $15°$ grid line. A prograde track peaks at $\\pm i$. A retrograde track peaks at $\\pm(180° - i)$, so check the direction of travel too.')
             }]
         };
 
@@ -293,12 +295,16 @@
             result: elliptical ? math('e > 0') : math('e = 0'),
             caption: elliptical
                 ? prose(`<b>Shape.</b> The time dots bunch up in the ${apogeeNorth ? 'north' : 'south'} and spread out in the ${apogeeNorth ? 'south' : 'north'}: the satellite dwells near apogee and races through perigee. The orbit is elliptical.`)
-                : prose('<b>Shape.</b> The time dots are evenly spaced, and the northern and southern halves of the track match: the satellite moves at one steady speed. The orbit is circular.'),
+                : equatorial
+                    ? prose('<b>Shape.</b> The track does not drift east or west at all: the satellite keeps exact pace with Earth all day, so its speed never changes. The orbit is circular.')
+                    : prose('<b>Shape.</b> The time dots are evenly spaced, and the northern and southern halves of the track match: the satellite moves at one steady speed. The orbit is circular.'),
             methods: [{
                 name: 'Dwell',
                 html: (elliptical
                     ? rule(`The dots mark equal steps of time. They are crowded in the ${apogeeNorth ? 'Northern' : 'Southern'} Hemisphere${model.id === 'molniya' ? ', where the track loops back west' : ''}, and far apart in the ${apogeeNorth ? 'Southern' : 'Northern'}. The speed changes around the orbit, so it is an ellipse.`, '$e \\neq 0$')
-                    : rule('The dots are evenly spaced along the track, and the track is the same shape north and south of the equator. The speed is constant, so it is a circle.', '$e = 0$'))
+                    : equatorial
+                        ? rule('The track is one fixed point. An eccentric orbit would speed up and slow down, so the point would swing east and west during the day. It does not, so the speed is constant: a circle.', '$e = 0$')
+                        : rule('The dots are evenly spaced along the track, and the track is the same shape north and south of the equator. The speed is constant, so it is a circle.', '$e = 0$'))
                     + note('The map can show that $e$ is not zero, but not its exact value.')
             }]
         };
@@ -326,31 +332,39 @@
             key: 'nu',
             title: prose('True anomaly now, $\\nu$'),
             result: elliptical ? math(`\\nu = ${model.nu}°`) : 'Undefined',
-            caption: elliptical
-                ? prose(`<b>Where the satellite is.</b> It is at ${FEATURES[satU]}, $u = ${satU}°$ past the ascending node and $\\nu = ${model.nu}°$ past perigee.`)
-                : prose(`<b>Where the satellite is.</b> It is at ${FEATURES[satU]}, $u = ${satU}°$. With no perigee, $\\nu$ is undefined.`),
+            caption: equatorial
+                ? prose('<b>Where the satellite is.</b> On the one point of the track. A circular, equatorial orbit has no perigee and no ascending node, so neither $\\nu$ nor $u$ is defined.')
+                : elliptical
+                    ? prose(`<b>Where the satellite is.</b> It is at ${FEATURES[satU]}, $u = ${satU}°$ past the ascending node (the purple arc) and $\\nu = ${model.nu}°$ past perigee.`)
+                    : prose(`<b>Where the satellite is.</b> It is at ${FEATURES[satU]}, $u = ${satU}°$ past the ascending node (the purple arc). With no perigee, $\\nu$ is undefined.`),
             methods: [{
                 name: 'From the node',
-                html: rule(`The satellite is at ${FEATURES[satU]}, so its argument of latitude is $u = ${satU}°$.`)
-                    + (elliptical
-                        ? nuLines + note(`$\\nu$ is measured from perigee, and $u = \\omega + \\nu$. ${model.nu === 0 ? 'The satellite is at perigee.' : model.nu === 180 ? 'The satellite is at apogee.' : ''}`)
-                        : rule('A circular orbit has no perigee to measure from, so $\\nu$ is undefined. Use $u$ instead.', '$\\nu$ is undefined'))
+                html: (equatorial
+                    ? rule('With $e = 0$ there is no perigee, and with $i = 0°$ there is no ascending node either. There is nothing to measure $\\nu$ or $u$ from.', '$\\nu$ is undefined')
+                        + note('For a geostationary satellite, its position is given by its longitude instead.')
+                    : rule(`The satellite is at ${FEATURES[satU]}, so its argument of latitude is $u = ${satU}°$.`)
+                        + (elliptical
+                            ? nuLines + note(`$\\nu$ is measured from perigee, and $u = \\omega + \\nu$. ${model.nu === 0 ? 'The satellite is at perigee.' : model.nu === 180 ? 'The satellite is at apogee.' : ''}`)
+                            : rule('A circular orbit has no perigee to measure from, so $\\nu$ is undefined. Use $u$ instead.', '$\\nu$ is undefined')))
                     + note(`This track is ${entry.name}.`)
             }]
         };
 
-        const satWhere = FEATURE_SHORT[satU].toLowerCase();
+        const satWhere = equatorial ? 'single point of the track' : FEATURE_SHORT[satU].toLowerCase();
+        const nodeLon = (lon) => lonText(lon).replace(/([EW])$/, '\\text{ $1}');
         return {
             type: entry.family,
             model,
             title: 'Ground Track',
             prompt: prose('The view shows one satellite’s ground track, with its direction of travel and where the satellite is now. Read the track to find its period, semi-major axis, whether its eccentricity is zero, its inclination, argument of perigee, and true anomaly.'),
-            statement: item(`\\lambda_{\\text{AN}1} = ${lonText(lambda1).replace(/([EW])$/, '\\text{ $1}')}`)
-                + item(`\\lambda_{\\text{AN}2} = ${lonText(lambda2).replace(/([EW])$/, '\\text{ $1}')}`)
-                + item(`\\text{Peaks: } \\pm ${deg(peak)}°`)
+            statement: (equatorial
+                ? item(`\\text{Track: one point at } ${nodeLon(lambda1)}`)
+                : item(`\\lambda_{\\text{AN}1} = ${nodeLon(lambda1)}`) + item(`\\lambda_{\\text{AN}2} = ${nodeLon(lambda2)}`))
                 + item('\\omega_\\oplus \\approx 15°/\\text{h}'),
-            overviewCaption: prose(`<b>The ground track as given.</b> Arrows show the direction of travel, and the dots are equal steps of time. The satellite is at the ${satWhere}.`),
-            limitsHtml: prose(`Accepted: $P$ within 2% (a bare number is hours; or type s, min, or h), $a$ within 1%, $e$ as zero or nonzero, $i$ within 0.5°, $\\omega$ and $\\nu$ within 1°. Type <i>undefined</i> or <i>n/a</i> for an angle a circular orbit does not have. The solutions use Earth turning $15°$/h, $\\mu = ${MU_TEX}\\text{ km}^3/\\text{s}^2$, and $R_\\oplus = 6{,}378\\text{ km}$.`),
+            overviewCaption: equatorial
+                ? prose('<b>The ground track as given.</b> One full period, drawn over a whole day. The satellite is at the single point of the track.')
+                : prose(`<b>The ground track as given.</b> One period, from ascending node 1 to node 2. Arrows show the direction of travel, and the dots are equal steps of time. The satellite is at the ${satWhere}.`),
+            limitsHtml: prose(`Accepted: $P$ within 2% (a bare number is hours; or type s, min, or h), $a$ within 1%, $e$ as zero or nonzero, $i$ within 7.5° (read the peaks to the nearest 15° line), $\\omega$ and $\\nu$ within 1°. Type <i>undefined</i> or <i>n/a</i> for an angle the orbit does not have. The solutions use Earth turning $15°$/h, $\\mu = ${MU_TEX}\\text{ km}^3/\\text{s}^2$, and $R_\\oplus = 6{,}378\\text{ km}$.`),
             fields,
             answers,
             steps: [periodStep, smaStep, incStep, eccStep, argpStep, nuStep]
