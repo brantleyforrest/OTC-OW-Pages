@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanical Energy | OTC OW</title>
+    <meta name="description" content="Watch a spacecraft trade kinetic and potential energy as it moves between perigee and apogee, while its total specific mechanical energy stays constant.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <style>
+        :root {
+            --energy-ke: #34d399;
+            --energy-pe: #60a5fa;
+            --energy-total: #e0b64f;
+        }
+
+        .sym { font-family: var(--font-mono); font-weight: 600; }
+        .sym.ke { color: var(--energy-ke); }
+        .sym.pe { color: var(--energy-pe); }
+        .sym.eps { color: var(--energy-total); }
+
+        .tool-side .panel { padding: 0.7rem 0.95rem; }
+
+        .param.first { margin-top: 0.55rem; }
+        .param + .param { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-subtle); }
+
+        .param-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.4rem;
+        }
+
+        .param-name {
+            min-width: 0;
+            font-size: 0.84rem;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+        }
+
+        .param-value {
+            display: flex;
+            align-items: center;
+            flex: 0 0 auto;
+            gap: 0.25rem;
+        }
+
+        .param-value input[type="number"] {
+            width: 5.6rem;
+            padding: 0.18rem 0.3rem;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            text-align: right;
+            color: #ffffff;
+            background: #060b14;
+            border: 1px solid var(--border-subtle);
+            border-radius: 5px;
+        }
+
+        .param-value input[type="number"][aria-invalid="true"] { border-color: var(--badge-amber); }
+
+        .param-unit {
+            width: 1.6rem;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            color: var(--text-muted);
+        }
+
+        .param input[type="range"] { display: block; margin-top: 0.25rem; }
+
+        .param-def {
+            font-size: 0.74rem;
+            line-height: 1.35;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        .jump {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.35rem;
+        }
+
+        .jump .btn { flex: 1 1 0; padding: 0.25rem 0.5rem; font-size: 0.76rem; }
+
+        .segmented.presets button { padding: 0.35rem 0.4rem; font-size: 0.74rem; }
+
+        /* Perigee, now, and apogee side by side */
+        .cmp {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.76rem;
+        }
+
+        .cmp th,
+        .cmp td {
+            padding: 0.22rem 0.3rem;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .cmp thead th {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .cmp tbody th {
+            text-align: left;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .cmp td { font-family: var(--font-mono); color: var(--text-main); }
+        .cmp .now { background: rgba(58, 130, 247, 0.1); color: #ffffff; font-weight: 600; }
+        .cmp tbody tr + tr { border-top: 1px solid rgba(28, 46, 74, 0.6); }
+        .cmp-unit { color: var(--text-dim); font-size: 0.68rem; margin-left: 0.2rem; }
+
+        .notice-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .notice-list li { padding-left: 0.9rem; position: relative; }
+        .notice-list li::before { content: '•'; position: absolute; left: 0; color: var(--accent-gold); }
+
+        /* Tablets: both columns fill the height of the row. */
+        @media (min-width: 700px) and (max-width: 1080px) {
+            .tool-side > .col > .panel { flex-grow: 1; }
+        }
+
+        @media (min-width: 1300px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 46rem; }
+            .tool-side { grid-template-columns: 20.5rem minmax(0, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Mechanical Energy</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../index.html#study" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <div class="col tool-stage-col">
+                <p class="tool-intro">A spacecraft trades potential energy for kinetic energy as it falls to perigee, and trades it back as it climbs to apogee. Their sum, the specific mechanical energy, never changes.</p>
+
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view">
+                        <canvas id="scene" aria-label="An elliptical orbit around Earth with a moving spacecraft and its velocity arrow, beside a bar chart of specific kinetic, potential, and mechanical energy."></canvas>
+                        <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                    </div>
+                    <div class="tool-hud" id="hud" aria-live="polite"></div>
+                </div>
+
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play">Pause</button>
+                            <button class="btn" id="reset">Reset</button>
+                        </div>
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="speed">Animation speed</label>
+                                <span class="control-value" id="speed-value"></span>
+                            </div>
+                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                        </div>
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="show-velocity" checked>Velocity</label>
+                            <label class="check"><input type="checkbox" id="show-labels" checked>Labels</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="tool-side">
+                <div class="col">
+                    <div class="panel">
+                        <div class="panel-title">Orbit</div>
+                        <div class="segmented presets" id="preset" role="group" aria-label="Choose an example orbit">
+                            <button data-value="gto" aria-pressed="true">GEO transfer</button>
+                            <button data-value="molniya" aria-pressed="false">Molniya</button>
+                            <button data-value="lesson" aria-pressed="false">Lesson</button>
+                            <button data-value="circular" aria-pressed="false">Circular</button>
+                        </div>
+
+                        <div class="param first">
+                            <div class="param-head">
+                                <label class="param-name" for="hp-number">Perigee altitude</label>
+                                <span class="param-value">
+                                    <input type="number" id="hp-number" min="100" max="100000" step="100">
+                                    <span class="param-unit">km</span>
+                                </span>
+                            </div>
+                            <input type="range" id="hp-range" min="0" max="1000" step="1" aria-label="Perigee altitude slider">
+                        </div>
+
+                        <div class="param">
+                            <div class="param-head">
+                                <label class="param-name" for="ha-number">Apogee altitude</label>
+                                <span class="param-value">
+                                    <input type="number" id="ha-number" min="100" max="100000" step="100">
+                                    <span class="param-unit">km</span>
+                                </span>
+                            </div>
+                            <input type="range" id="ha-range" min="0" max="1000" step="1" aria-label="Apogee altitude slider">
+                            <p class="param-def">Each altitude can be 100 to 100,000 km. Apogee is never below perigee.</p>
+                        </div>
+
+                        <div class="param">
+                            <div class="param-head">
+                                <label class="param-name" for="nu-range">Position (true anomaly <span class="sym">ν</span>)</label>
+                                <span class="control-value" id="nu-value"></span>
+                            </div>
+                            <input type="range" id="nu-range" min="0" max="360" step="1" aria-label="True anomaly slider">
+                            <div class="jump">
+                                <button class="btn" id="go-perigee">Go to perigee</button>
+                                <button class="btn" id="go-apogee">Go to apogee</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Perigee vs. Apogee</div>
+                        <table class="cmp">
+                            <thead>
+                                <tr><th scope="col"></th><th scope="col">Perigee</th><th scope="col" class="now">Now</th><th scope="col">Apogee</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><th scope="row">R<span class="cmp-unit">km</span></th><td id="c-r-p"></td><td class="now" id="c-r-n"></td><td id="c-r-a"></td></tr>
+                                <tr><th scope="row">V<span class="cmp-unit">km/s</span></th><td id="c-v-p"></td><td class="now" id="c-v-n"></td><td id="c-v-a"></td></tr>
+                                <tr><th scope="row"><span class="sym ke">sKE</span></th><td id="c-ke-p"></td><td class="now" id="c-ke-n"></td><td id="c-ke-a"></td></tr>
+                                <tr><th scope="row"><span class="sym pe">sPE</span></th><td id="c-pe-p"></td><td class="now" id="c-pe-n"></td><td id="c-pe-a"></td></tr>
+                                <tr><th scope="row"><span class="sym eps">ε</span></th><td id="c-e-p"></td><td class="now" id="c-e-n"></td><td id="c-e-a"></td></tr>
+                            </tbody>
+                        </table>
+                        <p class="eq-constants">Energies are per unit mass, in km²/s² (the same as MJ/kg).</p>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="panel accent eq-panel">
+                        <div class="panel-title">Equations With the Current Values</div>
+                        <div class="eq-list">
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Specific kinetic energy:</b> energy of motion</span><span class="eq-result sym ke" id="r-ke"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span><span class="sym ke">sKE</span> =</span><span class="fraction"><span>V²</span><span>2</span></span></span>
+                                    <span class="eq-val"><span>=</span><span class="fraction"><span>(<span id="w-ke-v"></span>)²</span><span>2</span></span></span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Specific potential energy:</b> energy of position</span><span class="eq-result sym pe" id="r-pe"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span><span class="sym pe">sPE</span> = −</span><span class="fraction"><span>μ</span><span>R</span></span></span>
+                                    <span class="eq-val"><span>= −</span><span class="fraction"><span>398,600</span><span id="w-pe-r"></span></span></span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Specific mechanical energy:</b> the sum</span><span class="eq-result sym eps" id="r-eps1"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span class="sym eps">ε</span> = <span class="sym ke">sKE</span> + <span class="sym pe">sPE</span></span>
+                                    <span class="eq-val">= <span id="w-eps-ke"></span> + (<span id="w-eps-pe"></span>)</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Semi-major axis</b> from apogee and perigee</span><span class="eq-result" id="r-a"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span>a =</span><span class="fraction"><span>R<sub>a</sub> + R<sub>p</sub></span><span>2</span></span></span>
+                                    <span class="eq-val"><span>=</span><span class="fraction"><span><span id="w-a-ra"></span> + <span id="w-a-rp"></span></span><span>2</span></span></span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Energy from orbit size:</b> the same at every point</span><span class="eq-result sym eps" id="r-eps2"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span><span class="sym eps">ε</span> = −</span><span class="fraction"><span>μ</span><span>2a</span></span></span>
+                                    <span class="eq-val"><span>= −</span><span class="fraction"><span>398,600</span><span>2 × <span id="w-eps-a"></span></span></span></span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Vis-viva:</b> speed from energy and distance</span><span class="eq-result" id="r-v"></span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">V = √(2 (μ/R + <span class="sym eps">ε</span>))</span>
+                                    <span class="eq-val">= √(2 (398,600/<span id="w-v-r"></span> + (<span id="w-v-eps"></span>)))</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="eq-constants">μ is Earth's gravitational parameter, 398,600 km³/s². R is measured from Earth's center: R = 6,378 km + altitude.</p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">What to Notice</div>
+                        <ul class="notice-list">
+                            <li>Toward apogee, R grows, so <span class="sym pe">sPE</span> rises toward zero and <span class="sym ke">sKE</span> falls. The spacecraft slows.</li>
+                            <li>Toward perigee, <span class="sym pe">sPE</span> drops and <span class="sym ke">sKE</span> gains the same amount. The spacecraft speeds up.</li>
+                            <li><span class="sym eps">ε</span> depends only on a. It is negative for every closed orbit.</li>
+                        </ul>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+    </main>
+
+
+    <script src="../assets/tool-kit.js"></script>
+    <script src="mechanical-energy.js"></script>
+</body>
+</html>

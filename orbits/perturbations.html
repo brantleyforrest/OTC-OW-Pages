@@ -1,80 +1,331 @@
-<!--
-OUTLINE ONLY. This page contains no markup yet. Build it from the plan below, then delete this comment.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perturbations Explorer | OTC OW</title>
+    <meta name="description" content="A 3D view of how drag, Earth's oblateness, the equator's ellipticity, the Sun and Moon, and sunlight change an orbit over time.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <style>
+        /* Mode colors. They match COLOR in perturbations.js. */
+        :root {
+            --drag: #f87171;
+            --j2: #60a5fa;
+            --j22: #fb923c;
+            --moon: #cbd5e1;
+            --sun: #e3b85a;
+            --srp: #facc15;
+            --stable: #34d399;
+            --unstable: #f87171;
+            --ghost: #94a3b8;
+        }
 
-START
-Copy _template/tool-template.html over this file, then keep this plan open beside it.
-    Remove the robots line.
-    Title:       Perturbations Explorer | OTC OW
-    Description: A 3D view of how drag, Earth's oblateness, the equator's ellipticity, the Sun and Moon, and sunlight change an orbit over time.
-    h1:          Perturbations Explorer
-    Intro:       The gray orbit is what two-body motion predicts. The colored orbit is what the perturbation actually does.
+        .key-drag { color: var(--drag); font-weight: 600; }
+        .key-j2 { color: var(--j2); font-weight: 600; }
+        .key-j22 { color: var(--j22); font-weight: 600; }
+        .key-moon { color: var(--moon); font-weight: 600; }
+        .key-sun { color: var(--sun); font-weight: 600; }
+        .key-srp { color: var(--srp); font-weight: 600; }
+        .key-stable { color: var(--stable); font-weight: 600; }
+        .key-unstable { color: var(--unstable); font-weight: 600; }
+        .key-ghost { color: var(--ghost); font-weight: 600; }
 
-SCRIPTS, in this order, all classic scripts
-    ../assets/tool-kit.js
-    ../assets/earth-land.js
-    ../assets/earth-scene.js
-    perturbations-model.js
-    perturbations.js
+        /* Required: .ctl-row sets display: flex, which otherwise overrides the hidden attribute. */
+        .ctl-row[hidden] { display: none; }
+        .mode-rows { display: flex; flex-direction: column; gap: 0.35rem; }
+        #mode .seg-short { display: none; }
 
-LAYOUT
-Use the same two-column layout as orbits/sun-synchronous.html. Copy its @media rule that sets aside width 40rem.
-Keep the template's #view, #scene, #labels, #view-hint, #status, and #hud elements unchanged.
-Set the canvas aria-label from script, per mode.
+        .chart-box { position: relative; height: 11.5rem; }
+        .chart-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        #leads-text { margin-top: 0.4rem; }
 
-CONTROLS PANEL (.panel.controls), top to bottom
-    Row 1: #play, #restart, #reset-view, and the speed slider #speed with #speed-value (min 0, max 2, step 1, value 1).
-    Row 2: "Perturbation" .segmented #mode with data-value drag, j2, j22, third, srp.
-           Button text: Drag, J₂, J₂,₂, 3rd Body, SRP. Then the checkbox #show-labels, checked.
-    Then the mode rows below. Each one has data-mode set to its mode. Only the active mode's rows are visible.
-    Last: p.ctl-caption #mode-caption.
+        @media (min-width: 1300px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 40rem; }
+            .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
 
-    data-mode="drag", two rows
-        Sliders, each with a -value span:
-            #drag-hp   Perigee altitude   min 130, max 800, step 10, value 250
-            #drag-ha   Apogee altitude    min 130, max 3000, step 10, value 1200
-        .segmented #drag-area:  feathered "Feathered", nominal "Nominal" (selected), windmill "Windmill"
-        .segmented #drag-solar: min "Solar Min", mean "Mean" (selected), max "Solar Max"
+        /* Narrow screens: shorter button text, so that the five modes fit on one line. */
+        @media (max-width: 640px) {
+            #mode .seg-full { display: none; }
+            #mode .seg-short { display: inline; }
+        }
+    </style>
+</head>
+<body>
 
-    data-mode="j2", two rows
-        .segmented #j2-preset: leo "LEO 45°" (selected), polar "Polar", sso "Sun-Sync", molniya "Molniya"
-        Sliders, each with a -value span:
-            #j2-inc   Inclination       min 1, max 179, step 0.1, value 45
-            #j2-hp    Perigee altitude  min 200, max 2000, step 10, value 500
-            #j2-ha    Apogee altitude   min 0, max 1000, step 1, log scale set from script
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Perturbations Explorer</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../index.html#study" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
 
-    data-mode="j22", one row
-        Slider #j22-lon with -value span: Starting longitude, min -180, max 180, step 1, value 30
-        Checkbox #j22-hold: Station-Keeping
+    <main class="tool-main">
+        <div class="tool-layout">
+            <div class="col tool-stage-col">
+                <p class="tool-intro">The gray orbit is what two-body motion predicts. The colored orbit is what the perturbation actually does.</p>
 
-    data-mode="third", one row
-        .segmented #third-body: moon "Moon" (selected), sun "Sun"
-        Checkbox #third-hold: Station-Keeping
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view">
+                        <canvas id="scene" aria-label="Earth with a gray two-body orbit and a colored perturbed orbit."></canvas>
+                        <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                        <div class="tool-hint" id="view-hint" style="display: none;">Drag to rotate the view. Scroll or pinch to zoom.</div>
+                        <div class="tool-status" id="status" style="display: none;"></div>
+                    </div>
+                    <div class="tool-hud" id="hud"></div>
+                </div>
 
-    data-mode="srp", one row
-        .segmented #srp-area: dense "Dense", arrays "Large Arrays", foil "Foil Debris"
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play">Pause</button>
+                            <button class="btn" id="restart">Restart</button>
+                            <button class="btn" id="reset-view">Reset View</button>
+                        </div>
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="speed">Speed</label>
+                                <span class="control-value" id="speed-value"></span>
+                            </div>
+                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                        </div>
+                    </div>
+                    <div class="ctl-row">
+                        <div class="ctl-grow">
+                            <div class="panel-title" style="margin-bottom: 0.2rem;">Perturbation</div>
+                            <div class="segmented" id="mode" role="group" aria-label="Choose a perturbation">
+                                <button data-value="drag" aria-pressed="true">Drag</button>
+                                <button data-value="j2" aria-pressed="false">J₂</button>
+                                <button data-value="j22" aria-pressed="false">J₂,₂</button>
+                                <button data-value="third" aria-pressed="false"><span class="seg-full">3rd Body</span><span class="seg-short">3rd</span></button>
+                                <button data-value="srp" aria-pressed="false">SRP</button>
+                            </div>
+                        </div>
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="show-labels" checked>Labels</label>
+                        </div>
+                    </div>
 
-SIDE PANELS. Text and values in all of these are set from script for the active mode.
-    Column 1
-        .panel.accent, title "What to Notice": p.panel-text #notice
-        .panel, title "Live Values": .stat-grid with 6 .stat-item, ids #stat-0-label and #stat-0 through #stat-5-label and #stat-5
-        .panel: .panel-title #chart-title, then div.chart-box #chart-box containing canvas #chart with an aria-label
-    Column 2
-        .panel.eq-panel: .panel-title #eq-title, .eq-list with 5 .eq-row, using the markup in sun-synchronous.html.
-            ids #eq-0-name, #eq-0-result, #eq-0-work through #eq-4-*. Then p.eq-constants #eq-constants.
-        .panel: title "Which Perturbation Leads?", div.chart-box #leads-box containing canvas #leads, then p.panel-text.muted #leads-text
+                    <div class="mode-rows" id="mode-rows">
+                        <div class="ctl-row" data-mode="drag">
+                            <div class="ctl-grow">
+                                <div class="control-label">
+                                    <label for="drag-hp">Perigee altitude</label>
+                                    <span class="control-value" id="drag-hp-value"></span>
+                                </div>
+                                <input type="range" id="drag-hp" min="130" max="800" step="10" value="250">
+                            </div>
+                            <div class="ctl-grow">
+                                <div class="control-label">
+                                    <label for="drag-ha">Apogee altitude</label>
+                                    <span class="control-value" id="drag-ha-value"></span>
+                                </div>
+                                <input type="range" id="drag-ha" min="130" max="3000" step="10" value="1200">
+                            </div>
+                        </div>
+                        <div class="ctl-row" data-mode="drag">
+                            <div class="ctl-grow">
+                                <div class="segmented" id="drag-area" role="group" aria-label="Choose the satellite's area-to-mass ratio">
+                                    <button data-value="feathered" aria-pressed="false">Feathered</button>
+                                    <button data-value="nominal" aria-pressed="true">Nominal</button>
+                                    <button data-value="windmill" aria-pressed="false">Windmill</button>
+                                </div>
+                            </div>
+                            <div class="ctl-grow">
+                                <div class="segmented" id="drag-solar" role="group" aria-label="Choose the solar activity level">
+                                    <button data-value="min" aria-pressed="false">Solar Min</button>
+                                    <button data-value="mean" aria-pressed="true">Mean</button>
+                                    <button data-value="max" aria-pressed="false">Solar Max</button>
+                                </div>
+                            </div>
+                        </div>
 
-PAGE-ONLY CSS
-    .chart-box { position: relative; height: 11.5rem; }
-    .chart-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-    .ctl-row[hidden] { display: none; }
-        This rule is required. .ctl-row sets display: flex, which otherwise overrides the hidden attribute.
-    Mode colors as CSS variables that match COLOR in perturbations.js: drag, j2, j22, moon, sun, srp.
-    On large screens, reserve the height of two mode rows, so that the view does not jump between modes.
-        Measure this once the rows exist. Do not apply it on phones. Do not set the height of .tool-canvas-box.
+                        <div class="ctl-row" data-mode="j2" hidden>
+                            <div class="ctl-grow">
+                                <div class="segmented" id="j2-preset" role="group" aria-label="Choose an example orbit">
+                                    <button data-value="leo" aria-pressed="true">LEO 45°</button>
+                                    <button data-value="polar" aria-pressed="false">Polar</button>
+                                    <button data-value="sso" aria-pressed="false">Sun-Sync</button>
+                                    <button data-value="molniya" aria-pressed="false">Molniya</button>
+                                </div>
+                            </div>
+                            <div class="ctl-grow">
+                                <div class="control-label">
+                                    <label for="j2-inc">Inclination</label>
+                                    <span class="control-value" id="j2-inc-value"></span>
+                                </div>
+                                <input type="range" id="j2-inc" min="1" max="179" step="0.1" value="45">
+                            </div>
+                        </div>
+                        <div class="ctl-row" data-mode="j2" hidden>
+                            <div class="ctl-grow">
+                                <div class="control-label">
+                                    <label for="j2-hp">Perigee altitude</label>
+                                    <span class="control-value" id="j2-hp-value"></span>
+                                </div>
+                                <input type="range" id="j2-hp" min="200" max="2000" step="10" value="500">
+                            </div>
+                            <div class="ctl-grow">
+                                <div class="control-label">
+                                    <label for="j2-ha">Apogee altitude</label>
+                                    <span class="control-value" id="j2-ha-value"></span>
+                                </div>
+                                <input type="range" id="j2-ha" min="0" max="1000" step="1" value="0">
+                            </div>
+                        </div>
 
-TEXT RULES
-    Write division with a slash, never the division symbol. Applies to every string on the page.
-    Show negative numbers with a true minus sign (see sun-synchronous.js, the eq-cos line).
-    Keep text short. Shorten rather than hiding text in tabs or a scrolling box.
-    The page must contain no identifying information about any person.
--->
+                        <div class="ctl-row" data-mode="j22" hidden>
+                            <div class="ctl-grow">
+                                <div class="control-label">
+                                    <label for="j22-lon">Starting longitude</label>
+                                    <span class="control-value" id="j22-lon-value"></span>
+                                </div>
+                                <input type="range" id="j22-lon" min="-180" max="180" step="1" value="30">
+                            </div>
+                            <div class="ctl-checks">
+                                <label class="check"><input type="checkbox" id="j22-hold">Station-Keeping</label>
+                            </div>
+                        </div>
+
+                        <div class="ctl-row" data-mode="third" hidden>
+                            <div class="ctl-grow">
+                                <div class="segmented" id="third-body" role="group" aria-label="Choose the third body">
+                                    <button data-value="moon" aria-pressed="true">Moon</button>
+                                    <button data-value="sun" aria-pressed="false">Sun</button>
+                                </div>
+                            </div>
+                            <div class="ctl-checks">
+                                <label class="check"><input type="checkbox" id="third-hold">Station-Keeping</label>
+                            </div>
+                        </div>
+
+                        <div class="ctl-row" data-mode="srp" hidden>
+                            <div class="ctl-grow">
+                                <div class="segmented" id="srp-area" role="group" aria-label="Choose the object's area-to-mass ratio">
+                                    <button data-value="dense" aria-pressed="true">Dense</button>
+                                    <button data-value="arrays" aria-pressed="false">Large Arrays</button>
+                                    <button data-value="foil" aria-pressed="false">Foil Debris</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="ctl-caption" id="mode-caption"></p>
+                </div>
+            </div>
+
+            <aside class="tool-side">
+                <div class="col">
+                    <div class="panel accent">
+                        <div class="panel-title">What to Notice</div>
+                        <p class="panel-text" id="notice"></p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Live Values</div>
+                        <div class="stat-grid">
+                            <div class="stat-item"><span class="stat-label" id="stat-0-label"></span><span class="stat-value" id="stat-0"></span></div>
+                            <div class="stat-item"><span class="stat-label" id="stat-1-label"></span><span class="stat-value" id="stat-1"></span></div>
+                            <div class="stat-item"><span class="stat-label" id="stat-2-label"></span><span class="stat-value" id="stat-2"></span></div>
+                            <div class="stat-item"><span class="stat-label" id="stat-3-label"></span><span class="stat-value" id="stat-3"></span></div>
+                            <div class="stat-item"><span class="stat-label" id="stat-4-label"></span><span class="stat-value" id="stat-4"></span></div>
+                            <div class="stat-item"><span class="stat-label" id="stat-5-label"></span><span class="stat-value" id="stat-5"></span></div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title" id="chart-title"></div>
+                        <div class="chart-box" id="chart-box"><canvas id="chart" aria-label="Chart for the selected perturbation"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="panel eq-panel">
+                        <div class="panel-title" id="eq-title"></div>
+                        <div class="eq-list">
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b id="eq-0-name"></b></span><span class="eq-result" id="eq-0-result"></span></div>
+                                <div class="eq-work" id="eq-0-work"></div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b id="eq-1-name"></b></span><span class="eq-result" id="eq-1-result"></span></div>
+                                <div class="eq-work" id="eq-1-work"></div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b id="eq-2-name"></b></span><span class="eq-result" id="eq-2-result"></span></div>
+                                <div class="eq-work" id="eq-2-work"></div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b id="eq-3-name"></b></span><span class="eq-result" id="eq-3-result"></span></div>
+                                <div class="eq-work" id="eq-3-work"></div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b id="eq-4-name"></b></span><span class="eq-result" id="eq-4-result"></span></div>
+                                <div class="eq-work" id="eq-4-work"></div>
+                            </div>
+                        </div>
+                        <p class="eq-constants" id="eq-constants"></p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Which Perturbation Leads?</div>
+                        <div class="chart-box" id="leads-box"><canvas id="leads" aria-label="Log-log chart of each perturbing acceleration against altitude, from 200 to 50,000 km"></canvas></div>
+                        <p class="panel-text muted" id="leads-text"></p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+    </main>
+
+
+    <script src="../assets/tool-kit.js"></script>
+    <script src="../assets/earth-land.js"></script>
+    <script src="../assets/earth-scene.js"></script>
+    <script src="perturbations-model.js"></script>
+    <script src="perturbations.js"></script>
+</body>
+</html>

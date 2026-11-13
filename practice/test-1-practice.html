@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test 1 Practice | OTC OW</title>
-    <meta name="description" content="Practice problems for Test 1: R-V vectors to orbital elements, Hohmann transfers, simple plane changes, combined plane changes, and coplanar and co-orbital rendezvous. Practice mode shows each problem in 3D and walks through the steps. Test mode accepts answers only, then shows the solution.">
+    <meta name="description" content="Practice problems for Test 1: R-V vectors to orbital elements, Hohmann transfers, simple plane changes, combined plane changes, coplanar and co-orbital rendezvous, time of flight with D = RT, and propulsion (the rocket equation, F = ma, and burn time), plus a card-matching drill for Kepler's three laws and Newton's four laws. Practice mode shows each problem in 3D and walks through the steps. Test mode accepts answers only, then shows the solution.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -116,6 +116,13 @@
             white-space: normal;
         }
 
+        /* On a narrow screen, the six sections take two rows of three. */
+        @media (max-width: 560px) {
+            .sections { display: grid; grid-template-columns: repeat(3, 1fr); }
+            .sections button:nth-child(n + 4) { border-top: 1px solid var(--border-subtle); }
+            .sections button:nth-child(3) { border-right: 0; }
+        }
+
         /* Topic: which kind of maneuver is generated */
         .topics { flex-wrap: wrap; margin-top: 0.5rem; }
         .topics button { flex: 1 1 auto; padding: 0.3rem 0.5rem; font-size: 0.76rem; }
@@ -176,6 +183,22 @@
         .answer[data-field="tof_total"] { --row-color: var(--param-nu); }
         .answer[data-field="a_ph"],
         .answer[data-field="h_p"] { --row-color: var(--param-raan); }
+        /* Propulsion: velocity changes red, masses green, accelerations orange, times violet,
+           thrust blue, specific impulse gold */
+        .answer[data-field="ratio"],
+        .answer[data-field^="m_"] { --row-color: var(--param-e); }
+        .answer[data-field="a0"],
+        .answer[data-field="a_f"],
+        .answer[data-field="a"] { --row-color: var(--param-a); }
+        .answer[data-field^="dt"] { --row-color: var(--param-nu); }
+        .answer[data-field="F"] { --row-color: var(--param-i); }
+        .answer[data-field="isp"],
+        .answer[data-field="n"],
+        .answer[data-field="feasible"] { --row-color: var(--param-v); }
+
+        /* Sections with no view (propulsion): the answers and walkthrough in one centered column */
+        body.no-view .tool-stage-col { display: none; }
+        body.no-view .tool-layout { grid-template-columns: minmax(0, 42rem); justify-content: center; }
 
         .answer-box {
             display: flex;
@@ -369,6 +392,111 @@
             color: var(--text-main);
         }
 
+        /* Laws section: no view, one wider centered column */
+        body.laws-only .tool-stage-col { display: none; }
+        body.laws-only .tool-layout { grid-template-columns: minmax(0, 52rem); justify-content: center; }
+
+        .laws-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
+            margin: 0.6rem 0 0.8rem;
+        }
+
+        .laws-option { flex: 1 1 14rem; min-width: 0; }
+        .laws-option .topics { margin-top: 0.2rem; }
+
+        .match-board {
+            display: grid;
+            grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.5fr);
+            gap: 0.8rem;
+            align-items: start;
+            margin-bottom: 0.4rem;
+        }
+
+        .match-col { display: flex; flex-direction: column; gap: 0.45rem; }
+
+        .match-card {
+            display: flex;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 0.25rem 0.55rem;
+            width: 100%;
+            min-height: 3rem;
+            padding: 0.55rem 0.65rem;
+            font-family: inherit;
+            font-size: 0.86rem;
+            line-height: 1.4;
+            text-align: left;
+            color: var(--text-main);
+            background: var(--deep-space);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+        }
+
+        .match-card.name { font-weight: 600; color: #ffffff; align-items: center; }
+        .match-card:hover:not(:disabled) { border-color: var(--border-accent); background: var(--surface-hover); }
+        .match-card:disabled { cursor: default; }
+
+        .match-tag {
+            flex: 0 0 1.45rem;
+            height: 1.45rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            border: 1px dashed var(--border-subtle);
+            border-radius: 5px;
+        }
+
+        .match-card.name .match-tag,
+        .match-card.paired .match-tag { color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+
+        .match-body { flex: 1 1 0; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+        .match-body .katex { font-size: 1.05em; }
+
+        .match-note {
+            flex: 1 1 100%;
+            padding-left: 2rem;
+            font-size: 0.76rem;
+            font-weight: 500;
+            color: var(--answer-wrong);
+        }
+
+        .match-note:empty { display: none; }
+
+        .match-card.selected { border-color: var(--accent-gold); background: var(--gold-glow); transform: translateX(2px); }
+        .match-card.paired { border-color: var(--border-accent); }
+        .match-card.right { border-color: var(--answer-right); background: rgba(52, 211, 153, 0.08); }
+        .match-card.right .match-tag { color: var(--answer-right); border: 1px solid var(--answer-right); }
+        .match-card.wrong,
+        .match-card.flash-wrong { border-color: var(--answer-wrong); background: rgba(248, 113, 113, 0.1); }
+        .match-card.wrong .match-tag { color: var(--answer-wrong); border: 1px solid var(--answer-wrong); }
+        .match-card.flash-wrong { animation: match-shake 0.3s ease; }
+
+        @keyframes match-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .match-card { transition: none; }
+            .match-card.flash-wrong { animation: none; }
+        }
+
+        @media (max-width: 520px) {
+            .match-board { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr); gap: 0.5rem; }
+            .match-card { padding: 0.45rem 0.5rem; font-size: 0.8rem; gap: 0.25rem 0.4rem; }
+            .match-tag { flex-basis: 1.3rem; height: 1.3rem; }
+            .match-note { padding-left: 0; }
+        }
+
         @media (min-width: 1081px) {
             .tool-layout { --aside-w: 36rem; }
         }
@@ -394,12 +522,15 @@
 
         @media (max-width: 640px) and (orientation: portrait) {
             :root:has(.answer input:focus) { --tool-view-h: 24svh; }
-            body.answers-only .tool-main { padding-top: calc(var(--nav-h) + 0.5rem); }
+            body.answers-only .tool-main,
+            body.no-view .tool-main { padding-top: calc(var(--nav-h) + 0.5rem); }
         }
 
         @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-            body.answers-only .top-nav { width: 100%; }
-            body.answers-only .tool-main { padding: calc(var(--nav-h) + 0.5rem) 1rem 1rem; }
+            body.answers-only .top-nav,
+            body.no-view .top-nav { width: 100%; }
+            body.answers-only .tool-main,
+            body.no-view .tool-main { padding: calc(var(--nav-h) + 0.5rem) 1rem 1rem; }
         }
     </style>
 </head>
@@ -461,9 +592,11 @@
                         <canvas id="scene-rv" aria-label="A 3D view of Earth, the position and velocity vectors, and the orbit they produce."></canvas>
                         <canvas id="scene-maneuver" aria-label="A 3D view of Earth, the initial and target orbits, the transfer, and the velocity change at each burn." hidden></canvas>
                         <canvas id="scene-rendezvous" aria-label="A 3D view of Earth, the chase and target orbits, the phase angles, and the rendezvous as it plays out." hidden></canvas>
+                        <canvas id="scene-tof" aria-label="A 3D view of Earth, the circular orbit, and the angle the satellite sweeps during the flight." hidden></canvas>
                         <div class="tool-labels" id="labels-rv" aria-hidden="true"></div>
                         <div class="tool-labels" id="labels-maneuver" aria-hidden="true" hidden></div>
                         <div class="tool-labels" id="labels-rendezvous" aria-hidden="true" hidden></div>
+                        <div class="tool-labels" id="labels-tof" aria-hidden="true" hidden></div>
                         <button type="button" class="btn view-reset" id="reset-view">Reset View</button>
                         <div class="tool-hint" id="view-hint">Drag to rotate. Scroll or pinch to zoom.</div>
                         <div class="tool-status" id="status" style="display: none;"></div>
@@ -487,6 +620,9 @@
                             <button type="button" data-value="rv" aria-pressed="true">R-V to COEs</button>
                             <button type="button" data-value="maneuvers" aria-pressed="false">Orbital Maneuvers</button>
                             <button type="button" data-value="rendezvous" aria-pressed="false">Rendezvous</button>
+                            <button type="button" data-value="tof" aria-pressed="false">Time of Flight</button>
+                            <button type="button" data-value="propulsion" aria-pressed="false">Propulsion</button>
+                            <button type="button" data-value="laws" aria-pressed="false">Laws</button>
                         </div>
                         <div class="segmented topics" id="topic" role="group" aria-label="Choose a kind of maneuver" hidden>
                             <button type="button" data-value="random" aria-pressed="true">Random</button>
@@ -500,9 +636,51 @@
                             <button type="button" data-value="coplanar" aria-pressed="false">Coplanar</button>
                             <button type="button" data-value="coorbital" aria-pressed="false">Co-orbital</button>
                         </div>
+                        <div class="segmented topics" id="tof-topic" role="group" aria-label="Choose what to find" hidden>
+                            <button type="button" data-value="random" aria-pressed="true">Random</button>
+                            <button type="button" data-value="time" aria-pressed="false">Find Time</button>
+                            <button type="button" data-value="position" aria-pressed="false">Find Position</button>
+                        </div>
+                        <div class="segmented topics" id="propulsion-topic" role="group" aria-label="Choose a difficulty" hidden>
+                            <button type="button" data-value="random" aria-pressed="true">Any Level</button>
+                            <button type="button" data-value="foundational" aria-pressed="false">Foundational</button>
+                            <button type="button" data-value="intermediate" aria-pressed="false">Intermediate</button>
+                            <button type="button" data-value="advanced" aria-pressed="false">Advanced</button>
+                        </div>
                     </div>
 
-                    <div class="panel accent">
+                    <!-- Laws section: match each of Kepler's and Newton's laws to its description. -->
+                    <div class="panel accent" id="laws-panel" hidden>
+                        <div class="panel-title">Kepler's and Newton's Laws</div>
+                        <p class="panel-text">Pick a law, then pick the card that describes it. Either column can go first.</p>
+                        <div class="laws-options">
+                            <div class="laws-option">
+                                <span class="ctl-caption">Laws</span>
+                                <div class="segmented topics" id="laws-deck" role="group" aria-label="Choose which laws to match">
+                                    <button type="button" data-value="all" aria-pressed="true">All 7</button>
+                                    <button type="button" data-value="kepler" aria-pressed="false">Kepler (3)</button>
+                                    <button type="button" data-value="newton" aria-pressed="false">Newton (4)</button>
+                                </div>
+                            </div>
+                            <div class="laws-option">
+                                <span class="ctl-caption">Cards show</span>
+                                <div class="segmented topics" id="laws-clue" role="group" aria-label="Choose what the cards show">
+                                    <button type="button" data-value="statement" aria-pressed="true">Statement</button>
+                                    <button type="button" data-value="equation" aria-pressed="false">Equation</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="match-board">
+                            <div class="match-col" id="match-names" role="group" aria-label="Laws"></div>
+                            <div class="match-col" id="match-clues" role="group" aria-label="Descriptions"></div>
+                        </div>
+                        <div class="answer-actions">
+                            <button type="button" class="btn primary" id="laws-submit" hidden>Submit Pairs</button>
+                            <span class="answer-score" id="laws-score" role="status"></span>
+                        </div>
+                    </div>
+
+                    <div class="panel accent" id="problem-panel">
                         <div class="panel-title" id="problem-title"></div>
                         <p class="panel-text" id="problem-prompt"></p>
                         <div class="given" id="given"></div>
@@ -544,6 +722,10 @@
     <script src="../orbits/inertial-rendezvous-scene.js"></script>
     <script src="test-1-rendezvous-problems.js"></script>
     <script src="test-1-rendezvous-scene.js"></script>
+    <script src="test-1-tof-problems.js"></script>
+    <script src="test-1-tof-scene.js"></script>
+    <script src="test-1-propulsion-problems.js"></script>
+    <script src="test-1-law-matching.js"></script>
     <script src="test-1-practice.js"></script>
 </body>
 </html>

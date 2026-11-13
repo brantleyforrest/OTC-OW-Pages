@@ -180,9 +180,12 @@
                     // A label keeps its previous spot while that spot is free, so that it does not
                     // jump as the view turns. A spot from the wider search is tried only after the
                     // spots beside the point, so that a label returns to its point when it can.
-                    const order = label.spot < nearSpots
-                        ? [label.spot, ...spots.keys()]
-                        : [...Array(nearSpots).keys(), label.spot, ...spots.keys()];
+                    // The spots below an overlay exist only while the point is under it, so a
+                    // previous spot can be gone this frame.
+                    const previous = label.spot < spots.length ? label.spot : 0;
+                    const order = previous < nearSpots
+                        ? [previous, ...spots.keys()]
+                        : [...Array(nearSpots).keys(), previous, ...spots.keys()];
                     for (const i of order) {
                         const r = at(i);
                         // Screen edges can push a label back onto its own point, so reject that spot too.

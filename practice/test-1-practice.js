@@ -1,10 +1,10 @@
-// Test 1 Practice: three sections on one page, the R-V problems, the orbital maneuver
-// problems, and the rendezvous problems, with the same two modes, answer form, and walkthrough
-// for all of them.
+// Test 1 Practice: five problem sections on one page, the R-V problems, the orbital maneuver
+// problems, the rendezvous problems, the time of flight problems, and the propulsion problems,
+// with the same two modes, answer form, and walkthrough for all of them.
 // Practice mode shows the view from the start and lets the student walk through the steps.
 // Test mode shows only the problem and the answer form until the answers are graded.
 // Problem types supply the numbers and the worked steps. See rv-coe-problems.js,
-// test-1-maneuver-problems.js, and test-1-rendezvous-problems.js.
+// test-1-maneuver-problems.js, test-1-rendezvous-problems.js, and test-1-tof-problems.js.
 (function () {
     'use strict';
 
@@ -15,6 +15,8 @@
     const RvCoe = window.RvCoeProblems;
     const Maneuvers = window.Test1ManeuverProblems;
     const Rendezvous = window.Test1RendezvousProblems;
+    const Tof = window.Test1TofProblems;
+    const Propulsion = window.Test1PropulsionProblems;
 
     // The R-V problems keep the satellite at least 1.5 Earth radii from Earth's center, so that
     // the orbit has room in the view.
@@ -25,14 +27,23 @@
         test: 'Enter your answers and submit. The view and the walkthrough open after grading.'
     };
 
-    // The page has three sections. Each section has its own problems, and a link can open any
-    // one (#rv, #maneuvers, or #rendezvous).
-    const SECTIONS = ['rv', 'maneuvers', 'rendezvous'];
+    // Kepler's and Newton's laws are matched on cards, with no view or walkthrough.
+    const LAWS_CAPTIONS = {
+        practice: 'Each pair is checked as you make it. A wrong pair lets go, so you can try again.',
+        test: 'Pair every card, then submit. Pick a paired card to undo its pair before submitting.'
+    };
+
+    // The page has six sections. The first five have their own problems, and the last is the
+    // laws matching drill. A link can open any one (#rv, #maneuvers, #rendezvous, #tof,
+    // #propulsion, or #laws). The propulsion problems have no 3D view.
+    const SECTIONS = ['rv', 'maneuvers', 'rendezvous', 'tof', 'propulsion', 'laws'];
     const state = {
         mode: 'practice',
         section: SECTIONS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'rv',
         maneuverType: 'random',  // In the maneuvers section: one kind of maneuver, or any of them
         rendezvousType: 'random', // In the rendezvous section: coplanar, co-orbital, or either
+        tofType: 'random',      // In the time of flight section: find the time, the position, or either
+        propulsionType: 'random', // In the propulsion section: one difficulty level, or any level
         problem: null,
         submitted: false,
         blankWarned: false,
@@ -41,6 +52,13 @@
     };
 
     const viz = createViz();
+    const laws = window.Test1LawMatching.create({
+        names: $('match-names'),
+        clues: $('match-clues'),
+        score: $('laws-score'),
+        submit: $('laws-submit')
+    });
+    const lawOptions = { deck: 'all', clue: 'statement' };
 
     /* ------------------------------------------------------------------ */
     /* Problems                                                           */
@@ -98,9 +116,46 @@
         };
     }
 
+    function tofProblem(type) {
+        const p = Tof.generate(type);
+        return {
+            view: 'tof',
+            title: p.title,
+            prompt: p.prompt,
+            limitsHtml: p.limitsHtml,
+            overviewCaption: p.overviewCaption,
+            fields: p.fields,
+            statement: p.statement,
+            answers: p.answers,
+            steps: p.steps,
+            source: p,
+            grade: (field, text) => Tof.grade(field.tolerance, text, p.answers[field.key].value, field.unitType)
+        };
+    }
+
+    // No view: the page shows only the answer form and the walkthrough.
+    function propulsionProblem(type) {
+        const p = Propulsion.generate(type);
+        return {
+            view: null,
+            title: p.title,
+            prompt: p.prompt,
+            limitsHtml: p.limitsHtml,
+            overviewCaption: p.overviewCaption,
+            fields: p.fields,
+            statement: p.statement,
+            answers: p.answers,
+            steps: p.steps,
+            source: p,
+            grade: (field, text) => Propulsion.grade(field.tolerance, text, p.answers[field.key].value, field.unitType)
+        };
+    }
+
     function generate() {
         if (state.section === 'rv') return rvProblem();
+        if (state.section === 'propulsion') return propulsionProblem(state.propulsionType);
         if (state.section === 'rendezvous') return rendezvousProblem(state.rendezvousType);
+        if (state.section === 'tof') return tofProblem(state.tofType);
         const types = Maneuvers.types;
         const type = state.maneuverType === 'random' ? types[Math.floor(Math.random() * types.length)] : state.maneuverType;
         return maneuverProblem(type);
@@ -135,7 +190,8 @@
             const input = document.createElement('input');
             input.id = `answer-${field.key}`;
             input.type = 'text';
-            input.inputMode = 'decimal';
+            // A yes/no answer needs letters; every other answer is a number.
+            input.inputMode = field.unitType === 'yesno' ? 'text' : 'decimal';
             input.spellcheck = false;
             const unit = document.createElement('span');
             unit.className = 'answer-unit';
@@ -335,6 +391,20 @@
     /* Modes and Problems                                                 */
     /* ------------------------------------------------------------------ */
     function applyLayout() {
+        const onLaws = state.section === 'laws';
+        document.body.classList.toggle('laws-only', onLaws);
+        document.body.classList.toggle('no-view', !onLaws && Boolean(state.problem) && !state.problem.view);
+        $('laws-panel').hidden = !onLaws;
+        $('problem-panel').hidden = onLaws;
+        $('mode-caption').textContent = (onLaws ? LAWS_CAPTIONS : MODE_CAPTIONS)[state.mode];
+        $('new-problem').textContent = onLaws ? 'Shuffle' : 'New Problem';
+        if (onLaws) {
+            document.body.classList.remove('answers-only');
+            $('walk-panel').hidden = true;
+            $('new-problem').classList.toggle('primary', laws.isDone());
+            return;
+        }
+
         const answersOnly = state.mode === 'test' && !state.submitted;
         document.body.classList.toggle('answers-only', answersOnly);
         $('walk-panel').hidden = answersOnly;
@@ -343,7 +413,16 @@
         $('new-problem').classList.toggle('primary', state.submitted);
     }
 
+    function dealLaws() {
+        laws.deal({ mode: state.mode, ...lawOptions });
+        applyLayout();
+    }
+
     function newProblem() {
+        if (state.section === 'laws') {
+            dealLaws();
+            return;
+        }
         state.problem = generate();
         state.submitted = false;
         state.blankWarned = false;
@@ -364,6 +443,8 @@
     function showSection() {
         $('topic').hidden = state.section !== 'maneuvers';
         $('rendezvous-topic').hidden = state.section !== 'rendezvous';
+        $('tof-topic').hidden = state.section !== 'tof';
+        $('propulsion-topic').hidden = state.section !== 'propulsion';
         for (const button of $('section').querySelectorAll('button')) {
             button.setAttribute('aria-pressed', String(button.dataset.value === state.section));
         }
@@ -386,11 +467,37 @@
         newProblem();
     });
 
-    Kit.bindSegmented($('mode'), (mode) => {
-        state.mode = mode;
-        $('mode-caption').textContent = MODE_CAPTIONS[mode];
+    Kit.bindSegmented($('tof-topic'), (type) => {
+        state.tofType = type;
         newProblem();
     });
+
+    Kit.bindSegmented($('propulsion-topic'), (type) => {
+        state.propulsionType = type;
+        newProblem();
+    });
+
+    Kit.bindSegmented($('mode'), (mode) => {
+        state.mode = mode;
+        newProblem();
+    });
+
+    Kit.bindSegmented($('laws-deck'), (deck) => {
+        lawOptions.deck = deck;
+        dealLaws();
+    });
+
+    Kit.bindSegmented($('laws-clue'), (clue) => {
+        lawOptions.clue = clue;
+        dealLaws();
+    });
+
+    // A pick can finish the drill, which makes Shuffle the next thing to press.
+    $('laws-panel').addEventListener('click', () => {
+        if (state.section === 'laws') $('new-problem').classList.toggle('primary', laws.isDone());
+    });
+
+    $('laws-submit').addEventListener('click', () => laws.submit());
 
     $('new-problem').addEventListener('click', newProblem);
 
@@ -407,7 +514,8 @@
         const views = {
             rv: { make: () => window.RvCoeScene, canvas: $('scene-rv'), labels: $('labels-rv'), constants: RvCoe.constants, live: null },
             maneuver: { make: () => window.Test1ManeuverScene, canvas: $('scene-maneuver'), labels: $('labels-maneuver'), constants: Maneuvers.constants, live: null },
-            rendezvous: { make: () => window.Test1RendezvousScene, canvas: $('scene-rendezvous'), labels: $('labels-rendezvous'), constants: Rendezvous.constants, live: null }
+            rendezvous: { make: () => window.Test1RendezvousScene, canvas: $('scene-rendezvous'), labels: $('labels-rendezvous'), constants: Rendezvous.constants, live: null },
+            tof: { make: () => window.Test1TofScene, canvas: $('scene-tof'), labels: $('labels-tof'), constants: Tof.constants, live: null }
         };
         const pending = { view: 'rv', problem: null, stage: 'given', answersShown: false };
 
@@ -416,8 +524,10 @@
             statusEl.textContent = text;
         }
 
+        // A problem with no view (view: null) leaves every canvas hidden.
         function current() {
-            return views[pending.view].live;
+            const v = views[pending.view];
+            return v ? v.live : null;
         }
 
         function showView(name) {

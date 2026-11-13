@@ -26,11 +26,12 @@ The web portal is established at `index.html`. The following tools are available
 * **[Orbital Equation Explorer](orbits/orbit-equation.html):** A 3D view of an orbit around Earth, with each parameter of the orbit equation set by hand or animated through its range.
 * **[Ground Track Visualizer](orbits/ground-track.html):** A split view of an orbit in 3D and its ground track on a world map.
 * **[Sun-Synchronous Orbit](orbits/sun-synchronous.html):** A 3D view of a year of orbit motion, comparing a sun-synchronous orbit with a polar orbit.
+* **[Perturbations Explorer](orbits/perturbations.html):** A 3D view of drag, J₂, J₂,₂, third-body gravity, and solar radiation pressure, each compared with the two-body orbit it started from.
 * **[Orbital Maneuvers](orbits/orbital-maneuvers.html):** An interactive 3D visualizer of Hohmann transfers, simple plane changes, and combined maneuvers with live equations and a delta-V budget (loads KaTeX from a CDN).
 * **[Inertial Rendezvous](orbits/inertial-rendezvous.html):** An interactive 3D visualizer for coplanar and co-orbital orbital rendezvous in the inertial (ECI) frame with live equations and a trade panel (loads KaTeX from a CDN).
 
 The Study tab links to:
-* **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems in three sections, classical orbital elements from state vectors, orbital maneuvers (Hohmann transfers, simple plane changes, and combined plane changes), and coplanar and co-orbital rendezvous, with answer checking and a 3D walkthrough in which the satellite moves along with the steps.
+* **[Test 1 Practice](practice/test-1-practice.html):** Generated practice problems in four sections, classical orbital elements from state vectors, orbital maneuvers (Hohmann transfers, simple plane changes, and combined plane changes), coplanar and co-orbital rendezvous, and time of flight with D = RT (time to sweep an angle, or position after a time), with answer checking and a 3D walkthrough in which the satellite moves along with the steps. A fifth section matches Kepler's three laws and Newton's four laws to their statements or equations on cards.
 
 ---
 
