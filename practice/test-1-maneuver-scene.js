@@ -19,6 +19,8 @@
     const DIMMED = 0.3;
     const TRANSFER_SECONDS = 2.6;   // The satellite takes this long to fly the transfer
     const PLANE_LAP_SECONDS = 12;   // and this long to go once around a plane change's orbit
+    const TOUR_FLIGHT_SECONDS = 5.5;    // Going on to the second burn, the satellite flies the transfer this slowly
+    const TOUR_PAUSE = 0.4;         // The camera holds this long before and after that flight
 
     const smooth = (t) => t * t * (3 - 2 * t);
     const nearestAngle = (from, to) => from + ((((to - from) % 360) + 540) % 360) - 180;
@@ -672,6 +674,9 @@
         let problemId = 0;
         let viewW = 1, viewH = 1;
         let flight = null;      // The camera move in progress
+        let tour = [];          // Camera moves still to come in this step, each after its wait
+        let aim = null;         // Where the camera is headed now, as a function
+        let buildClock = 0;     // Time this step has spent ready to build its parts
         let manual = false;     // True once the reader has turned or zoomed the view in this step
         let answersShown = false;
         let motion = null;      // Where the satellite is, and where the current step moves it
@@ -705,8 +710,11 @@
 
             stage = 'given';
             stageClock = 0;
+            buildClock = 0;
             manual = false;
             flight = null;
+            tour = [];
+            aim = null;
             answersShown = false;
             motion = Motion.create(data.motionRate);
             // A transfer starts a quarter turn before the first burn. A plane change starts where
@@ -769,6 +777,40 @@
             }
         }
 
+        // Going forward to the second burn, the camera pulls back to show the whole transfer, the
+        // satellite flies it slowly, and then the camera closes in on the second burn. The second
+        // burn's parts wait for that last move.
+        function tourToBurn2() {
+            const d = data;
+            const atBurn1 = d.T1, atBurn2 = d.T1 + 1;
+            if (d.family !== 'transfer' || stage !== 'burn2' || motion.tau >= atBurn2 - 1e-9 || Kit.prefersReducedMotion()) return false;
+            const overview = () => stageGoal('tof');
+            motion.plan([
+                { to: atBurn1 },
+                { wait: () => !flight && stageClock >= CAMERA_SECONDS + TOUR_PAUSE },
+                { to: atBurn2, seconds: TOUR_FLIGHT_SECONDS }
+            ]);
+            tour = [{ wait: () => motion.tau >= atBurn2 - 1e-9, pause: TOUR_PAUSE, held: 0, aim: () => stageGoal('burn2') }];
+            aim = overview;
+            flyTo(overview(), CAMERA_SECONDS);
+            return true;
+        }
+
+        function aimNow() {
+            return aim ? aim() : stageGoal(stage);
+        }
+
+        function runTour(seconds) {
+            if (flight || !tour.length) return;
+            const next = tour[0];
+            if (!next.wait()) return;
+            next.held += seconds;
+            if (next.held < next.pause) return;
+            tour.shift();
+            aim = next.aim;
+            if (!manual) flyTo(aim(), CAMERA_SECONDS);
+        }
+
         function flyTo(goal, seconds) {
             const from = { ...camView };
             flight = { from, to: { ...goal, az: nearestAngle(from.az, goal.az) }, clock: 0, seconds };
@@ -780,8 +822,10 @@
                 p.grow = p.goalGrow;
                 p.level = p.goalLevel;
             }
-            if (flight) Object.assign(camView, flight.to);
+            if (tour.length) aim = tour[tour.length - 1].aim;
+            if (flight || tour.length) Object.assign(camView, aimNow());
             flight = null;
+            tour = [];
             if (motion) motion.finish();
             dirty = true;
         }
@@ -789,16 +833,21 @@
         function setStage(next) {
             stage = stages.includes(next) ? next : 'given';
             stageClock = 0;
+            buildClock = 0;
             manual = false;
+            tour = [];
+            aim = null;
             if (!data) return;
             applyStage();
-            planMotion();
-            flyTo(stageGoal(stage), CAMERA_SECONDS);
+            if (!tourToBurn2()) {
+                planMotion();
+                flyTo(stageGoal(stage), CAMERA_SECONDS);
+            }
             if (Kit.prefersReducedMotion()) finishNow();
         }
 
         function canStartBuilding(s) {
-            if (stageClock < BUILD_DELAY) return false;
+            if (buildClock < BUILD_DELAY) return false;
             if (!s.after) return true;
             const prior = parts[s.after];
             return !prior || !prior.on || prior.grow >= 1;
@@ -807,6 +856,7 @@
         function advance(seconds) {
             if (!data) return;
             stageClock += seconds;
+            if (!tour.length) buildClock += seconds;
             for (const [name, p] of partEntries) {
                 const s = spec[name];
                 if (p.grow !== p.goalGrow) {
@@ -828,6 +878,7 @@
                 if (flight.clock >= flight.seconds) flight = null;
                 dirty = true;
             }
+            runTour(seconds);
         }
 
         /* Where the camera goes at each step ------------------------------- */
@@ -1190,7 +1241,7 @@
         dom.reset.addEventListener('click', () => {
             if (!data) return;
             manual = false;
-            flyTo(stageGoal(stage), RESET_SECONDS);
+            flyTo(aimNow(), RESET_SECONDS);
         });
 
         /* Start ------------------------------------------------------------ */
@@ -1202,7 +1253,7 @@
             camera.updateProjectionMatrix();
             layer.remeasure();
             if (data && !manual) {
-                const goal = stageGoal(stage);
+                const goal = aimNow();
                 if (flight) flight.to = { ...goal, az: nearestAngle(flight.from.az, goal.az) };
                 else Object.assign(camView, goal);
             }

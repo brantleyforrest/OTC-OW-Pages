@@ -1,5 +1,5 @@
 // The 3D view for time of flight problems on the Test 1 Practice page. Earth, the circular
-// orbit, the ascending node (u = 0°), and the satellite at u_0. The walkthrough plays the motion:
+// orbit, and the satellite at u_0. The walkthrough plays the motion:
 // one lap at the steady rate n, then the sweep D from u_0, drawn as an arc behind the satellite.
 // A sweep of more than one lap spirals outward, so that each lap stays visible. Computed values
 // are labeled only after the answers are graded.
@@ -22,7 +22,6 @@
     const START_DELAY = 0.5;
     const COLORS = {
         orbit: '#e0b64f',
-        node: '#60a5fa',
         start: '#34d399',
         end: '#ff8a3d',
         sweep: '#c4a1ff',
@@ -55,7 +54,7 @@
         const stars = global.EarthScene.addStars(THREE, scene);
         const layer = new Kit.LabelLayer(dom.labels, { wide: true });
 
-        // The orbit plane: tilted about the node line (X), so that u = 0° is on +X.
+        // The orbit plane: tilted about X, so that u = 0° is on +X.
         const plane = new THREE.Group();
         plane.rotation.x = TILT;
         scene.add(plane);
@@ -65,8 +64,6 @@
 
         const orbitLine = new THREE.LineLoop(new THREE.BufferGeometry(), lineMat(COLORS.orbit, 0.85));
         plane.add(orbitLine);
-        const nodeLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: COLORS.node, dashSize: 0.08, gapSize: 0.06 }));
-        plane.add(nodeLine);
         const startLine = new THREE.Line(new THREE.BufferGeometry(), lineMat(COLORS.start, 0.8));
         const endLine = new THREE.Line(new THREE.BufferGeometry(), lineMat(COLORS.end, 0.8));
         plane.add(startLine, endLine);
@@ -88,7 +85,6 @@
             return label;
         };
         const labels = {
-            node: tag(`<span style="color:${COLORS.node}">Ascending node</span>`, 3),
             start: tag(`<span style="color:${COLORS.start}">${math('u_0')}</span>`, 1),
             end: tag(`<span style="color:${COLORS.end}">${math('u_1')}</span>`, 1),
             sweep: tag(`<span style="color:${COLORS.sweep}">${math('D')}</span>`, 2),
@@ -136,7 +132,6 @@
             const ring = [];
             for (let i = 0; i < 256; i++) ring.push(inPlane(i / 256 * 360, r));
             setLine(orbitLine, ring);
-            setLine(nodeLine, [new THREE.Vector3(0, 0, 0), inPlane(0, r * 1.18)]);
             setLine(startLine, [new THREE.Vector3(0, 0, 0), inPlane(model.u0, r)]);
             const endRadius = spiral(model.sweep);
             setLine(endLine, [new THREE.Vector3(0, 0, 0), inPlane(model.u1, endRadius)]);
@@ -257,7 +252,6 @@
 
         function updateLabels() {
             layer.begin();
-            showAt(labels.node, inPlane(0, r * 1.18));
             showAt(labels.start, startDot.position);
             if (endDot.visible) showAt(labels.end, endDot.position);
             if (sweep.visible) {

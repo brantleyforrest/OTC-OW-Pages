@@ -309,6 +309,7 @@
         return {
             type: 'coplanar',
             model: m,
+            positions: pos,
             title: 'Coplanar Rendezvous',
             prompt: prose('The chase and the target are on circular orbits in the same plane. The chase waits for the right phase angle, then flies a Hohmann transfer to meet the target. Find the initial phase angle, the synodic period, the transfer time, the target’s travel during the transfer, the desired phase angle, the wait for the first opportunity, and the total time.'),
             statement: item(`R_{\\text{chase}} = ${km(Rchase)}\\text{ km}`) + item(`R_{\\text{target}} = ${km(Rtarget)}\\text{ km}`) + positionItems(pos),
@@ -473,6 +474,7 @@
         return {
             type: 'coorbital',
             model: m,
+            positions: pos,
             title: 'Co-orbital Rendezvous',
             prompt: prose(`The chase and the target share one circular orbit. The chase flies ${kText} and meets the target where it started. Find the initial phase angle, the target’s travel during one phasing orbit, the time to rendezvous, the phasing orbit’s size, its perigee altitude, the first burn, and the total $\\Delta V$.`),
             statement: item(`R = ${km(R)}\\text{ km}`) + positionItems(pos) + item(`k = ${k}`) + item(`R_\\oplus = ${km(R_EARTH)}\\text{ km}`),

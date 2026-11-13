@@ -15,10 +15,12 @@
     function create(secondsPerUnit) {
         const m = { tau: 0, steps: [], leg: null, loop: null };
 
-        function startLeg(to) {
+        // A forward leg can name its own `seconds`, to slow it down for the reader.
+        function startLeg(to, seconds) {
             const span = to - m.tau;
             if (Math.abs(span) < 1e-9) return;
-            const duration = span < 0 ? REWIND_SECONDS : Math.min(MAX_LEG_SECONDS, span * secondsPerUnit);
+            const natural = seconds === undefined ? Math.min(MAX_LEG_SECONDS, span * secondsPerUnit) : seconds;
+            const duration = span < 0 ? REWIND_SECONDS : natural;
             m.leg = { from: m.tau, to, duration, clock: 0, eased: span < 0 };
         }
 
@@ -33,7 +35,7 @@
                 m.loop = null;
             },
 
-            // steps: { to } moves to that tau; { wait } holds until wait() returns true.
+            // steps: { to } moves to that tau ({ to, seconds } takes that long going forward); { wait } holds until wait() returns true.
             // loop: [from, to] keeps the satellite going around that stretch after the last step.
             plan(steps, loop = null) {
                 m.steps = steps.slice();
@@ -58,7 +60,7 @@
                         if (!step) break;
                         if (step.wait && !step.wait()) break;
                         m.steps.shift();
-                        if (step.to !== undefined) startLeg(step.to);
+                        if (step.to !== undefined) startLeg(step.to, step.seconds);
                         continue;
                     }
                     const leg = m.leg;

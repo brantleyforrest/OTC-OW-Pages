@@ -1,6 +1,7 @@
 // The 3D view for rendezvous problems on the Test 1 Practice page. It is the view from the
 // Inertial Rendezvous tool (../orbits/inertial-rendezvous-scene.js), driven by the walkthrough.
-// It starts with only the given orbits, the two spacecraft, and phi_0. Each step adds what it
+// It starts with only the given orbits, the two spacecraft at their given positions (theta from
+// I-hat), and phi_0. Each step adds what it
 // finds, moves the mission timeline to the part of the rendezvous it explains, and plays that
 // part when the step is about motion. Computed values are labeled only after the answers are
 // graded; from then on, every part is drawn.
@@ -14,11 +15,11 @@
     const START_DELAY = 0.6;    // A step starts playing this long after the camera starts moving
 
     // The parts of the solution drawn at each step (see `reveal` in inertial-rendezvous-scene.js)
-    // The spacecraft positions are given, not phi_0, so its value is labeled from the first
-    // step on, where it is found.
-    const GIVEN = {};
+    // The spacecraft positions are given, not phi_0, so the view starts with each one's theta
+    // from I-hat, and phi_0's value is labeled from the first step on, where it is found.
+    const GIVEN = { thetas: true };
     const COPLANAR_REVEAL = {
-        phase: { phi0: true },
+        phase: { phi0: true, thetas: true },
         motions: { phi0: true },
         synodic: { phi0: true },
         transfer: { phi0: true, transfer: true, burns: true },
@@ -28,7 +29,7 @@
         total: { phi0: true, transfer: true, burns: true, nu: true, desired: true }
     };
     const COORBITAL_REVEAL = {
-        phase: { phi0: true },
+        phase: { phi0: true, thetas: true },
         nu: { phi0: true, nu: true },
         period: { phi0: true, nu: true, phasing: true, burns: true },
         size: { phi0: true, nu: true, phasing: true, burns: true },
@@ -56,16 +57,28 @@
             return f >= 1 ? Math.max(seg.from, tl - 1e-4) : tl;
         }
 
+        // Playing time for the wait: longer when the chase coasts more laps, so each lap
+        // stays slow enough to follow
+        function waitSeconds() {
+            const laps = (model.n_chase * model.WT) / (2 * Math.PI);
+            return Math.min(7, 2.4 + 0.8 * laps);
+        }
+
         // Where each step puts the timeline: a fixed point, or a span it plays through. `focus`
         // is the part the camera frames (anything but a burn frames the whole scene).
         function planFor(name) {
             if (model.mode === 'coplanar') {
+                // About one lap of the chase: enough to watch phi change at the drift rate
+                const lap = Math.min(1, (2 * Math.PI) / (model.n_chase * model.WT));
                 switch (name) {
+                    case 'motions': return { from: 0, to: at('wait', lap), focus: 'overview', seconds: 2.8 };
+                    // The departure burn, then the flight to the far end of the transfer
                     case 'transfer':
-                    case 'travel': return { from: at('transfer', 0), to: at('transfer', 1), focus: 'transfer', seconds: 2.8 };
+                    case 'travel': return { from: at('burn1', 0), to: at('transfer', 1), focus: 'transfer', seconds: 3.4 };
                     case 'desired': return { to: at('wait', 1), focus: 'wait' };
-                    case 'wait': return { from: 0, to: at('wait', 1), focus: 'wait', seconds: 3.2 };
-                    case 'total': return { from: at('transfer', 0), to: 1, focus: 'together', seconds: 3.4 };
+                    case 'wait': return { from: 0, to: at('wait', 1), focus: 'wait', seconds: waitSeconds() };
+                    // The whole mission: wait, burn, transfer, burn, together
+                    case 'total': return { from: 0, to: 1, focus: 'together', seconds: waitSeconds() + 3.6 };
                     default: return { to: 0, focus: 'overview' };
                 }
             }
@@ -73,10 +86,12 @@
             // farthest from the burn: perigee when it is behind, apogee when it is ahead.
             const half = at('phasing', 0) + (at('phasing', 1) - at('phasing', 0)) / (2 * model.k);
             switch (name) {
-                case 'period': return { from: at('phasing', 0), to: 1, focus: 'phasing', seconds: 2.4 + 0.8 * model.k };
+                // The first burn, every phasing orbit, and the burn back onto the circle
+                case 'period': return { from: 0, to: 1, focus: 'phasing', seconds: 2.8 + 0.8 * model.k };
                 case 'size':
                 case 'perigee': return { to: half, focus: 'phasing' };
-                case 'burn': return { to: at('burn1', 1), focus: 'burn1' };
+                // The first burn grows from the old velocity to the new one
+                case 'burn': return { from: at('burn1', 0), to: at('burn1', 1), focus: 'burn1', seconds: 1.6 };
                 default: return { to: 0, focus: 'overview' };
             }
         }
@@ -93,6 +108,7 @@
             answersShown = false;
             play = null;
             applyReveal();
+            view.setFrame(problem.positions ? problem.positions.chase : null);
             view.setModel(model);
             view.setTime(0);
             view.setFocus('overview', true);

@@ -434,11 +434,16 @@
         const phiDesiredArc = createTube(COLORS.theta, { arc: true, dashed: true });
         const nuTravelArc = createTube(COLORS.tof, { arc: true });
 
+        // Given positions, measured from I-hat (only when a frame angle is set)
+        const thetaChaseArc = createTube(COLORS.orbit1, { arc: true });
+        const thetaTargetArc = createTube(COLORS.orbit2, { arc: true });
+
         // Angle wedges (shaded between Earth and the arc) and the radial legs that
         // bound each angle at Earth's center, as in the lesson figures
         const phiSector = createSector(COLORS.theta);
         const nuSector = createSector(COLORS.tof);
         const legs = [0, 1, 2].map(() => createBar(COLORS.radius));
+        const thetaLegs = [0, 1].map(() => createBar(COLORS.radius));
 
         // Radius lines
         const rChaseBar = createBar(COLORS.orbit1);
@@ -497,6 +502,8 @@
             phi: measureLabel('\\phi', COLORS.theta, 0),
             phi0: measureLabel('\\phi_0', COLORS.theta, 0),
             phiDesired: measureLabel('\\phi_{\\text{desired}}', COLORS.theta, 1),
+            thetaChase: measureLabel('\\theta_{\\text{chase}}', COLORS.orbit1, 1),
+            thetaTarget: measureLabel('\\theta_{\\text{target}}', COLORS.orbit2, 1),
             nuTravel: measureLabel('\\nu_{\\text{travel}}', COLORS.tof, 1),
             rendezvous: wordLabel('Rendezvous', 2, true),
             r1: measureLabel('R_{\\text{chase}}', COLORS.orbit1, 2),
@@ -551,8 +558,22 @@
             return ext;
         }
 
+        // Radii of the given-position arcs (theta_chase, theta_target), outside everything else
+        function thetaRadii(m) {
+            const ext = sceneExtent(m);
+            const step = Math.max(0.22, 0.09 * ext);
+            return [ext + step, ext + 2 * step];
+        }
+
         function axisLength(m) {
-            return Math.max(Math.max(m.Rchase, m.Rtarget || m.Rchase) / R_E * 1.35, sceneExtent(m) * 1.1);
+            const reach = framed ? thetaRadii(m)[1] * 1.08 : 0;
+            return Math.max(Math.max(m.Rchase, m.Rtarget || m.Rchase) / R_E * 1.35, sceneExtent(m) * 1.1, reach);
+        }
+
+        // What the camera keeps in view: the given-position arcs too, when there are any,
+        // so the framing does not jump when they go away
+        function viewExtent(m) {
+            return framed ? thetaRadii(m)[1] : sceneExtent(m);
         }
 
         // Thin radial leg from Earth's center out through a point to at least `reach`
@@ -606,6 +627,12 @@
         let currentModel = null;
         let modelSeq = 0;
         let timelineTl = 0;
+        // The solvers start the chase at theta = 0. A frame angle (the chase's given position,
+        // measured from I-hat) turns the inertial axes back by that much, and the camera with
+        // them, so the axes look the same and the chase starts that far from I-hat.
+        let frameRad = 0;
+        let framed = false;
+        const axisDir = (rad, out = new THREE.Vector3()) => out.set(Math.cos(rad - frameRad), Math.sin(rad - frameRad), 0);
         // values: false labels computed quantities by symbol only (a practice page hides them
         // until the answers are graded); the given radii and initial phase angle keep theirs.
         // reveal: null draws everything; an object draws only the parts of the solution set in
@@ -633,7 +660,7 @@
             // Pull back on narrow (portrait) views so the largest orbit fits side to side
             const aspect = viewW / viewH;
             const zoom = Math.min(MAX_ZOOM, Math.max(1, 1.08 / Math.max(0.2, aspect)));
-            return { az: 25, el: 55, zoom, x: 0, y: 0, z: 0 };
+            return { az: 25 - frameRad * R2D, el: 55, zoom, x: 0, y: 0, z: 0 };
         }
 
         function flyTo(goal, seconds) {
@@ -676,7 +703,7 @@
             }
 
             const target = right.multiplyScalar(midX).addScaledVector(up, midY);
-            const baseDist = Math.max(3.9, (currentModel ? sceneExtent(currentModel) : 4) * 2.8);
+            const baseDist = Math.max(3.9, (currentModel ? viewExtent(currentModel) : 4) * 2.8);
             const zoom = Math.min(MAX_ZOOM, (distance * Math.min(1, aspect)) / baseDist);
             return { az, el, zoom, x: target.x, y: target.y, z: target.z };
         }
@@ -755,6 +782,13 @@
             dirty = true;
         }
 
+        // deg: where the chase starts, measured from I-hat; null for no frame (chase on I-hat)
+        function setFrame(deg) {
+            framed = typeof deg === 'number' && Number.isFinite(deg);
+            frameRad = framed ? deg * D2R : 0;
+            dirty = true;
+        }
+
         /* ------------------------------------------------------------------ */
         /* Orbit & Burn Helpers                                               */
         /* ------------------------------------------------------------------ */
@@ -794,6 +828,10 @@
             phiDesiredAnchor: new THREE.Vector3(),
             phiDesiredText: '',
             phiIsInitial: false,
+            thetaChaseAnchor: new THREE.Vector3(),
+            thetaTargetAnchor: new THREE.Vector3(),
+            thetaChaseText: '',
+            thetaTargetText: '',
             burns: [
                 { pos: new THREE.Vector3(), dvVal: 0, name: 'burn1' },
                 { pos: new THREE.Vector3(), dvVal: 0, name: 'burn2' },
@@ -828,8 +866,8 @@
 
             // Coordinate axes
             const axisLen = axisLength(m);
-            placeArrow(axisI, 0.45, ORIGIN, new THREE.Vector3(axisLen, 0, 0), sz);
-            placeArrow(axisJ, 0.45, ORIGIN, new THREE.Vector3(0, axisLen, 0), sz);
+            placeArrow(axisI, 0.45, ORIGIN, axisDir(0).multiplyScalar(axisLen), sz);
+            placeArrow(axisJ, 0.45, ORIGIN, axisDir(Math.PI / 2).multiplyScalar(axisLen), sz);
             placeArrow(axisK, 0.45, ORIGIN, new THREE.Vector3(0, 0, axisLen), sz);
 
             // Craft positions
@@ -1038,6 +1076,29 @@
                 }
             }
 
+            // Given positions at the start: theta from I-hat to each spacecraft, in the
+            // direction of motion, set off just outside everything else
+            anchors.thetaChaseText = '';
+            anchors.thetaTargetText = '';
+            if (framed && shown.angles && revealed('thetas') && tl <= 1e-6) {
+                const [rChaseArc, rTargetArc] = thetaRadii(m);
+                const start = -frameRad;
+                const thetaTarget = global.RendezvousMath.wrap2Pi(frameRad - m.phi0_rad);
+                const arcs = [
+                    { tube: thetaChaseArc, sweep: frameRad, r: rChaseArc, pos: anchors.chasePos, anchor: anchors.thetaChaseAnchor, text: 'thetaChaseText' },
+                    { tube: thetaTargetArc, sweep: thetaTarget, r: rTargetArc, pos: anchors.targetPos, anchor: anchors.thetaTargetAnchor, text: 'thetaTargetText' }
+                ];
+                arcs.forEach((a, i) => {
+                    placeLeg(thetaLegs[i], 0.3, a.pos, a.r, sz);
+                    if (a.sweep < 0.004) return;
+                    drawTube(a.tube, 1, 0.9, `${mid}_theta${i}_${a.sweep.toFixed(4)}_${frameRad.toFixed(4)}`, (t, out) => {
+                        const ang = start + t * a.sweep;
+                        return out.set(a.r * Math.cos(ang), a.r * Math.sin(ang), 0);
+                    }, sz, a.anchor);
+                    anchors[a.text] = degText(a.sweep * R2D);
+                });
+            }
+
             // Burn velocity & Delta-V arrows
             anchors.burns.forEach((b) => { b.shown = false; });
             if (shown.vectors && m.events && m.events.length > 0 && !same && revealed('burns')) {
@@ -1122,8 +1183,9 @@
             axisSpots.length = 0;
 
             const axisLen = axisLength(currentModel);
-            showAxisName(labels.I, new THREE.Vector3(axisLen * 1.05, 0, 0), X_AXIS);
-            showAxisName(labels.J, new THREE.Vector3(0, axisLen * 1.05, 0), Y_AXIS);
+            const dirI = axisDir(0), dirJ = axisDir(Math.PI / 2);
+            showAxisName(labels.I, dirI.clone().multiplyScalar(axisLen * 1.05), dirI);
+            showAxisName(labels.J, dirJ.clone().multiplyScalar(axisLen * 1.05), dirJ);
             showAxisName(labels.K, new THREE.Vector3(0, 0, axisLen * 1.05), Z_AXIS);
 
             if (shown.labels) {
@@ -1158,6 +1220,14 @@
                         const given = (anchors.phiIsInitial || clockAt(currentModel, timelineTl) <= 0) && revealed('phi0');
                         setLabelValue(lbl, shown.values || given ? anchors.phiText : '');
                         project(lbl, anchors.phiAnchor, 0.85);
+                    }
+                    if (anchors.thetaChaseText) {
+                        setLabelValue(labels.thetaChase, anchors.thetaChaseText);
+                        project(labels.thetaChase, anchors.thetaChaseAnchor, 0.85);
+                    }
+                    if (anchors.thetaTargetText) {
+                        setLabelValue(labels.thetaTarget, anchors.thetaTargetText);
+                        project(labels.thetaTarget, anchors.thetaTargetAnchor, 0.85);
                     }
                     if (anchors.phiDesiredText && anchors.phiDesiredAnchor.lengthSq() > 1e-4) {
                         setLabelValue(labels.phiDesired, shown.values ? anchors.phiDesiredText : '');
@@ -1194,7 +1264,7 @@
         /* Camera Update & Render Frame                                       */
         /* ------------------------------------------------------------------ */
         function updateCamera() {
-            const baseDist = Math.max(3.9, (currentModel ? sceneExtent(currentModel) : 4) * 2.8);
+            const baseDist = Math.max(3.9, (currentModel ? viewExtent(currentModel) : 4) * 2.8);
             const distance = baseDist * camView.zoom;
             const el = camView.el * D2R, az = camView.az * D2R;
             const lookTarget = new THREE.Vector3(camView.x, camView.y, camView.z);
@@ -1320,6 +1390,7 @@
             setModel,
             setTime,
             setShown,
+            setFrame,
             setFocus,
             resetView,
             resize

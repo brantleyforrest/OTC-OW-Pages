@@ -524,40 +524,40 @@
                 const first = s.history.samples[0];
                 const alt = M.altitudesFromElements(a, e);
                 const alt0 = M.altitudesFromElements(first.a, first.e);
-                const period = M.periodSeconds(a) / 60, period0 = M.periodSeconds(first.a) / 60;
                 const speed = Math.sqrt(M.MU / a), speed0 = Math.sqrt(M.MU / first.a);
                 const change = (x) => (Math.abs(x) < 0.5 ? '' : ` (${signed(x, 0)})`);
+                const left = s.history.days - s.t;
                 return [
                     { label: 'Elapsed', value: formatDuration(s.t) },
-                    { label: 'Eccentricity', value: e.toFixed(4) },
-                    { label: 'Perigee', value: `${comma(alt.hp)} km${change(alt.hp - alt0.hp)}` },
-                    { label: 'Apogee', value: `${comma(alt.ha)} km${change(alt.ha - alt0.ha)}` },
-                    { label: 'Period', value: `${period.toFixed(1)} min${Math.abs(period - period0) < 0.05 ? '' : ` (${signed(period - period0, 1)})`}` },
-                    { label: 'Mean speed √(μ / a), km/s', value: `${speed.toFixed(3)}${Math.abs(speed - speed0) < 0.0005 ? '' : ` (${signed(speed - speed0, 3)})`}` }
+                    { label: s.done ? 'Lifetime' : 'Time left in orbit', value: s.history.reentered ? formatDuration(s.done ? s.history.days : left) : `Over ${M.CAP_YEARS} yr` },
+                    { label: 'Perigee altitude', value: `${comma(alt.hp)} km${change(alt.hp - alt0.hp)}` },
+                    { label: 'Apogee altitude', value: `${comma(alt.ha)} km${change(alt.ha - alt0.ha)}` },
+                    { label: 'Decay phase', value: M.dragPhase(e) === 1 ? '1: Circularizing' : '2: Spiral decay' },
+                    { label: 'Mean speed, km/s', value: `${speed.toFixed(3)}${Math.abs(speed - speed0) < 0.0005 ? '' : ` (${signed(speed - speed0, 3)})`}` }
                 ];
             },
+            // Equation-sheet formulas only, applied to the orbit as drag changes it.
             equations() {
                 const { a, e } = current();
-                const rp = a * (1 - e);
-                const v = M.speedAt(a, rp);
-                const rho = M.density(rp - M.RE) * M.SOLAR[s.solar];
-                const accel = M.dragAccel(rp - M.RE, v, M.AREA[s.area], s.solar);
-                const phase = M.dragPhase(e);
-                const left = s.history.days - s.t;
-                const regime = { immediate: 'Below 120 km: reentry within hours', active: 'Active drag: 120 to 600 km', low: 'Above 600 km: drag is weak' }[M.dragRegime(rp - M.RE)];
+                const first = s.history.samples[0];
+                const ra = a * (1 + e), rp = a * (1 - e);
+                const va = M.speedAt(a, ra), va0 = M.speedAt(first.a, first.a * (1 + first.e));
+                const period = M.periodSeconds(a) / 60, period0 = M.periodSeconds(first.a) / 60;
                 return {
-                    title: 'Drag at This Moment',
-                    constants: 'C_D = 2.2. Density: mean atmosphere, scaled for solar activity.',
+                    title: 'Two-Body Values as Drag Acts',
+                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. Drag removes energy every orbit, so ε, a, e, and the period all fall.',
                     rows: [
-                        { name: 'Drag at perigee', result: `${sci(accel)} m/s²`, work: work('a = ½ ρ v² (C<sub>D</sub> A / m)', `ρ = ${sci(rho, 2)}, v = ${v.toFixed(2)} km/s`) },
-                        { name: 'Ballistic coefficient', result: `${M.ballisticCoefficient(M.AREA[s.area]).toFixed(1)} kg/m²`, work: work('BC = m / (C<sub>D</sub> A)', `A / m = ${M.AREA[s.area]} m²/kg`) },
-                        { name: 'Orbital energy', result: `${fixed(-M.MU / (2 * a), 2)} km²/s²`, work: work('E = −μ / (2a)', `a = ${comma(a)} km`) },
-                        { name: 'Decay phase', result: phase === 1 ? 'Phase 1' : 'Phase 2', work: work(phase === 1 ? 'Circularizing' : 'Spiral decay', `e = ${e.toFixed(4)} ${phase === 1 ? '>' : '≤'} 0.05`) },
-                        { name: s.done ? 'Lifetime' : 'Time left in orbit', result: s.history.reentered ? formatDuration(s.done ? s.history.days : left) : `Over ${M.CAP_YEARS} yr`, work: work(regime) }
+                        { name: 'Semi-major axis', result: `${comma(a)} km`, work: work('a = (R<sub>a</sub> + R<sub>p</sub>) / 2', `R<sub>a</sub> = ${comma(ra)}, R<sub>p</sub> = ${comma(rp)}`) },
+                        { name: 'Eccentricity', result: e.toFixed(4), work: work('e = (R<sub>a</sub> − R<sub>p</sub>) / (R<sub>a</sub> + R<sub>p</sub>)', `start ${first.e.toFixed(4)}`) },
+                        { name: 'Specific mechanical energy', result: `${fixed(-M.MU / (2 * a), 2)} km²/s²`, work: work('ε = −μ / (2a)', `start ${fixed(-M.MU / (2 * first.a), 2)}`) },
+                        { name: 'Orbital period', result: `${period.toFixed(1)} min`, work: work('Period = 2π √(a³ / μ)', `start ${period0.toFixed(1)} min`) },
+                        { name: 'Speed at apogee', result: `${va.toFixed(3)} km/s`, work: work('V = √(μ (2/R − 1/a))', `R = R<sub>a</sub>, start ${va0.toFixed(3)}`) }
                     ]
                 };
             },
-            notice: () => 'Drag acts mostly near perigee, shown by the glow. Each pass lowers apogee, so the orbit shrinks and rounds out. The satellite speeds up as it sinks.',
+            impact: () => 'Drag removes orbital energy. Each pass near perigee lowers apogee, so the orbit shrinks and becomes circular, then spirals down to reentry. The period shortens and the satellite speeds up as it sinks.',
+            regime: () => 'Low Earth orbit. Drag is strongest from 120 to 600 km and is the largest non-gravitational force below about 630 km. Below 120 km, reentry follows within hours. Solar activity and area-to-mass ratio set the lifetime.',
+            notice: () => 'The glow shows where drag acts: mostly near perigee. Watch apogee fall while perigee barely moves.',
             hud() {
                 if (s.done) {
                     return s.history.reentered
@@ -827,27 +827,28 @@
                     { label: 'RAAN', value: `${M.wrap360(raanNow()).toFixed(1)}°` },
                     { label: 'Node motion', value: M.nodeDirection(s.inc) === 'none' ? 'None' : nodeText() },
                     { label: 'Argument of perigee', value: circular() ? 'No perigee' : `${M.wrap360(argpNow()).toFixed(1)}°` },
-                    { label: 'Perigee motion', value: circular() ? 'No perigee' : { forward: 'Forward', backward: 'Backward', none: 'None' }[dir] },
+                    { label: 'Perigee motion', value: circular() ? 'No perigee' : dir === 'none' ? 'Frozen' : `${dir === 'forward' ? 'Fwd' : 'Back'} ${Math.abs(s.rates.perigeeDegDay).toFixed(Math.abs(s.rates.perigeeDegDay) < 1 ? 3 : 2)}°/day` },
                     { label: 'Apogee latitude', value: circular() ? 'No apogee' : (() => { const l = M.apogeeLatitude(s.inc, argpNow()); return `${Math.abs(l).toFixed(1)}° ${l >= 0 ? 'N' : 'S'}`; })() }
                 ];
             },
+            // Equation-sheet formulas only. J2 does not change these, which is the point of showing them.
             equations() {
-                const r = s.rates;
-                const c = Math.abs(Math.cos(s.inc * D2R)) < 1e-9 ? 0 : Math.cos(s.inc * D2R);
-                const circuit = r.nodeDegDay === 0 ? 'Never' : `${(360 / Math.abs(r.nodeDegDay)).toFixed(1)} days`;
+                const ra = s.a * (1 + s.e), rp = s.a * (1 - s.e);
+                const n = M.meanMotion(s.a);
                 return {
-                    title: 'J₂ Drift Rates',
-                    constants: 'J₂ = 1.08263 × 10⁻³, Rₑ = 6,378.14 km, μ = 398,600.44 km³/s².',
+                    title: 'Two-Body Values J₂ Leaves Alone',
+                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. J₂ turns Ω and ω (rates in Live Values) but leaves a, e, and i unchanged on average, so these values stay fixed.',
                     rows: [
-                        { name: 'Semi-latus rectum', result: `${comma(r.p, 1)} km`, work: work('p = a(1 − e²)', `a = ${comma(s.a)} km, e = ${s.e.toFixed(3)}`) },
-                        { name: 'Mean motion', result: `${(r.n * 1000).toFixed(4)} mrad/s`, work: work('n = √(μ / a³)') },
-                        { name: 'Node drift', result: `${fixed(r.nodeDegDay, 3)}°/day`, work: work('Ω̇ = −1.5 J₂ (Rₑ/p)² n cos i', `cos i = ${fixed(c, 4)}`) },
-                        { name: 'Perigee drift', result: `${Math.abs(r.perigeeDegDay) < 5e-4 ? '0.000' : signed(r.perigeeDegDay, 3)}°/day`, work: work('ω̇ = 0.75 J₂ (Rₑ/p)² n (5 cos² i − 1)', `5 cos² i − 1 = ${fixed(5 * c * c - 1, 3)}`) },
-                        { name: 'Full node circuit', result: circuit, work: work('T = 360° / |Ω̇|') }
+                        { name: 'Perigee radius', result: `${comma(rp)} km`, work: work('R<sub>p</sub> = a(1 − e)', `a = ${comma(s.a)} km, e = ${s.e.toFixed(3)}`) },
+                        { name: 'Apogee radius', result: `${comma(ra)} km`, work: work('R<sub>a</sub> = a(1 + e)') },
+                        { name: 'Mean motion', result: `${sci(n, 4)} rad/s`, work: work('n = √(μ / a³)') },
+                        { name: 'Orbital period', result: `${(M.periodSeconds(s.a) / 60).toFixed(1)} min`, work: work('Period = 2π √(a³ / μ)') }
                     ]
                 };
             },
-            notice: () => "The bulge's pull turns the orbit's plane like a torque on a gyroscope. Inclination sets the direction: west below 90°, east above it. Perigee also turns, unless the orbit is at a critical inclination.",
+            impact: () => 'The equatorial bulge turns the orbit plane: the ascending node moves west for prograde orbits and east for retrograde ones. It also turns perigee within the plane, unless the inclination is 63.4° or 116.6°. Sun-synchronous and Molniya orbits are built on these two effects.',
+            regime: () => 'All Earth orbits, strongest in low orbits, and weaker with altitude. It is the largest perturbation from LEO up to about 33,800 km, above which the Sun and Moon take over.',
+            notice: () => 'The shaded wedge shows how far the node has moved from the gray two-body orbit. Try 90° (no node motion) and 63.4° (frozen perigee).',
             hud() {
                 const dir = M.nodeDirection(s.inc);
                 const node = { west: 'Prograde: the node moves <span class="key-j2">west</span>.', none: 'Polar: the node stays <span class="key-j2">fixed</span>.', east: 'Retrograde: the node moves <span class="key-j2">east</span>.' }[dir];
@@ -1026,12 +1027,32 @@
         group.add(swing);
         let swingKey = '';
         const startDot = makeDot(0.045, COLOR.ghost, group);
-        const startLabel = layer.add('<b style="color:#94a3b8">Start</b>', { rank: 2, optional: true });
+        const startLabel = layer.add('<b style="color:#94a3b8">Two-body</b><span class="hint">would stay here</span>', { rank: 2, optional: true });
         const satellite = makeDot(0.07, '#ffffff', group);
+        const satelliteLabel = layer.add('', { rank: 0 });
+
+        // The point on the equator the satellite hovers over, joined to it by a line. In this Earth-fixed
+        // view a GEO satellite keeps pace with Earth's spin, so the line shows what it is "parked" over.
+        const groundDot = makeDot(0.035, '#ffffff', group);
+        const tether = new THREE.Line(
+            new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3)),
+            new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+        );
+        tether.frustumCulled = false;
+        group.add(tether);
+
+        // A reminder that the satellite still orbits once a day, at the same rate Earth turns.
+        const ORBIT_HINT_LON = -150;
+        const orbitArrow = makeArrow('#cbd5e1', group);
+        lonVec(ORBIT_HINT_LON, GEO_DRAW + 0.12, orbitArrow.position);
+        orbitArrow.setDirection(new THREE.Vector3(-Math.sin(ORBIT_HINT_LON * D2R), Math.cos(ORBIT_HINT_LON * D2R), 0));
+        setArrowLength(orbitArrow, 0.45);
+        const orbitLabel = { label: layer.add('<span style="color:#cbd5e1">Orbits once a day,<br>as Earth turns</span>', { rank: 3, optional: true }), point: lonVec(ORBIT_HINT_LON + 6, GEO_DRAW + 0.12) };
+
         const accelArrow = makeArrow(COLOR.unstable, group);
         const driftArrow = makeArrow(COLOR.stable, group);
-        const accelLabel = layer.add(`<b style="color:${COLOR.unstable}">Acceleration</b>`, { rank: 1 });
-        const driftLabel = layer.add(`<b style="color:${COLOR.stable}">Drift</b>`, { rank: 1 });
+        const accelLabel = layer.add(`<b style="color:${COLOR.unstable}">J₂,₂ push</b>`, { rank: 1 });
+        const driftLabel = layer.add(`<b style="color:${COLOR.stable}">Longitude drift</b>`, { rank: 1 });
         const tip = new THREE.Vector3(), dir = new THREE.Vector3();
 
         const lonDeg = () => s.sim.lon * R2D;
@@ -1076,6 +1097,11 @@
                 earth.pivot.rotation.z = 0;
                 const lon = lonDeg();
                 lonVec(lon, GEO_DRAW, satellite.position);
+                lonVec(lon, 1.0, groundDot.position);
+                const tp = tether.geometry.attributes.position;
+                tp.setXYZ(0, groundDot.position.x, groundDot.position.y, 0);
+                tp.setXYZ(1, satellite.position.x, satellite.position.y, 0);
+                tp.needsUpdate = true;
                 lonVec(startLon(), GEO_DRAW, startDot.position);
                 startDot.visible = Math.abs(M.wrap180(lon - startLon())) > 1;
 
@@ -1110,10 +1136,13 @@
                         showLabel(label, tip.copy(arrow.position).addScaledVector(dir, len));
                     }
                 }
+                setLabel(satelliteLabel, `<b>GEO satellite</b><span class="hint">over ${formatLon(lonDeg())}</span>`);
+                showAt(satelliteLabel, satellite);
                 for (const m of markers) showLabel(m.label, m.point);
                 if (startDot.visible) showAt(startLabel, startDot);
                 showLabel(longLabel.label, longLabel.point);
                 showLabel(shortLabel.label, shortLabel.point);
+                showLabel(orbitLabel.label, orbitLabel.point);
             },
             stats() {
                 const lon = lonDeg();
@@ -1123,36 +1152,41 @@
                 const off = s.hold ? 0 : M.semiMajorOffsetKm(s.sim.rate);
                 return [
                     { label: 'Elapsed', value: formatDuration(s.t) },
-                    { label: 'Longitude', value: formatLon(lon) },
-                    { label: 'Drift rate', value: s.hold || Math.abs(rateDay) < 0.0005 ? '0.000°/day' : `${rateDay > 0 ? 'East' : 'West'} ${Math.abs(rateDay).toFixed(3)}°/day` },
+                    { label: 'Hovers over', value: formatLon(lon) },
+                    { label: 'Longitude drift', value: s.hold || Math.abs(rateDay) < 0.0005 ? '0.000°/day' : `${rateDay > 0 ? 'East' : 'West'} ${Math.abs(rateDay).toFixed(3)}°/day` },
                     { label: 'Height above GEO', value: `${Math.abs(off) < 0.05 ? '0.0' : signed(off, 1)} km` },
                     { label: 'Libration period', value: s.hold ? 'Held' : isFinite(T) ? `${comma(T)} days` : 'Very long' },
                     { label: 'E-W Δv', value: s.hold ? `${s.dv.toFixed(2)} m/s spent` : `${M.eastWestDvPerYear(lon).toFixed(2)} m/s/yr here` }
                 ];
             },
+            // Equation-sheet formulas only: why being slightly above or below GEO moves the satellite in longitude.
             equations() {
-                const lon = lonDeg();
-                const stable = M.nearestStable(startLon());
-                const T = M.librationPeriodDays(stable.amplitudeDeg);
+                const off = s.hold ? 0 : M.semiMajorOffsetKm(s.sim.rate);
+                const N_GEO = 0.0000729212; // the equation sheet's constant
+                const r = Math.cbrt(M.MU / (N_GEO * N_GEO)) + off; // GEO radius that matches it exactly, plus the offset
+                const n = M.meanMotion(r);
+                const side = Math.abs(off) < 0.05 ? 'equal: it stays put' : off > 0 ? 'smaller: it falls behind (west)' : 'larger: it pulls ahead (east)';
                 return {
-                    title: 'Longitude Drift at GEO',
-                    constants: 'J₂,₂ = 1.8 × 10⁻⁶, long axis at 15° W, r = 42,164 km.',
+                    title: 'Why Height Moves Longitude',
+                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. The J₂,₂ push changes a by only kilometers, but that is enough to make n differ from Earth\'s spin.',
                     rows: [
-                        { name: 'Tangential acceleration', result: `${sci(M.tangentialAccel(lon))} m/s²`, work: work('a<sub>λ</sub> = −6 μ Rₑ² J₂,₂ / r⁴ · sin 2(λ − λ₂,₂)', `λ = ${formatLon(lon)}`) },
-                        { name: 'Longitude response', result: `${sci(M.longitudeAccel(lon) * R2D * M.DAY_S * M.DAY_S)} °/day²`, work: work('λ̈ = −3 a<sub>λ</sub> / r', 'opposite sign') },
-                        { name: 'Nearest stable longitude', result: lonName(stable.lon), work: work('Short axis', `start ${stable.amplitudeDeg.toFixed(1)}° away`) },
-                        { name: 'Libration period', result: isFinite(T) ? `${comma(T)} days` : 'Very long', work: work('Depends on swing size', isFinite(T) ? `${(T / M.YEAR_DAYS).toFixed(1)} yr` : '') },
-                        { name: 'E-W station-keeping', result: `${M.eastWestDvPerYear(lon).toFixed(3)} m/s/yr`, work: work('Δv = 1.715 |sin 2(λ − λ₂,₂)|') }
+                        { name: 'Orbital radius', result: `${comma(r, 1)} km`, work: work('R = altitude + R⊕', `altitude = ${comma(r - 6378.137, 1)} km`) },
+                        { name: 'Mean motion', result: `${sci(n, 6)} rad/s`, work: work('n = √(μ / a³)') },
+                        { name: 'GEO mean motion', result: `${sci(N_GEO, 6)} rad/s`, work: work('n<sub>geo</sub> (constant)', `n is ${side}`) },
+                        { name: 'Orbital period', result: `${(M.periodSeconds(r) / 3600).toFixed(4)} h`, work: work('Period = 2π √(a³ / μ)', 'sidereal day 23.9345 h') },
+                        { name: 'Circular-orbit speed', result: `${Math.sqrt(M.MU / r).toFixed(4)} km/s`, work: work('V = √(μ / R)') }
                     ]
                 };
             },
-            notice: () => 'The equator is slightly elliptical. A push along the orbit raises it, which slows the satellite\'s motion in longitude, so it drifts the opposite way. Satellites collect on the short axis, not over extra mass.',
+            impact: () => 'Earth\'s equator is slightly elliptical. Its uneven pull pushes a GEO satellite along its orbit, which changes the orbit\'s size by a few kilometers. The satellite then slowly drifts east or west and swings back and forth about 75° E or 105° W, over 2 to 3 years. Holding a slot costs at most 1.715 m/s per year.',
+            regime: () => 'Geosynchronous orbits only. A GEO satellite stays over the same longitude, so the same push acts day after day and adds up. In other orbits the satellite passes over every longitude, and the push averages out.',
+            notice: () => 'Earth is held still here, as if you rode along with it. A forward push raises the orbit, which makes it slower than Earth\'s spin, so the satellite drifts backward: the drift is opposite the push. The chart shows the same swing as a ball rolling in a valley.',
             hud() {
-                if (s.hold) return '<span class="key-j22">Station-keeping</span> holds this slot, at a small yearly cost.';
-                if (!arrowsShown()) return 'This is an equilibrium point. Acceleration here is zero.';
-                return '<span class="key-unstable">Acceleration</span> points toward the long axis. The <span class="key-stable">drift</span> goes the other way.';
+                if (s.hold) return '<span class="key-j22">Station-keeping</span> keeps the satellite over its slot, at a small yearly cost.';
+                if (!arrowsShown()) return 'The J₂,₂ push is zero at this longitude, so the satellite stays over it.';
+                return 'Earth-fixed view: the satellite orbits once a day, keeping pace with Earth, so it seems to hover. Over years, J₂,₂ slowly moves the spot it hovers over.';
             },
-            caption: () => 'The ring is not to scale, and the wedges are exaggerated. Earth is shown fixed, so longitude can be read directly.',
+            caption: () => 'Earth is held still, so a GEO satellite appears to hover. Each swing takes years; the satellite still circles Earth once a day. The ring is not to scale, and the wedges are exaggerated.',
             altitudeMarker: () => [35786, 35786],
             drawChartBase(g, w, h) {
                 const p = plotFor(w, h);
@@ -1307,25 +1341,28 @@
                     { label: 'Δv spent', value: `${s.hold ? comma(M.NORTH_SOUTH_DV.total * s.t, 1) : '0'} m/s` }
                 ];
             },
+            // Equation-sheet formulas only: the plane change that undoes the tilt.
             equations() {
-                const acc = M.accelerationsAt(35786);
-                const share = M.NORTH_SOUTH_DV.total / (M.NORTH_SOUTH_DV.total + 1.715) * 100;
+                const { incDeg } = tilt();
+                const v = Math.sqrt(M.MU / M.R_GEO); // km/s
+                const planeChange = (deg) => Math.abs(2 * v * Math.sin(deg * D2R / 2)) * 1000; // m/s
+                const yearTilt = M.geoTilt(1).incDeg;
                 return {
-                    title: 'Sun and Moon at GEO',
-                    constants: 'Budgets from SMAD, for i = 0. The tilt shown is the combined Sun and Moon effect.',
+                    title: 'Undoing the Tilt',
+                    constants: 'μ = 398,600.44 km³/s². A plane change at the node removes the tilt. The lesson\'s yearly budget, 51.4 m/s, comes from a fuller model.',
                     rows: [
-                        { name: "Moon's differential pull", result: `${sci(acc.moon)} m/s²`, work: work('a ≈ 2 μ r / d³', 'd = 384,400 km') },
-                        { name: "Sun's differential pull", result: `${sci(acc.sun)} m/s²`, work: work('a ≈ 2 μ r / d³', 'd = 1 AU') },
-                        { name: 'Combined vs. J₂', result: 'Sun and Moon lead', work: work(`${sci(acc.thirdBody)} > ${sci(acc.j2)} m/s²`) },
-                        { name: 'N-S budget', result: `${M.NORTH_SOUTH_DV.total} m/s/yr`, work: work(`${M.NORTH_SOUTH_DV.moon} + ${M.NORTH_SOUTH_DV.sun}`, 'Moon + Sun') },
-                        { name: 'Share of station-keeping', result: `${share.toFixed(1)}%`, work: work('51.4 / (51.4 + 1.715)') }
+                        { name: 'Circular-orbit speed at GEO', result: `${v.toFixed(3)} km/s`, work: work('V = √(μ / R)', 'R = 42,164 km') },
+                        { name: 'Plane change for the tilt now', result: `${comma(planeChange(incDeg), 1)} m/s`, work: work('ΔV<sub>S</sub> = |2V sin(θ / 2)|', s.hold ? 'θ = 0 (held flat)' : `θ = ${incDeg.toFixed(2)}°`) },
+                        { name: 'Plane change for one year of tilt', result: `${comma(planeChange(yearTilt), 1)} m/s`, work: work('ΔV<sub>S</sub> = |2V sin(θ / 2)|', `θ = ${yearTilt.toFixed(3)}°`) }
                     ]
                 };
             },
-            notice: () => 'Sun and Moon pull harder on the near side of the orbit than on Earth, and harder on Earth than on the far side. Because they sit off the equator, those differences tilt a GEO orbit by nearly 1° per year.',
+            impact: () => 'The Sun and Moon pull harder on the near side of the orbit than on Earth, and harder on Earth than on the far side. Because they sit off the equator, that difference tilts a GEO orbit by about 0.75° to 0.95° per year, to about 15° after 27 years. The ground trace becomes a daily figure-eight. North-south station-keeping costs about 51.4 m/s per year, over 95% of a GEO budget.',
+            regime: () => 'High orbits. The effect grows with altitude and passes J₂ above about 33,800 km, so it leads at GEO and beyond. In LEO it is far smaller than J₂ and drag.',
+            notice: () => 'Arrows show only the difference from the pull on Earth. The gray ring is the two-body orbit, which would stay on the equator.',
             hud: () => (s.hold
                 ? '<span class="key-moon">Station-keeping</span> holds the orbit flat. This is over 95% of station-keeping Δv.'
-                : 'Arrows show only the difference from the pull on Earth.'),
+                : 'The Sun and Moon slowly tilt the orbit out of the equator.'),
             caption: () => 'Ring, arrows, and body distance are not to scale. The body stays at one direction for clarity.',
             altitudeMarker: () => [35786, 35786],
             drawChartBase(g, w, h) {
@@ -1495,28 +1532,31 @@
                     { label: 'Eccentricity', value: v.e < 1e-3 ? sci(v.e, 3) : v.e.toFixed(4) },
                     { label: 'Peak eccentricity', value: peak < 1e-3 ? sci(peak, 3) : peak.toFixed(3) },
                     { label: 'SRP acceleration', value: `${sci(M.srpAccel(M.AREA_SRP[s.area]), 3)} m/s²` },
-                    { label: 'Perigee dip now', value: `${comma(M.srpPerigeeDipKm(v.e), M.srpPerigeeDipKm(v.e) < 100 ? 1 : 0)} km` },
+                    { label: 'Area-to-mass', value: `${M.AREA_SRP[s.area]} m²/kg` },
                     { label: 'Peak perigee dip', value: `${comma(M.srpPerigeeDipKm(peak), peak < 0.01 ? 1 : 0)} km` }
                 ];
             },
+            // Equation-sheet formulas only, applied to the orbit as sunlight stretches it. a does not change.
             equations() {
-                const am = M.AREA_SRP[s.area];
-                const acc = M.srpAccel(am);
-                const r = rE();
-                const v = ecc();
+                const a = M.R_GEO;
+                const { e } = ecc();
+                const rp = a * (1 - e), ra = a * (1 + e);
+                const eText = e < 1e-3 ? sci(e, 3) : e.toFixed(4);
+                const d = rp < a - 100 ? 0 : 1;
                 return {
-                    title: 'Sunlight on a GEO Satellite',
-                    constants: 'P = 4.54 × 10⁻⁶ N/m², C_R = 1.3. Circular start, no eclipses.',
+                    title: 'Orbit Shape Under Sunlight',
+                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. Sunlight changes e but not a, so the period stays fixed while perigee dips and apogee rises.',
                     rows: [
-                        { name: 'SRP acceleration', result: `${sci(acc)} m/s²`, work: work('a = P C<sub>R</sub> (A / m)') },
-                        { name: 'Yearly circle radius', result: sci(r, 4), work: work('r<sub>e</sub> = 3a / (2 V Ω<sub>sun</sub>)', `V = ${M.V_GEO.toFixed(3)} km/s`) },
-                        { name: 'Peak eccentricity', result: 2 * r < 1e-3 ? sci(2 * r) : (2 * r).toFixed(3), work: work('e<sub>max</sub> = 2 r<sub>e</sub>', 'after half a year') },
-                        { name: 'Perigee dip now', result: `${comma(M.srpPerigeeDipKm(v.e), 1)} km`, work: work('Δr = a<sub>orbit</sub> · e', 'a = 42,164 km') },
-                        { name: 'Area-to-mass', result: `${am} m²/kg`, work: work('A / m', { dense: 'compact satellite', arrays: 'large solar arrays', foil: 'thin foil debris' }[s.area]) }
+                        { name: 'Perigee radius', result: `${comma(rp, d)} km`, work: work('R<sub>p</sub> = a(1 − e)', `a = 42,164 km, e = ${eText}`) },
+                        { name: 'Apogee radius', result: `${comma(ra, d)} km`, work: work('R<sub>a</sub> = a(1 + e)') },
+                        { name: 'Perigee altitude', result: `${comma(rp - 6378.137, d)} km`, work: work('R = altitude + R⊕', `GEO altitude ${comma(a - 6378.137, d)} km`) },
+                        { name: 'Orbital period', result: `${(M.periodSeconds(a) / 3600).toFixed(3)} h`, work: work('Period = 2π √(a³ / μ)', 'unchanged') }
                     ]
                 };
             },
-            notice: () => 'Sunlight pushes steadily away from the Sun. Over half a year this stretches the orbit, and over the next half it undoes the stretch. High area-to-mass objects behave like solar sails.',
+            impact: () => 'Sunlight pushes steadily away from the Sun. Over half a year this stretches a circular GEO orbit, and over the next half it rounds out again. A dense satellite\'s perigee dips about 12 km. Light, wide objects such as foil debris act like solar sails, and their perigee drops by thousands of km.',
+            regime: () => 'Every orbit in sunlight, with the same strength at any altitude. Above about 630 km it is larger than drag, so it is the main non-gravitational force at GEO. It grows with area-to-mass ratio.',
+            notice: () => 'The gray ring is the circular two-body orbit. Watch perigee swing to follow the Sun while the orbit stretches and relaxes.',
             hud: () => (s.area === 'foil'
                 ? '<span class="key-srp">Foil debris</span> is pushed so hard that its perigee drops by thousands of km.'
                 : 'The orbit <span class="key-srp">stretches</span> for half a year, then rounds out again.'),
@@ -1613,7 +1653,7 @@
 
     /* "Which Perturbation Leads?" chart, shared by all modes. */
     const LEADS = [
-        { key: 'central', name: 'μ/r²', color: COLOR.central },
+        { key: 'central', name: 'Earth', color: COLOR.central },
         { key: 'j2', name: 'J₂', color: COLOR.j2 },
         { key: 'j22', name: 'J₂,₂', color: COLOR.j22, from: 2000 },
         { key: 'moon', name: 'Moon', color: COLOR.moon },
@@ -1743,6 +1783,7 @@
     }
 
     /* Panels */
+    const EQ_ROWS = 5;
     function updatePanels() {
         const mode = active();
         mode.stats().forEach((stat, i) => {
@@ -1752,11 +1793,17 @@
         const eq = mode.equations();
         setText($('eq-title'), eq.title);
         setText($('eq-constants'), eq.constants);
-        eq.rows.forEach((row, i) => {
+        for (let i = 0; i < EQ_ROWS; i++) {
+            const row = eq.rows[i];
+            const box = $(`eq-${i}-name`).closest('.eq-row');
+            if (box.hidden !== !row) box.hidden = !row;
+            if (!row) continue;
             setText($(`eq-${i}-name`), row.name);
             setText($(`eq-${i}-result`), row.result);
             setHTML($(`eq-${i}-work`), row.work);
-        });
+        }
+        setText($('impact'), mode.impact());
+        setText($('regime'), mode.regime());
         setText($('notice'), mode.notice());
         const before = hud.innerHTML;
         setHTML(hud, mode.hud());
