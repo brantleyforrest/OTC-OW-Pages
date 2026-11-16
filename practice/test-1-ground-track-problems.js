@@ -47,9 +47,27 @@
         { id: 'gps', name: 'a semi-synchronous MEO orbit, like a GPS satellite’s', family: 'circular', i: 60, shifts: [180] },
         { id: 'igso', name: 'an inclined geosynchronous orbit', family: 'circular', i: [15, 30, 45], shifts: [360] },
         { id: 'geo', name: 'a geostationary orbit', family: 'circular', i: 0, shifts: [360] },
-        { id: 'molniya', name: 'a Molniya orbit', family: 'elliptical', e: 0.72, i: 60, argp: [270, 270, 90], shifts: [180] },
-        { id: 'tundra', name: 'a Tundra orbit', family: 'elliptical', e: 0.27, i: 60, argp: [270, 270, 90], shifts: [360] }
+        // apsisHours: the time from perigee to the ascending node. Earth turns 15° per hour, so
+        // a whole number of hours puts perigee, apogee, both peaks, and the descending node on
+        // 15° longitude lines. The eccentricity is solved from it (see eccentricityFor):
+        // about 0.55 for Molniya (1 h) and 0.27 for Tundra (4 h).
+        { id: 'molniya', name: 'a Molniya orbit', family: 'elliptical', apsisHours: 1, i: 60, argp: [270, 270, 90], shifts: [180] },
+        { id: 'tundra', name: 'a Tundra orbit', family: 'elliptical', apsisHours: 4, i: 60, argp: [270, 270, 90], shifts: [360] }
     ];
+
+    // The eccentricity for which the satellite takes `hours` to fly from perigee to true anomaly
+    // 90°, the ascending node when the argument of perigee is 270° (and, by symmetry, from the
+    // node to perigee when it is 90°). The time shrinks as e grows, so bisection finds it.
+    function eccentricityFor(hours, period) {
+        const timeTo90 = (e) => (Math.acos(e) - e * Math.sqrt(1 - e * e)) / TWO_PI * period / 3600;
+        let low = 0, high = 0.95;
+        for (let k = 0; k < 60; k++) {
+            const mid = (low + high) / 2;
+            if (timeTo90(mid) > hours) low = mid;
+            else high = mid;
+        }
+        return (low + high) / 2;
+    }
 
     /* ------------------------------------------------------------------ */
     /* Orbit Motion                                                       */
@@ -169,7 +187,7 @@
         const n = TWO_PI / P;
         const a = Math.cbrt(MU * (P / TWO_PI) ** 2);
         const elliptical = entry.family === 'elliptical';
-        const e = elliptical ? entry.e : 0;
+        const e = elliptical ? eccentricityFor(entry.apsisHours, P) : 0;
         const i = Array.isArray(entry.i) ? pick(entry.i) : entry.i;
         const argp = elliptical ? pick(entry.argp) : 0;
         const retrograde = i > 90;
@@ -186,8 +204,14 @@
         };
 
         // Where the satellite is marked: one of the four features, during the one period drawn,
-        // from ascending node 1 to node 2.
-        const satU = equatorial ? null : pick([0, 90, 180, 270]);
+        // from ascending node 1 to node 2. Only a feature reached a whole number of hours after
+        // the node lies on a 15° longitude line. A 2-hour orbit reaches its peaks at the half
+        // hour, so its satellite is marked only at a node.
+        const onGrid = (u) => {
+            const hours = (u === 0 ? P : timeAtU(model, u, 0)) / 3600;
+            return Math.abs(hours - Math.round(hours)) < 1e-6;
+        };
+        const satU = equatorial ? null : pick([0, 90, 180, 270].filter(onGrid));
         model.satU = satU;
         model.tSat = equatorial ? 0 : satU === 0 ? P : timeAtU(model, satU, 0);
         model.nu = elliptical ? wrap360(satU - argp) : null;
@@ -302,7 +326,7 @@
             methods: [{
                 name: 'Dwell',
                 html: (elliptical
-                    ? rule(`The dots mark equal steps of time. They are crowded in the ${apogeeNorth ? 'Northern' : 'Southern'} Hemisphere${model.id === 'molniya' ? ', where the track loops back west' : ''}, and far apart in the ${apogeeNorth ? 'Southern' : 'Northern'}. The speed changes around the orbit, so it is an ellipse.`, '$e \\neq 0$')
+                    ? rule(`The dots mark equal steps of time. They are crowded in the ${apogeeNorth ? 'Northern' : 'Southern'} Hemisphere, and far apart in the ${apogeeNorth ? 'Southern' : 'Northern'}. The speed changes around the orbit, so it is an ellipse.`, '$e \\neq 0$')
                     : equatorial
                         ? rule('The track is one fixed point. An eccentric orbit would speed up and slow down, so the point would swing east and west during the day. It does not, so the speed is constant: a circle.', '$e = 0$')
                         : rule('The dots are evenly spaced along the track, and the track is the same shape north and south of the equator. The speed is constant, so it is a circle.', '$e = 0$'))
