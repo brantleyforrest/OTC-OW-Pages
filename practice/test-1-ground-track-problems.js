@@ -1,8 +1,10 @@
 // Ground track problems for the Test 1 Practice page. The view draws the ground track of one
 // standard orbit on a world map, and the student reads it with the Ground Tracks lesson's
 // checklist: the period from the westward shift between consecutive ascending nodes, then the
-// semi-major axis from Kepler's third law, whether the eccentricity is zero, the inclination
-// from the latitude peaks, the argument of perigee from the hemisphere of apogee dwell, and the
+// semi-major axis from Kepler's third law, whether the eccentricity is zero (from whether the
+// descending node sits halfway between the ascending nodes, so the satellite spends equal time
+// north and south), the inclination from the latitude peaks, the argument of perigee from the
+// hemisphere where the satellite spends longer (apogee), and the
 // true anomaly from where the satellite is marked.
 // Every track comes from a bank of standard orbits, so that each one can be read from the map.
 // The track uses the course model: two-body motion with a fixed orbital plane, a spherical
@@ -218,6 +220,12 @@
         model.tNorth = timeAtU(model, 90, 0);
         model.tSouth = timeAtU(model, 270, 0);
         model.tDescending = timeAtU(model, 180, 0);
+        // The node-halves test for e: the hours spent north and south of the equator, the
+        // descending node that makes them, and where a circular orbit would put it
+        model.tNorthH = Math.round(model.tDescending / 3600 * 1e6) / 1e6;
+        model.tSouthH = periodH - model.tNorthH;
+        model.lambdaD = wrap180(lambda1 + 180 - EARTH_DEG_PER_HOUR * model.tNorthH);
+        model.lambdaDCircular = wrap180(lambda1 + 180 - shift / 2);
         if (elliptical) {
             model.tPerigeeAfterNode = timeAtU(model, argp, 0);
             model.tApogeeAfterNode = timeAtU(model, wrap360(argp + 180), 0);
@@ -314,22 +322,29 @@
         };
 
         const apogeeNorth = argp === 270;
+        const { tNorthH, tSouthH, lambdaD, lambdaDCircular } = model;
+        const halfShift = shift / 2;
+        const atNode1 = Math.abs(wrap180(lambdaDCircular - lambda1)) < 1e-9;
+        const circularDN = `${lonText(lambdaDCircular)}${atNode1 ? ', the same point as node 1, so the track would cross itself there in a figure-8' : ''}`;
+        const eccWork = equatorial
+            ? rule('The track is one fixed point. An eccentric orbit would speed up and slow down, so the point would swing east and west during the day. It does not, so the speed is constant: a circle.', '$e = 0$')
+            : rule(`Each half of the orbit, from one node to the other, is $180°$ of the orbit. At constant speed each half takes $P/2 = ${deg(periodH / 2)}\\text{ h}$, and Earth turns $\\Delta N/2 = ${deg(halfShift)}°$ under it. So a circular orbit puts the descending node $180°$ from node 1, then ${deg(halfShift)}° west: ${circularDN}.`)
+                + (elliptical
+                    ? rule(`The track's descending node is at ${lonText(lambdaD)}, not ${lonText(lambdaDCircular)}. Earth turned ${deg(15 * tNorthH)}° under the northern half and ${deg(15 * tSouthH)}° under the southern, so the satellite spent ${deg(tNorthH)} h north of the equator and ${deg(tSouthH)} h south. The halves take different times, so the speed changes around the orbit: an ellipse.`, '$e > 0$')
+                    : rule(`The track's descending node is at ${lonText(lambdaD)}, right where a circular orbit puts it. The northern and southern halves are the same width and are mirror images of each other.`, '$e = 0$'));
         const eccStep = {
             key: 'ecc',
             title: prose('Eccentricity: zero or nonzero, $e$'),
             result: elliptical ? math('e > 0') : math('e = 0'),
             caption: elliptical
-                ? prose(`<b>Shape.</b> The time dots bunch up in the ${apogeeNorth ? 'north' : 'south'} and spread out in the ${apogeeNorth ? 'south' : 'north'}: the satellite dwells near apogee and races through perigee. The orbit is elliptical.`)
+                ? prose(`<b>Shape.</b> The descending node is off-center, so the two halves of the track are lopsided: ${deg(tNorthH)} h north of the equator and ${deg(tSouthH)} h south. The satellite is slow near apogee and fast near perigee. The orbit is elliptical.`)
                 : equatorial
                     ? prose('<b>Shape.</b> The track does not drift east or west at all: the satellite keeps exact pace with Earth all day, so its speed never changes. The orbit is circular.')
-                    : prose('<b>Shape.</b> The time dots are evenly spaced, and the northern and southern halves of the track match: the satellite moves at one steady speed. The orbit is circular.'),
+                    : prose('<b>Shape.</b> The descending node is exactly halfway, so the satellite spends half its period north of the equator and half south. The two halves of the track are mirror images. The orbit is circular.'),
             methods: [{
-                name: 'Dwell',
-                html: (elliptical
-                    ? rule(`The dots mark equal steps of time. They are crowded in the ${apogeeNorth ? 'Northern' : 'Southern'} Hemisphere, and far apart in the ${apogeeNorth ? 'Southern' : 'Northern'}. The speed changes around the orbit, so it is an ellipse.`, '$e \\neq 0$')
-                    : equatorial
-                        ? rule('The track is one fixed point. An eccentric orbit would speed up and slow down, so the point would swing east and west during the day. It does not, so the speed is constant: a circle.', '$e = 0$')
-                        : rule('The dots are evenly spaced along the track, and the track is the same shape north and south of the equator. The speed is constant, so it is a circle.', '$e = 0$'))
+                name: 'Node halves',
+                html: eccWork
+                    + (equatorial ? '' : note('The quick check: is the descending node centered, and are the northern and southern halves mirror images? An eccentric track is lopsided, with a wide, slow half around apogee and a narrow, fast half around perigee. This works whenever perigee is away from the nodes, as in Molniya and Tundra orbits ($\\omega = 90°$ or $270°$).'))
                     + note('The map can show that $e$ is not zero, but not its exact value.')
             }]
         };
@@ -344,7 +359,7 @@
             methods: [{
                 name: 'Hemisphere',
                 html: elliptical
-                    ? rule(`Apogee dwell is in the ${apogeeNorth ? 'north' : 'south'}, so perigee is at the ${apogeeNorth ? 'southern' : 'northern'} peak. From the ascending node, the satellite reaches the northern peak at $u = 90°$ and the southern peak at $u = 270°$.`, `$\\omega = ${argp}°$`)
+                    ? rule(`The satellite spends longer in the ${apogeeNorth ? 'north' : 'south'} (${deg(apogeeNorth ? tNorthH : tSouthH)} h against ${deg(apogeeNorth ? tSouthH : tNorthH)} h), so it is slowest there: apogee is at the ${apogeeNorth ? 'northern' : 'southern'} peak and perigee at the ${apogeeNorth ? 'southern' : 'northern'} peak. From the ascending node, the satellite reaches the northern peak at $u = 90°$ and the southern peak at $u = 270°$.`, `$\\omega = ${argp}°$`)
                         + note('$\\omega \\approx 270°$ puts apogee north (the standard Molniya and Tundra design). $\\omega \\approx 90°$ puts apogee south.')
                     : rule('With $e = 0$ every point is the same distance from Earth. There is no perigee to measure to.', '$\\omega$ is undefined')
             }]
@@ -384,7 +399,7 @@
                 + item('\\text{Grid: every } 15°'),
             overviewCaption: equatorial
                 ? prose('<b>The ground track as given.</b> One full period, drawn over a whole day. The satellite is at the single point of the track.')
-                : prose(`<b>The ground track as given.</b> One period: the track starts at an ascending node and ends at the next one. Arrows show the direction of travel, and the dots are equal steps of time. The nodes and peaks all fall on 15° grid lines.`),
+                : prose(`<b>The ground track as given.</b> One period: the track starts at an ascending node and ends at the next one. Arrows show the direction of travel. The nodes and peaks all fall on 15° grid lines.`),
             limitsHtml: prose(`Accepted: $P$ within 2% (a bare number is hours; or type s, min, or h), $a$ within 1%, $e$ as zero or nonzero, $i$ within 7.5° (read the peaks to the nearest 15° line), $\\omega$ and $\\nu$ within 1°. Type <i>undefined</i> or <i>n/a</i> for an angle the orbit does not have. The solutions use Earth turning $15°$/h, $\\mu = ${MU_TEX}\\text{ km}^3/\\text{s}^2$, and $R_\\oplus = 6{,}378\\text{ km}$.`),
             fields,
             answers,

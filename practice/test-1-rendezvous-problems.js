@@ -156,7 +156,7 @@
 
     function coplanarProblem() {
         const m = coplanarModel();
-        const { Rchase, Rtarget, n_chase, n_target, T_syn, a_transfer, TOF, nu_travel_deg, phi_desired_deg, WT, TOF_total } = m;
+        const { Rchase, Rtarget, n_chase, n_target, a_transfer, TOF, nu_travel_deg, phi_desired_deg, WT, TOF_total } = m;
         const phi0 = m.phi0;
         const pos = positions(phi0);
         const chaseLower = Rchase < Rtarget;
@@ -165,18 +165,18 @@
         // phi_desired = nu_travel - 180°, made positive by adding one lap if needed
         const phiRaw = nu_travel_deg - 180;
         const phiD = phi_desired_deg;
-        // The phase change during the wait: phi_desired - phi_0 plus whole laps, with the same
-        // sign as the drift rate and less than one lap, for the first opportunity
+        // The course method: start with phi_desired - phi_0. If that gives a negative wait, add
+        // 360° (taken in the direction of the drift) until the wait is positive.
         const raw = phiD - phi0;
-        let change = ((raw % 360) + 360) % 360;
-        if (drift < 0 && change > 0) change -= 360;
+        const rawWT = raw / drift;
+        let change = raw;
+        while (change / drift < 0) change += drift > 0 ? 360 : -360;
         const laps = Math.round((change - raw) / 360);
         const lapTex = laps === 0 ? '' : ` ${laps > 0 ? '+' : '-'} ${Math.abs(laps) === 1 ? '' : Math.abs(laps)}(360^\\circ)`;
         const phiDText = phiD > 180 ? `${phiD.toFixed(2)}° (or −${(360 - phiD).toFixed(2)}°)` : `${phiD.toFixed(2)}°`;
 
         const answers = {
             phi0: { value: phi0, text: `${phi0}°` },
-            t_syn: { value: T_syn, text: timeText(T_syn) },
             tof: { value: TOF, text: timeText(TOF) },
             nu: { value: nu_travel_deg, text: `${nu_travel_deg.toFixed(2)}°` },
             phi_d: { value: phiD, text: phiDText },
@@ -186,7 +186,6 @@
 
         const fields = [
             phaseField(),
-            { key: 't_syn', tex: 'T_{\\text{syn}}', name: 'Synodic period', unit: 's', tolerance: { relative: 0.01 }, unitType: 'time_s' },
             { key: 'tof', tex: 'TOF', name: 'Transfer time', unit: 's', tolerance: { relative: 0.005 }, unitType: 'time_s' },
             { key: 'nu', tex: '\\nu_{\\text{travel}}', name: 'Target travel', unit: '°', tolerance: { absolute: 0.5 }, unitType: 'angle' },
             { key: 'phi_d', tex: '\\phi_{\\text{desired}}', name: 'Desired phase angle', unit: '°', tolerance: { absolute: 0.5, wrap: 360 }, unitType: 'angle' },
@@ -197,9 +196,11 @@
         const leadNote = phiRaw < 0
             ? `At the burn, the target must lead the chase by $180^\\circ - \\nu_{\\text{travel}} = ${(-phiRaw).toFixed(2)}°$. Measured from the target to the chase, in the direction of motion, that is $${phiD.toFixed(2)}°$.`
             : `At the burn, the chase must lead the target by $${phiD.toFixed(2)}°$.`;
-        const waitNote = chaseLower
-            ? `The chase is lower and faster, so $\\phi$ grows and the drift rate is positive. Laps are added until the change is positive and less than $360°$: that is the first opportunity.`
-            : `The chase is higher and slower, so $\\phi$ shrinks and the drift rate is negative. Laps are subtracted until the change is negative and less than $360°$ in size: that is the first opportunity.`;
+        const fix = drift > 0 ? 'add $360°$ to' : 'subtract $360°$ from';
+        const waitNote = laps === 0
+            ? `Start with $\\phi_{\\text{desired}} - \\phi_0$. The wait is already positive, so no $360°$ is added.`
+            : `Start with $\\phi_{\\text{desired}} - \\phi_0$: $WT = ${group(rawWT, 1)}\\text{ s}$, which is negative. So ${fix} the angle${Math.abs(laps) > 1 ? ' until the wait is positive' : ''}.`
+                + (drift < 0 ? ' The chase is higher, so the drift rate is negative and the angle has to be negative too.' : '');
 
         const steps = [
             phaseStep(pos, phi0, `<b>Initial phase angle.</b> $\\phi_0$ is how far the chase is ahead of the target, measured in the direction of motion.`),
@@ -220,19 +221,6 @@
                             `${degRate(n_chase)} - ${degRate(n_target)}`
                         ], `${degRate(n_chase - n_target)}°\\text{/s}`)
                         + note('Keep the units together: degrees with °/s, or radians with rad/s.')
-                }]
-            },
-            {
-                key: 'synodic',
-                title: prose('Synodic period, $T_{\\text{syn}}$'),
-                result: math(`T_{\\text{syn}} = ${group(T_syn, 1)}\\text{ s}`),
-                caption: prose('<b>Synodic period.</b> Each time the faster spacecraft gains a full lap on the slower one, the same geometry returns. There is one rendezvous opportunity per $T_{\\text{syn}}$.'),
-                methods: [{
-                    name: 'Formula',
-                    html: calc('T_{\\text{syn}} = \\dfrac{360^\\circ}{|n_{\\text{chase}} - n_{\\text{target}}|}', [
-                        `\\dfrac{360^\\circ}{${degRate(Math.abs(n_chase - n_target))}°\\text{/s}}`
-                    ], timeTex(T_syn))
-                        + note('The time between rendezvous opportunities.')
                 }]
             },
             {
@@ -284,12 +272,11 @@
                 caption: prose('<b>Wait time.</b> The chase coasts on its orbit while $\\phi$ drifts from $\\phi_0$ to $\\phi_{\\text{desired}}$. Then it makes the first burn.'),
                 methods: [{
                     name: 'Formula',
-                    html: calc('WT = \\dfrac{\\phi_{\\text{desired}} - \\phi_0 \\pm k(360^\\circ)}{n_{\\text{chase}} - n_{\\text{target}}}', [
+                    html: calc('WT = \\dfrac{\\phi_{\\text{desired}} - \\phi_0}{n_{\\text{chase}} - n_{\\text{target}}}', [
                         `\\dfrac{${phiD.toFixed(2)}° - ${phi0}°${lapTex}}{${degRate(n_chase - n_target)}°\\text{/s}}`,
                         `\\dfrac{${change.toFixed(2)}°}{${degRate(n_chase - n_target)}°\\text{/s}}`
                     ], timeTex(WT))
                         + note(waitNote)
-                        + note(`Check: the wait is shorter than one synodic period, $${group(T_syn, 1)}\\text{ s}$.`)
                 }]
             },
             {
@@ -311,10 +298,10 @@
             model: m,
             positions: pos,
             title: 'Coplanar Rendezvous',
-            prompt: prose('The chase and the target are on circular orbits in the same plane. The chase waits for the right phase angle, then flies a Hohmann transfer to meet the target. Find the initial phase angle, the synodic period, the transfer time, the target’s travel during the transfer, the desired phase angle, the wait for the first opportunity, and the total time.'),
+            prompt: prose('The chase and the target are on circular orbits in the same plane. The chase waits for the right phase angle, then flies a Hohmann transfer to meet the target. Find the initial phase angle, the transfer time, the target’s travel during the transfer, the desired phase angle, the wait for the first opportunity, and the total time.'),
             statement: item(`R_{\\text{chase}} = ${km(Rchase)}\\text{ km}`) + item(`R_{\\text{target}} = ${km(Rtarget)}\\text{ km}`) + positionItems(pos),
             overviewCaption: prose(`<b>The problem as given.</b> The chase is on the ${chaseLower ? 'inner' : 'outer'} orbit and the target on the ${chaseLower ? 'outer' : 'inner'} one, in the same plane. ${POSITION_DEF}`),
-            limitsHtml: prose(`Accepted: $\\phi_0$ within 0.5°, $T_{\\text{syn}}$, $WT$, and $TOF_{\\text{total}}$ within 1%, $TOF$ within 0.5% (${TIME_FORMS}), $\\nu_{\\text{travel}}$ and $\\phi_{\\text{desired}}$ within 0.5°. $\\phi_{\\text{desired}}$ may be given as a negative angle. ${MU_NOTE}`),
+            limitsHtml: prose(`Accepted: $\\phi_0$ within 0.5°, $WT$ and $TOF_{\\text{total}}$ within 1%, $TOF$ within 0.5% (${TIME_FORMS}), $\\nu_{\\text{travel}}$ and $\\phi_{\\text{desired}}$ within 0.5°. $\\phi_{\\text{desired}}$ may be given as a negative angle. ${MU_NOTE}`),
             fields,
             answers,
             steps

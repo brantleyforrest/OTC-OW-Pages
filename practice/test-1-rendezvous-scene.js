@@ -35,7 +35,6 @@
     const COPLANAR_REVEAL = {
         phase: { phi0: true, thetas: true },
         motions: { phi0: true },
-        synodic: { phi0: true },
         transfer: { phi0: true, transfer: true, burns: true },
         travel: { phi0: true, transfer: true, burns: true, nu: true },
         desired: { phi0: true, transfer: true, burns: true, nu: true, desired: true },
@@ -221,14 +220,12 @@
         function planFor(name) {
             if (model.mode === 'coplanar') {
                 // About one lap of the chase, enough to watch phi change at the drift rate, but
-                // never more than half the wait, so the synodic step has the rest to play
+                // never more than half the wait
                 const lap = Math.min(0.5, (2 * Math.PI) / (model.n_chase * model.WT));
                 const departure = at('wait', 1);
                 switch (name) {
                     case 'phase': return { at: 0, sweep: ['thetas', 'phi'] };
                     case 'motions': return { from: 0, to: at('wait', lap), follow: 0 };
-                    // On through the wait, to the first opportunity
-                    case 'synodic': return { from: at('wait', lap), to: departure, follow: 0 };
                     // The departure burn, then the flight to the far end of the transfer
                     case 'transfer': return { from: at('burn1', 0), to: at('transfer', 1), follow: departure };
                     // The transfer again, with the target's travel drawn as it goes

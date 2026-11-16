@@ -1,8 +1,9 @@
 // The map view for ground track problems on the Test 1 Practice page. A flat world map with one
-// period of the track, from ascending node 1 to node 2, arrows for the direction of travel, dots
-// at equal steps of time, the two labeled ascending nodes, and the satellite. Latitude lines
-// every 15° let the peaks be read. Each walkthrough step adds what it reads: the node shift, the
-// peak latitudes, the time dots, perigee and apogee, and the arc u from the node to the
+// period of the track, from ascending node 1 to node 2, arrows for the direction of travel, the
+// two labeled ascending nodes, and the satellite. There are no time marks, as on the test.
+// Latitude lines every 15° let the peaks be read. Each walkthrough step adds what it reads: the
+// node shift, the peak latitudes, the northern and southern halves with the descending node,
+// perigee and apogee, and the arc u from the node to the
 // satellite. The peaks, perigee, and apogee are labeled only by those steps, or after the
 // answers are graded, since finding them is part of the problem.
 // The view is drawn on a 2D canvas, so it does not need the 3D library.
@@ -26,11 +27,12 @@
         shift: '#ff8a3d',
         peak: '#34d399',
         nu: '#c4a1ff',
+        north: '#34d399',
+        south: '#c4a1ff',
         sat: '#ffffff',
         ink: '#060b14'
     };
     const SAMPLES_PER_ORBIT = 1440;
-    const DOTS_PER_ORBIT = 24;
     const ARROWS_PER_ORBIT = 8;
 
     function create(dom) {
@@ -221,17 +223,6 @@
             }
         }
 
-        function drawTimeDots(big) {
-            const m = problem.model;
-            const step = m.period / DOTS_PER_ORBIT;
-            g.fillStyle = big ? '#ffffff' : COLORS.track;
-            for (let t = Math.ceil(m.tStart / step) * step; t <= m.tEnd; t += step) {
-                const p = at(t);
-                g.beginPath();
-                g.arc(mapX(p.lon), mapY(p.lat), big ? 3.2 : 2.1, 0, 2 * Math.PI);
-                g.fill();
-            }
-        }
 
         /* Marks and labels ------------------------------------------------ */
         function triangle(x, y, up, color) {
@@ -396,8 +387,34 @@
             // nu = u - omega.
             if (stage === 'nu' && !m.equatorial && m.satU > 0) highlight(0, m.tSat, COLORS.nu);
 
-            drawTimeDots(stage === 'ecc');
+            // Eccentricity: the northern half (node 1 to the descending node) and the southern
+            // half (on to node 2), and where a circular orbit would put the descending node
+            if (stage === 'ecc' && !m.equatorial) {
+                highlight(0, m.tDescending, COLORS.north);
+                highlight(m.tDescending, m.period, COLORS.south);
+            }
             drawArrows();
+            if (stage === 'ecc' && !m.equatorial) {
+                const desc = at(m.tDescending);
+                if (m.elliptical) {
+                    const cx = mapX(m.lambdaDCircular), cy = mapY(0);
+                    g.save();
+                    g.setLineDash([3, 3]);
+                    g.lineWidth = 1.6;
+                    g.strokeStyle = COLORS.descending;
+                    g.beginPath();
+                    g.arc(cx, cy, 7, 0, 2 * Math.PI);
+                    g.stroke();
+                    g.restore();
+                    tag(`Circular DN: ${lonText(m.lambdaDCircular)}`, cx, cy, COLORS.descending, 10, 36);
+                }
+                triangle(mapX(m.lambda1), mapY(0), true, COLORS.node);
+                triangle(mapX(m.lambda2), mapY(0), true, COLORS.node);
+                triangle(mapX(desc.lon), mapY(0), false, COLORS.descending);
+                tag(`DN: ${lonText(desc.lon)}`, mapX(desc.lon), mapY(0), COLORS.descending, 10, 16);
+                tag(`North: ${deg(m.tNorthH)} h`, plot.x + 6, plot.y + 4, COLORS.north, 0, 14);
+                tag(`South: ${deg(m.tSouthH)} h`, plot.x + 6, plot.y + plot.h - 4, COLORS.south, 0, -14);
+            }
 
             // The two ascending nodes, and the descending node between them. They are read from
             // the grid, so they are marked only by the period steps or after grading. An
