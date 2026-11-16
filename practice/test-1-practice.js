@@ -1,4 +1,5 @@
-// Test 1 Practice: six problem sections on one page, the R-V problems, the orbital maneuver
+// Test 1 Practice: seven problem sections on one page, the R-V problems, the COE box problems
+// (test-1-coe-box-problems.js, checkboxes instead of typed answers), the orbital maneuver
 // problems, the rendezvous problems, the time of flight problems, the ground track problems,
 // and the propulsion problems,
 // with the same two modes, answer form, and walkthrough for all of them.
@@ -19,6 +20,7 @@
     const Tof = window.Test1TofProblems;
     const Propulsion = window.Test1PropulsionProblems;
     const GroundTrack = window.Test1GroundTrackProblems;
+    const CoeBox = window.Test1CoeBoxProblems;
 
     // The R-V problems keep the satellite at least 1.5 Earth radii from Earth's center, so that
     // the orbit has room in the view.
@@ -35,11 +37,12 @@
         test: 'Pair every card, then submit. Pick a paired card to undo its pair before submitting.'
     };
 
-    // The page has seven sections. The first six have their own problems, and the last is the
-    // laws matching drill. A link can open any one (#rv, #maneuvers, #rendezvous, #tof,
-    // #groundtrack, #propulsion, or #laws). The propulsion problems have no view. The ground
-    // track problems draw a flat map, which is part of the problem, so it shows in test mode too.
-    const SECTIONS = ['rv', 'maneuvers', 'rendezvous', 'tof', 'groundtrack', 'propulsion', 'laws'];
+    // The page has eight sections. The first seven have their own problems, and the last is the
+    // laws matching drill. A link can open any one (#rv, #coebox, #maneuvers, #rendezvous, #tof,
+    // #groundtrack, #propulsion, or #laws). The COE box and propulsion problems have no view. The
+    // ground track problems draw a flat map, which is part of the problem, so it shows in test
+    // mode too.
+    const SECTIONS = ['rv', 'coebox', 'maneuvers', 'rendezvous', 'tof', 'groundtrack', 'propulsion', 'laws'];
     const state = {
         mode: 'practice',
         section: SECTIONS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'rv',
@@ -174,8 +177,27 @@
         };
     }
 
+    // No view: the 14 boxes are checkboxes, each graded on its own.
+    function coeBoxProblem() {
+        const p = CoeBox.generate();
+        return {
+            view: null,
+            title: p.title,
+            prompt: p.prompt,
+            limitsHtml: p.limitsHtml,
+            overviewCaption: p.overviewCaption,
+            fields: p.fields,
+            statement: p.statement,
+            answers: p.answers,
+            steps: p.steps,
+            source: p,
+            grade: (field, text) => CoeBox.grade(field, text, p.answers[field.key].value)
+        };
+    }
+
     function generate() {
         if (state.section === 'rv') return rvProblem();
+        if (state.section === 'coebox') return coeBoxProblem();
         if (state.section === 'propulsion') return propulsionProblem(state.propulsionType);
         if (state.section === 'rendezvous') return rendezvousProblem(state.rendezvousType);
         if (state.section === 'tof') return tofProblem(state.tofType);
@@ -194,8 +216,14 @@
         const fields = state.problem.fields;
         $('answers').textContent = '';
         answerRows = {};
+        // A box problem lays its checkboxes out in the sheet's two columns of seven
+        $('answers').classList.toggle('check-grid', fields.every((field) => field.unitType === 'check'));
 
         fields.forEach((field, index) => {
+            if (field.unitType === 'check') {
+                buildCheckRow(field);
+                return;
+            }
             const row = document.createElement('div');
             row.className = 'answer';
             row.dataset.field = field.key;
@@ -250,6 +278,35 @@
         setScore('');
     }
 
+    // One checkbox answer: the box, its name, and a short mark after grading
+    function buildCheckRow(field) {
+        const row = document.createElement('label');
+        row.className = 'answer check';
+        row.dataset.field = field.key;
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = `answer-${field.key}`;
+        const name = document.createElement('span');
+        name.className = 'check-name';
+        name.innerHTML = field.name;
+        const noteEl = document.createElement('span');
+        noteEl.className = 'answer-note';
+        row.append(input, name, noteEl);
+        $('answers').appendChild(row);
+        answerRows[field.key] = { row, input, noteEl };
+        input.addEventListener('change', () => {
+            if (state.submitted) return;
+            setMark(field.key, '', '');
+            $('score').textContent = '';
+        });
+    }
+
+    // What the student gave: the text typed, or '1' for a checked box
+    const answerText = (field) => {
+        const input = answerRows[field.key].input;
+        return input.type === 'checkbox' ? (input.checked ? '1' : '') : input.value;
+    };
+
     function setMark(key, result, text) {
         const { row, noteEl } = answerRows[key];
         row.classList.toggle('right', result === 'right');
@@ -264,7 +321,12 @@
 
     // In practice mode, a mark says only right or wrong, so the student can try again.
     // In test mode, grading is final, so a mark also gives the correct value.
-    function noteFor(result, answer, isTest) {
+    function noteFor(result, answer, isTest, field) {
+        // A checkbox is marked with a tick or cross alone, to keep the box list compact
+        if (field && field.unitType === 'check') {
+            if (result === 'right') return '✓';
+            return isTest ? `✗ ${answer.value ? 'should be checked' : 'should be empty'}` : '✗';
+        }
         const blank = result === 'blank' || result === 'invalid';
         if (isTest) {
             if (result === 'right') return `✓ ${answer.text}`;
@@ -280,7 +342,7 @@
         const problem = state.problem;
         const results = problem.fields.map((field) => ({
             field,
-            result: problem.grade(field, answerRows[field.key].input.value)
+            result: problem.grade(field, answerText(field))
         }));
 
         const blanks = results.filter((item) => item.result === 'blank').length;
@@ -293,7 +355,7 @@
         results.forEach(({ field, result }) => {
             // In test mode, anything that is not right is marked wrong, including a blank.
             const shown = result === 'right' ? 'right' : (isTest || result === 'wrong' ? 'wrong' : '');
-            setMark(field.key, shown, noteFor(result, problem.answers[field.key], isTest));
+            setMark(field.key, shown, noteFor(result, problem.answers[field.key], isTest, field));
         });
 
         const correct = results.filter((item) => item.result === 'right').length;
@@ -305,7 +367,11 @@
 
         if (isTest) {
             state.submitted = true;
-            problem.fields.forEach((field) => { answerRows[field.key].input.readOnly = true; });
+            problem.fields.forEach((field) => {
+                const input = answerRows[field.key].input;
+                if (input.type === 'checkbox') input.disabled = true;
+                else input.readOnly = true;
+            });
             problem.steps.forEach((step, index) => state.visited.add(index));
             applyLayout();
             refreshSteps();
