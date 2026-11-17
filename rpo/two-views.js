@@ -23,34 +23,36 @@
     const SHORTCUTS = ['geo', 'gps', 'leo'];
 
     const PRESETS = [
-        { name: 'Perch', target: 'geo', diff: { dnu: 0.05 }, span: 2, range: 'small', scale: 'mag',
+        { group: 'Simple', name: 'Perch', target: 'geo', diff: { dnu: 0.05 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Same orbit, 37 km ahead. Only the position differs, so the gap never changes. In RIC chase sits still: a perch.' },
-        { name: 'Drift', target: 'geo', diff: { da: 5 }, span: 3, range: 'small', scale: 'mag',
+        { group: 'Simple', name: 'Drift', target: 'geo', diff: { da: 5 }, span: 3, range: 'small', scale: 'mag',
           notice: 'A larger orbit takes longer to go around (15 s per rev here), so chase falls about 47 km farther behind every rev: a drift backward. A smaller orbit drifts forward.' },
-        { name: 'NMC', target: 'geo', diff: { de: 0.0003 }, span: 2, range: 'small', scale: 'mag',
+        { group: 'Simple', name: 'NMC', target: 'geo', diff: { de: 0.0003 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Same period, different shape. Chase dips below and speeds up at perigee, then rises and slows at apogee. In RIC that is a 2-by-1 ellipse that stays put: an NMC.' },
-        { name: 'Drifting NMC', target: 'geo', diff: { da: -2, de: 0.0003 }, span: 3, range: 'small', scale: 'mag',
-          notice: 'Size and shape both differ: the NMC ellipse and the drift happen together, so the loops walk forward. A drifting NMC.' },
-        { name: 'Cross-Track', target: 'geo', diff: { di: 0.02 }, span: 2, range: 'small', scale: 'mag',
+        { group: 'Simple', name: 'Cross-Track', target: 'geo', diff: { di: 0.02 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Only the tilt differs. The two orbit planes cross twice per rev, so chase swings left and right of the target’s plane once per rev. Watch the view from behind.' },
-        { name: 'Cross-Track NMC', target: 'geo', diff: { de: 0.0003, di: 0.02 }, span: 2, range: 'small', scale: 'mag',
+        { group: 'Two-Component', name: 'Drifting NMC', target: 'geo', diff: { da: -2, de: 0.0003 }, span: 3, range: 'small', scale: 'mag',
+          notice: 'Size and shape both differ: the NMC ellipse and the drift happen together, so the loops walk forward. A drifting NMC.' },
+        { group: 'Two-Component', name: 'Cross-Track NMC', target: 'geo', diff: { de: 0.0003, di: 0.02 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Same period, but shape and tilt both differ: the NMC ellipse also swings left and right once per rev. The loop tilts out of the target’s plane but still closes on itself, so it never drifts. A cross-track NMC. Turn the 3D box to see it.' },
-        { name: 'Corkscrew', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag',
+        { group: 'Three-Component', name: 'Corkscrew', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag',
           notice: 'Size, shape, and tilt all differ: a drifting NMC that also swings side to side. A corkscrew. Turn the 3D box to see it.' }
     ];
     const DEFAULT_PRESET = 'NMC';
 
     // Slider ranges for the Difference column: [min, max, step], by the nearest target shortcut.
     // Large is the old Small; Small is finer still (owner, 2026-11-17: the sliders were too coarse).
+    // Δω matches Δν: on a near-circular orbit both just slide chase along the track (u = ω + ν),
+    // so 1° of ω is hundreds of km. Type a larger Δω in the box if needed.
     const SMALL = {
-        geo: { da: [-10, 10, 0.1], de: [0, 0.0004, 0.000005], di: [-0.03, 0.03, 0.0005], draan: [-0.03, 0.03, 0.0005], dargp: [-180, 180, 1], dnu: [-0.06, 0.06, 0.0005] },
-        gps: { da: [-6, 6, 0.1], de: [0, 0.0004, 0.000005], di: [-0.03, 0.03, 0.0005], draan: [-0.03, 0.03, 0.0005], dargp: [-180, 180, 1], dnu: [-0.06, 0.06, 0.0005] },
-        leo: { da: [-2, 2, 0.02], de: [0, 0.0008, 0.00001], di: [-0.04, 0.04, 0.001], draan: [-0.04, 0.04, 0.001], dargp: [-180, 180, 1], dnu: [-0.08, 0.08, 0.001] }
+        geo: { da: [-10, 10, 0.1], de: [0, 0.0004, 0.000005], di: [-0.03, 0.03, 0.0005], draan: [-0.03, 0.03, 0.0005], dargp: [-0.06, 0.06, 0.0005], dnu: [-0.06, 0.06, 0.0005] },
+        gps: { da: [-6, 6, 0.1], de: [0, 0.0004, 0.000005], di: [-0.03, 0.03, 0.0005], draan: [-0.03, 0.03, 0.0005], dargp: [-0.06, 0.06, 0.0005], dnu: [-0.06, 0.06, 0.0005] },
+        leo: { da: [-2, 2, 0.02], de: [0, 0.0008, 0.00001], di: [-0.04, 0.04, 0.001], draan: [-0.04, 0.04, 0.001], dargp: [-0.08, 0.08, 0.001], dnu: [-0.08, 0.08, 0.001] }
     };
     const LARGE = {
-        geo: { da: [-50, 50, 1], de: [0, 0.001, 0.00005], di: [-0.05, 0.05, 0.005], draan: [-0.05, 0.05, 0.005], dargp: [-180, 180, 5], dnu: [-0.1, 0.1, 0.005] },
-        gps: { da: [-30, 30, 1], de: [0, 0.001, 0.00005], di: [-0.05, 0.05, 0.005], draan: [-0.05, 0.05, 0.005], dargp: [-180, 180, 5], dnu: [-0.1, 0.1, 0.005] },
-        leo: { da: [-10, 10, 0.5], de: [0, 0.002, 0.0001], di: [-0.1, 0.1, 0.01], draan: [-0.1, 0.1, 0.01], dargp: [-180, 180, 5], dnu: [-0.2, 0.2, 0.01] }
+        geo: { da: [-50, 50, 1], de: [0, 0.001, 0.00005], di: [-0.05, 0.05, 0.005], draan: [-0.05, 0.05, 0.005], dargp: [-0.1, 0.1, 0.005], dnu: [-0.1, 0.1, 0.005] },
+        gps: { da: [-30, 30, 1], de: [0, 0.001, 0.00005], di: [-0.05, 0.05, 0.005], draan: [-0.05, 0.05, 0.005], dargp: [-0.1, 0.1, 0.005], dnu: [-0.1, 0.1, 0.005] },
+        leo: { da: [-10, 10, 0.5], de: [0, 0.002, 0.0001], di: [-0.1, 0.1, 0.01], draan: [-0.1, 0.1, 0.01], dargp: [-0.2, 0.2, 0.01], dnu: [-0.2, 0.2, 0.01] }
     };
     const TARGET_LIMITS = { a: [6500, 50000], e: [0, 0.9], i: [0, 180], raan: [0, 360], argp: [0, 360], nu: [0, 360] };
     const ROWS = [
