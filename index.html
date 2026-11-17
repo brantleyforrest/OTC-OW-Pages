@@ -1155,8 +1155,8 @@
                         <path d="M3.5 20l3.5-7 3.5 7z"></path>
                         <path d="M9 12c1.5-2.5 2.5-3.5 4.5-4" stroke-dasharray="2 2.5"></path>
                     </svg>
-                    <span class="nav-text-full">Drift</span>
-                    <span class="nav-text-short">Drift</span>
+                    <span class="nav-text-full">Burn</span>
+                    <span class="nav-text-short">Burn</span>
                 </a>
                 <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
                     <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
@@ -1547,10 +1547,10 @@
         </main>
     </div>
 
-    <!-- View 3: Drift (the game). Still being built: shown only in dev mode. -->
+    <!-- View 3: Burn (the game). Still being built: shown only in dev mode. -->
     <div id="view-game" class="portal-view dev-only">
         <header class="hero">
-            <h1>Drift</h1>
+            <h1>Burn</h1>
         </header>
 
         <main class="content">
@@ -1564,14 +1564,14 @@
                 </div>
 
                 <span class="status-pill wip">Work in Progress</span>
-                <h2>Drift</h2>
+                <h2>Burn</h2>
                 <p class="desc">
                     A turn-based game of relative motion. Each turn you choose one small burn, then coast: stop a drift, move a perch, or circle the target on the least delta-V. Play alone, or join a room with a code.
                 </p>
 
                 <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
-                    <a href="https://brantleyforrest.github.io/OTC-OW-Drift/drift/" class="btn-launch">
-                        Play Drift
+                    <a href="https://brantleyforrest.github.io/OTC-OW-Burn/burn/" class="btn-launch">
+                        Play Burn
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                         </svg>
@@ -1596,7 +1596,7 @@
         const VIEWS = {
             tools:  { view: 'view-tools',  nav: 'nav-tools',  title: 'Interactive Tools | OTC OW', hash: '' },
             guides: { view: 'view-guides', nav: 'nav-guides', title: 'Study | OTC OW',             hash: '#study' },
-            game:   { view: 'view-game',   nav: 'nav-game',   title: 'Drift | OTC OW',             hash: '#game', devOnly: true }
+            game:   { view: 'view-game',   nav: 'nav-game',   title: 'Burn | OTC OW',              hash: '#game', devOnly: true }
         };
 
         function isDevMode() {
@@ -1640,7 +1640,7 @@
             const hash = window.location.hash.toLowerCase();
             if (hash === '#study' || hash === '#guides' || hash === '#study-guides') {
                 switchView('guides', false);
-            } else if (hash === '#game' || hash === '#drift') {
+            } else if (hash === '#game' || hash === '#burn' || hash === '#drift') {
                 switchView('game', false);
             } else {
                 switchView('tools', false);
@@ -1757,7 +1757,7 @@
                 const hash = window.location.hash.toLowerCase();
                 if (!on && document.getElementById('view-game').classList.contains('active')) {
                     switchView('tools', true);
-                } else if (on && (hash === '#game' || hash === '#drift')) {
+                } else if (on && (hash === '#game' || hash === '#burn' || hash === '#drift')) {
                     checkHash();
                 }
 
