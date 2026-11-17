@@ -477,7 +477,7 @@
         // Earth's surface fills the lower view, and at GEO Earth is too far below to appear except
         // when looking down at the target.
         const BG_FOV = 38;
-        let backdropOn = true, haveBasis = false, orbitR = 1;
+        let backdropOn = true, insetOn = false, orbitOn = true, orbitKey = '', haveBasis = false, orbitR = 1;
         const bg = (() => {
             if (!window.EarthScene || !window.RpoMath) return null;
             const bgScene = new THREE.Scene();
@@ -505,7 +505,14 @@
                 new THREE.LineBasicMaterial({ color: COLORS.ric, transparent: true, opacity: 0.6 }));
             marker.visible = radial.visible = false;
             bgScene.add(marker, radial);
-            return { scene: bgScene, camera: bgCamera, world, holder, earth, stars, insetCamera, marker, radial };
+            // The target's whole orbit, in ECI inside the world group, so it passes through the
+            // target and curves down around Earth as the frame turns.
+            const orbit = new THREE.LineLoop(new THREE.BufferGeometry(),
+                new THREE.LineBasicMaterial({ color: COLORS.target, transparent: true, opacity: 0.55 }));
+            orbit.frustumCulled = false;
+            orbit.visible = false;
+            world.add(orbit);
+            return { scene: bgScene, camera: bgCamera, world, holder, earth, stars, insetCamera, marker, radial, orbit };
         })();
         // The inset's outline and caption, laid over the canvas (the picture itself is drawn in WebGL).
         const insetEl = bg && canvas.parentElement ? (() => {
@@ -531,7 +538,7 @@
         function renderInset() {
             // A narrow pane (the RMOE Explorer's second view) gives the inset half its width.
             const iw = Math.round(Math.max(84, Math.min(170, w * (w < 300 ? 0.5 : 0.28)))), ih = Math.round(iw * 0.8);
-            const show = w >= 140 && h >= 170 && !earthInView();
+            const show = insetOn && w >= 140 && h >= 170 && !earthInView();
             if (insetEl) insetEl.style.display = show ? '' : 'none';
             if (!show) return;
             if (insetEl) {
@@ -567,6 +574,25 @@
             bg.marker.visible = bg.radial.visible = false;
             bg.holder.visible = wasHolder;
         }
+        // The target's orbit as an ECI ring in Earth radii, rebuilt only when its elements change.
+        function setOrbit(coe) {
+            if (!bg) return;
+            if (!coe) { bg.orbit.visible = false; orbitKey = ''; return; }
+            const key = [coe.a, coe.e, coe.i, coe.raan, coe.argp].join(',');
+            if (key !== orbitKey) {
+                const M = window.RpoMath, RE = M.RE, count = 720;
+                const arr = new Float32Array(count * 3);
+                for (let k = 0; k < count; k++) {
+                    const r = M.coesToRv({ a: coe.a, e: coe.e, i: coe.i, raan: coe.raan, argp: coe.argp, nu: k * 360 / count }).r;
+                    arr[3 * k] = r[0] / RE; arr[3 * k + 1] = r[1] / RE; arr[3 * k + 2] = r[2] / RE;
+                }
+                bg.orbit.geometry.dispose();
+                bg.orbit.geometry = new THREE.BufferGeometry();
+                bg.orbit.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+                orbitKey = key;
+            }
+            bg.orbit.visible = orbitOn;
+        }
         function setBackdropFrame(basis, rT, t) {
             if (!bg || !basis || !rT) { haveBasis = false; return; }
             const M = window.RpoMath, RE = M.RE;
@@ -580,6 +606,7 @@
             bg.world.matrixWorldNeedsUpdate = true;
             bg.stars.quaternion.setFromRotationMatrix(bg.world.matrix);
             bg.holder.position.set(-rT[0] / RE, -rT[1] / RE, -rT[2] / RE);
+            bg.orbit.position.copy(bg.holder.position);       // the ring is centered on Earth
             orbitR = Math.hypot(rT[0], rT[1], rT[2]) / RE;
             bg.earth.pivot.rotation.z = M.OMEGA_E * (t || 0);
             haveBasis = true;
@@ -813,6 +840,11 @@
             resetView() { zoom = 1; setView('3d', true); },
             // Earth and stars behind the box (on by default). They need basis, rT, and t in update().
             setBackdrop(on) { if (backdropOn !== !!on) { backdropOn = !!on; render(); } },
+            // The zoomed-out Earth inset (off by default); it shows only with the backdrop on.
+            setInset(on) { if (insetOn !== !!on) { insetOn = !!on; render(); } },
+            // The target's orbit traced through the backdrop (on by default); needs targetCoe in update().
+            setOrbit(on) { if (orbitOn !== !!on) { orbitOn = !!on; if (bg) bg.orbit.visible = orbitOn && !!orbitKey; render(); } },
+            orbitShown: () => !!(bg && bg.orbit.visible),
             hasBackdrop: () => !!(bg && backdropOn && haveBasis),
             // For tests: where an ECI-relative point (km from the target, in box axes) lands in the backdrop.
             backdropToScreen(xyzKm) {
@@ -828,6 +860,7 @@
             // place Earth and the stars behind the box.
             update(data) {
                 setBackdropFrame(data.basis, data.rT, data.t);
+                setOrbit(data.targetCoe || null);
                 fill(ghostLine, data.ghost || null, null);
                 fill(trailLine, data.trail, null);
                 fill(modelLine, data.model, null);

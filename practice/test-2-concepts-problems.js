@@ -41,12 +41,12 @@
             prompt: 'Match each difference between chase’s and the target’s orbital elements to the relative motion it gives.',
             cards: [
                 { key: 'nu', name: 'Only $\\nu$ differs', clue: 'A fixed point ahead or behind: a perch' },
-                { key: 'a', name: 'Only $a$ differs', clue: 'A steady drift with no ellipse: linear drift' },
-                { key: 'e', name: 'Only $e$ differs', clue: 'A 2-by-1 ellipse with no drift: stationary NMC' },
+                { key: 'a', name: 'Only $a$ differs', clue: 'A steady slide along the track with no ellipse: drift' },
+                { key: 'e', name: 'Only $e$ differs', clue: 'A 2-by-1 ellipse that stays put: NMC' },
                 { key: 'i', name: 'Only $i$ or $\\Omega$ differs', clue: 'Side-to-side oscillation: cross-track motion' },
                 { key: 'ae', name: '$a$ and $e$ differ', clue: 'Loops that drift: drifting NMC' },
                 { key: 'aei', name: '$a$, $e$, and $i$ differ', clue: 'Drifting loops that also swing side to side: corkscrew' },
-                { key: 'ai', name: '$a$ and $\\Omega$ differ', clue: 'Side-to-side swing plus a drift: drifting cross-track motion' }
+                { key: 'ai', name: '$a$ and $\\Omega$ differ', clue: 'Side-to-side swing plus a drift: drift with cross-track motion' }
             ]
         },
         burns: {

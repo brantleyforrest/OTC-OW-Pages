@@ -40,16 +40,14 @@
     ];
     const PRESETS = [
         { name: 'Perch', rmoe: { yc0: -20 }, notice: 'Every RMOE but y_C0 is zero: chase sits still 20 km behind the target. A perch.' },
-        { name: 'Stationary NMC', rmoe: { C: 10 }, notice: 'C = 10 km and nothing else: a 2-by-1 ellipse, 20 km tall and 40 km long, centered on the target. It does not drift because x_C = 0.' },
-        { name: 'Offset NMC', rmoe: { yc0: 30, C: 10 }, notice: 'The same ellipse, centered 30 km ahead of the target. y_C0 slides it along the track.' },
-        { name: 'Drifting Forward', rmoe: { xc: -2, C: 6, yc0: -40 }, notice: 'The center is 2 km below the target, so the loops walk forward about 19 km each rev.' },
-        { name: 'Drifting Backward', rmoe: { xc: 2, C: 6, yc0: 40 }, notice: 'The center is 2 km above the target, so the loops walk backward about 19 km each rev.' },
-        { name: 'Linear Drift', rmoe: { xc: 2, yc0: 40 }, notice: 'No ellipse (C = 0), only a center 2 km above the target: chase slides straight backward along the track.' },
-        { name: 'Cross-Track Only', rmoe: { yc0: -20, zmax: 10 }, notice: 'A perch 20 km behind that swings 10 km left and right once per rev. Watch the view from behind.' },
+        { name: 'Drift', rmoe: { xc: 2, yc0: 40 }, notice: 'No ellipse (C = 0), only a center 2 km above the target: chase slides straight backward along the track, about 19 km each rev. Make x_C negative and it drifts forward.' },
+        { name: 'NMC', rmoe: { C: 10 }, notice: 'C = 10 km and nothing else: a 2-by-1 ellipse, 20 km tall and 40 km long, centered on the target. It does not drift because x_C = 0. Move y_C0 to slide it along the track.' },
+        { name: 'Drifting NMC', rmoe: { xc: 2, C: 6, yc0: 40 }, notice: 'An NMC whose center is 2 km above the target, so the loops walk backward about 19 km each rev. Below the target they walk forward.' },
+        { name: 'Cross-Track', rmoe: { yc0: -20, zmax: 10 }, notice: 'A perch 20 km behind that swings 10 km left and right once per rev. Watch the view from behind.' },
         { name: 'Corkscrew', rmoe: { xc: -1.5, C: 5, zmax: 5, yc0: -40, dM0: 270 }, second: 'box',
           notice: 'Drift, ellipse, and swing together: a corkscrew. In the 3D box, ΔM_0 decides which part of each loop is farthest to the side.' }
     ];
-    const DEFAULT_PRESET = 'Drifting Backward';
+    const DEFAULT_PRESET = 'Drifting NMC';
     const ZERO = { xc: 0, yc0: 0, C: 0, M0: 0, zmax: 0, dM0: 0 };
     const POINTS_PER_REV = 240;
     const TINY = 1e-9;
@@ -64,7 +62,7 @@
         second: 'behind',
         annot: { center: true, size: false, corners: false, cross: false },
         hot: null, lastRow: null,
-        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, backdrop: true, labels: true
+        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, backdrop: true, inset: false, orbit3d: true, labels: true
     };
     let sim = null, dirty = true;
 
@@ -217,7 +215,9 @@
         const basis = M.ricBasis(sim.coe, t);
         if (stage.box && stage.second() === 'box') {
             stage.box.setBackdrop(state.backdrop);
-            stage.box.update({ chase: now, trail, ghost: sim.path, basis, rT: basis.r, t });
+            stage.box.setInset(state.inset);
+            stage.box.setOrbit(state.orbit3d);
+            stage.box.update({ chase: now, trail, ghost: sim.path, basis, rT: basis.r, t, targetCoe: sim.coe });
         }
         if (stage.inertial) {
             // ghost: the whole two-rev path is drawn faintly from the start, so the carried trail never
@@ -426,7 +426,7 @@
         dirty = true;
     });
     Kit.bindSegmented($('camera-pick'), v => { state.camera = v; applyViewOptions(); dirty = true; });
-    [['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-labels', 'labels']].forEach(([id, key]) => {
+    [['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
 

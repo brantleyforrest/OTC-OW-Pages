@@ -12,11 +12,11 @@
 
     const MOTIONS = [
         { value: 'perch', html: 'Perch' },
-        { value: 'linear-drift', html: 'Linear drift' },
-        { value: 'stationary-nmc', html: 'Stationary NMC' },
+        { value: 'linear-drift', html: 'Drift' },
+        { value: 'stationary-nmc', html: 'NMC' },
         { value: 'drifting-nmc', html: 'Drifting NMC' },
         { value: 'cross-track', html: 'Cross-track motion' },
-        { value: 'drifting-cross-track', html: 'Drifting cross-track motion' },
+        { value: 'drifting-cross-track', html: 'Drift with cross-track motion' },
         { value: 'nmc-cross-track', html: 'NMC with cross-track motion' },
         { value: 'corkscrew', html: 'Corkscrew' }
     ];

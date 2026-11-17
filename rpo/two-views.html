@@ -288,6 +288,8 @@
                             <label class="check"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
                             <label class="check"><input type="checkbox" id="opt-shadows">Shadows</label>
                             <label class="check" title="Earth and the stars behind the 3D RIC box, in their true directions from the target"><input type="checkbox" id="opt-backdrop" checked>Earth and Stars</label>
+                            <label class="check" title="A zoomed-out view of the target and Earth in the 3D RIC view, when Earth is out of its view"><input type="checkbox" id="opt-inset">Earth Inset</label>
+                            <label class="check" title="The target's whole orbit, traced through Earth and the stars behind the 3D RIC view"><input type="checkbox" id="opt-orbit3d" checked>3D Orbit Trace</label>
                             <label class="check"><input type="checkbox" id="opt-labels" checked>Labels</label>
                             <label class="check"><input type="checkbox" id="opt-model">Course Model</label>
                             <label class="check"><input type="checkbox" id="opt-shared" checked>Shared Scale</label>
@@ -347,6 +349,9 @@
                             <li><span class="ric-c">I</span>: in-track, the way the target is moving (forward).</li>
                             <li><span class="ric-c">C</span>: cross-track, along the orbit's angular momentum (left).</li>
                             <li><b>Rev</b>: one orbit of the target.</li>
+                            <li><b>NMC</b>: natural motion circumnavigation, the 2-by-1 ellipse chase traces around a fixed center with no burns.</li>
+                            <li><b>Drift</b>: chase slides steadily along the track, backward when its orbit is larger, forward when smaller.</li>
+                            <li><b>Drifting NMC</b>: both at once, NMC loops that walk along the track.</li>
                             <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track, the way the target is moving.</li>
                         </ul>
                     </div>

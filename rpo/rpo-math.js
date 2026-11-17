@@ -346,11 +346,11 @@
     // ---------- description, sampling, plans ----------
     const MOTIONS = {
         '000': ['perch', 'Perch'],
-        '100': ['linear-drift', 'Linear drift'],
-        '010': ['stationary-nmc', 'Stationary NMC'],
+        '100': ['linear-drift', 'Drift'],
+        '010': ['stationary-nmc', 'NMC'],
         '110': ['drifting-nmc', 'Drifting NMC'],
         '001': ['cross-track', 'Cross-track motion'],
-        '101': ['drifting-cross-track', 'Drifting cross-track motion'],
+        '101': ['drifting-cross-track', 'Drift with cross-track motion'],
         '011': ['nmc-cross-track', 'NMC with cross-track motion'],
         '111': ['corkscrew', 'Corkscrew']
     };

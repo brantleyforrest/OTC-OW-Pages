@@ -18,8 +18,8 @@
         { key: 'axes', label: 'RIC Axes', module: window.Test2AxesProblems,
           types: [['random', 'Random'], ['arrows', 'Arrows'], ['cards', 'Cards']] },
         { key: 'motion', label: 'Elements to Motion', module: window.Test2MotionProblems,
-          types: [['random', 'Random'], ['perch', 'Perch'], ['linear-drift', 'Linear Drift'], ['stationary-nmc', 'Stationary NMC'],
-              ['drifting-nmc', 'Drifting NMC'], ['cross-track', 'Cross-Track'], ['drifting-cross-track', 'Drifting Cross-Track'],
+          types: [['random', 'Random'], ['perch', 'Perch'], ['linear-drift', 'Drift'], ['stationary-nmc', 'NMC'],
+              ['drifting-nmc', 'Drifting NMC'], ['cross-track', 'Cross-Track'], ['drifting-cross-track', 'Drift + Cross-Track'],
               ['nmc-cross-track', 'NMC + Cross-Track'], ['corkscrew', 'Corkscrew']] },
         { key: 'concepts', label: 'Concepts', module: window.Test2ConceptsProblems,
           types: [['random', 'Random'], ['assumptions', 'CW Assumptions'], ['rmoe', 'RMOEs'], ['elements', 'Elements'], ['burns', 'Burns']] }

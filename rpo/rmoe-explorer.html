@@ -255,6 +255,8 @@
                             <label class="check"><input type="checkbox" id="opt-inertial" checked>Inertial Trail</label>
                             <label class="check"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
                             <label class="check" title="Earth and the stars behind the 3D RIC view, in their true directions from the target"><input type="checkbox" id="opt-backdrop" checked>Earth and Stars</label>
+                            <label class="check" title="A zoomed-out view of the target and Earth in the 3D RIC view, when Earth is out of its view"><input type="checkbox" id="opt-inset">Earth Inset</label>
+                            <label class="check" title="The target's whole orbit, traced through Earth and the stars behind the 3D RIC view"><input type="checkbox" id="opt-orbit3d" checked>3D Orbit Trace</label>
                             <label class="check"><input type="checkbox" id="opt-labels" checked>Labels</label>
                         </div>
                     </div>
@@ -286,7 +288,9 @@
                         <ul class="terms">
                             <li><b>Target</b> (green square): the origin of the RIC frame. <b>Chase</b> (gold triangle): the other spacecraft.</li>
                             <li><span class="ric-c">R</span> radial (up), <span class="ric-c">I</span> in-track (forward), <span class="ric-c">C</span> cross-track (left).</li>
-                            <li><b>NMC</b>: natural motion circumnavigation, the 2-by-1 ellipse chase traces with no burns.</li>
+                            <li><b>NMC</b>: natural motion circumnavigation, the 2-by-1 ellipse chase traces around a fixed center with no burns.</li>
+                            <li><b>Drift</b>: chase slides steadily along the track, backward when its orbit is larger, forward when smaller.</li>
+                            <li><b>Drifting NMC</b>: both at once, NMC loops that walk along the track.</li>
                             <li><b>Course model</b>: the linear (CW) equations, good for a circular target orbit and a chase close to it.</li>
                             <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track.</li>
                         </ul>

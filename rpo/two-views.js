@@ -10,7 +10,7 @@
     const Kit = window.ToolKit, M = window.RpoMath, V = window.RpoViews;
 
     /* ---------- Data tables ----------
-     * To add a preset, add one row to PRESETS: group (the <optgroup>), name, target (a key of
+     * To add a preset, add one row to PRESETS: group (an optional <optgroup>), name, target (a key of
      * TARGETS), diff (only the differences that are not zero: da in km, de, and di, draan, dargp,
      * dnu in degrees, always chase minus target), span in target revs, range ('small' or
      * 'large', which slider ranges open), scale ('mag' or 'true'), model (Course Model on or
@@ -18,42 +18,25 @@
     const TARGETS = {
         geo: { a: 42164, e: 0, i: 0, raan: 0, argp: 0, nu: 0 },
         gps: { a: 26562, e: 0, i: 55, raan: 30, argp: 0, nu: 0 },
-        leo: { a: 7000, e: 0, i: 51.6, raan: 30, argp: 0, nu: 0 },
-        gpsEccentric: { a: 26562, e: 0.3, i: 55, raan: 30, argp: 0, nu: 0 }
+        leo: { a: 7000, e: 0, i: 51.6, raan: 30, argp: 0, nu: 0 }
     };
     const SHORTCUTS = ['geo', 'gps', 'leo'];
 
     const PRESETS = [
-        { group: 'Small', name: 'Position only', target: 'geo', diff: { dnu: 0.05 }, span: 2, range: 'small', scale: 'mag', model: false,
+        { name: 'Perch', target: 'geo', diff: { dnu: 0.05 }, span: 2, range: 'small', scale: 'mag', model: false,
           notice: 'Same orbit, 37 km ahead. Only the position differs, so the gap never changes. In RIC chase sits still: a perch.' },
-        { group: 'Small', name: 'Size only', target: 'geo', diff: { da: 5 }, span: 3, range: 'small', scale: 'mag', model: false,
-          notice: 'A larger orbit takes longer to go around (15 s per rev here), so chase falls about 47 km farther behind every rev: a linear drift backward. A smaller orbit drifts forward.' },
-        { group: 'Small', name: 'Shape only', target: 'geo', diff: { de: 0.0003 }, span: 2, range: 'small', scale: 'mag', model: false,
-          notice: 'Same period, different shape. Chase dips below and speeds up at perigee, then rises and slows at apogee. In RIC that is a 2-by-1 ellipse that stays put: a stationary NMC.' },
-        { group: 'Small', name: 'Tilt only', target: 'geo', diff: { di: 0.02 }, span: 2, range: 'small', scale: 'mag', model: false,
-          notice: 'The two orbit planes cross twice per rev. Chase swings left and right of the target’s plane once per rev.' },
-        { group: 'Small', name: 'Twist only', target: 'gps', diff: { draan: 0.03 }, span: 2, range: 'small', scale: 'mag', model: false,
-          notice: 'Turning the plane about Earth’s axis also makes the planes cross twice per rev, and shifts chase along the orbit.' },
-        { group: 'Small', name: 'Size and shape', target: 'geo', diff: { da: -2, de: 0.0003 }, span: 3, range: 'small', scale: 'mag', model: false,
-          notice: 'The ellipse and the drift happen together: loops that walk forward. A drifting NMC.' },
-        { group: 'Small', name: 'Size, shape, and tilt', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag', model: false,
-          notice: 'Loops, drift, and side-to-side swing together: a corkscrew. Turn the 3D box to see it.' },
-        { group: 'Small', name: 'Twist and size', target: 'gps', diff: { draan: 0.03, da: 3 }, span: 3, range: 'small', scale: 'mag', model: false,
-          notice: 'A side-to-side swing that drifts backward.' },
-        { group: 'Large', name: 'Lower orbit', target: 'leo', diff: { da: -200 }, span: 3, range: 'large', scale: 'true', model: false,
-          notice: 'Chase’s orbit is smaller, so each rev takes about 4 minutes less. Around Earth it pulls a little farther ahead every lap. In RIC that is the same fact: below the target and moving forward.' },
-        { group: 'Large', name: 'Stretched orbit', target: 'leo', diff: { de: 0.03 }, span: 2, range: 'large', scale: 'true', model: false,
-          notice: 'Same period, but chase is 210 km below the target’s altitude at perigee and 210 km above it at apogee, running ahead and falling behind as its speed changes. In RIC: the 2-by-1 ellipse, large enough to see where it comes from.' },
-        { group: 'Large', name: 'Tilted orbit', target: 'leo', diff: { di: 10 }, span: 2, range: 'large', scale: 'true', model: false,
-          notice: 'Same size and shape, tilted plane. The orbits cross twice per rev. Between crossings chase is up to about 1,200 km to one side.' },
-        { group: 'Large', name: 'All three', target: 'leo', diff: { da: 300, de: 0.04, di: 8 }, span: 3, range: 'large', scale: 'true', model: false,
-          notice: 'Larger, stretched, and tilted: chase falls behind, loops, and swings side to side at once. This is the corkscrew at a scale where both orbits are plain to see.' },
-        { group: 'Limits', name: 'Far ahead', target: 'leo', diff: { dnu: 3 }, span: 2, range: 'large', scale: 'true', model: true,
-          notice: 'Same orbit, 3° ahead: a perch. The course model puts a perch on the in-track axis. The orbit curves, so chase is really about 10 km below that line. The hollow marker is the course model. Close in, the gap vanishes.' },
-        { group: 'Limits', name: 'Eccentric target', target: 'gpsEccentric', diff: { dnu: 1 }, span: 2, range: 'large', scale: 'mag', model: false,
-          notice: 'Both spacecraft share one eccentric orbit, 1° apart at perigee. On a circular orbit that would be a perch. Here the gap swings between about 175 and 325 km every rev, because both speed up near perigee and slow near apogee. This is why the course model needs a circular target.' }
+        { name: 'Drift', target: 'geo', diff: { da: 5 }, span: 3, range: 'small', scale: 'mag', model: false,
+          notice: 'A larger orbit takes longer to go around (15 s per rev here), so chase falls about 47 km farther behind every rev: a drift backward. A smaller orbit drifts forward.' },
+        { name: 'NMC', target: 'geo', diff: { de: 0.0003 }, span: 2, range: 'small', scale: 'mag', model: false,
+          notice: 'Same period, different shape. Chase dips below and speeds up at perigee, then rises and slows at apogee. In RIC that is a 2-by-1 ellipse that stays put: an NMC.' },
+        { name: 'Drifting NMC', target: 'geo', diff: { da: -2, de: 0.0003 }, span: 3, range: 'small', scale: 'mag', model: false,
+          notice: 'Size and shape both differ: the NMC ellipse and the drift happen together, so the loops walk forward. A drifting NMC.' },
+        { name: 'Cross-Track', target: 'geo', diff: { di: 0.02 }, span: 2, range: 'small', scale: 'mag', model: false,
+          notice: 'Only the tilt differs. The two orbit planes cross twice per rev, so chase swings left and right of the target’s plane once per rev. Watch the view from behind.' },
+        { name: 'Corkscrew', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag', model: false,
+          notice: 'Size, shape, and tilt all differ: a drifting NMC that also swings side to side. A corkscrew. Turn the 3D box to see it.' }
     ];
-    const DEFAULT_PRESET = 'Shape only';
+    const DEFAULT_PRESET = 'NMC';
 
     // Slider ranges for the Difference column: [min, max, step].
     const SMALL = {
@@ -88,7 +71,7 @@
         trail: 'full', roll: 1, stepSize: 0.0625,
         scale: 'mag', mag: 'auto',
         frame: 'ECI', camera: 'earth',
-        axes: false, equator: false, orbits: true, carried: true, shadows: false, backdrop: true, labels: true, model: false, shared: true
+        axes: false, equator: false, orbits: true, carried: true, shadows: false, backdrop: true, inset: false, orbit3d: true, labels: true, model: false, shared: true
     };
     let sim = null;          // everything derived from the inputs; rebuilt only when they change
     let dirty = true;
@@ -190,8 +173,10 @@
         if (stage.box) {
             stage.box.setShadows(state.shadows);
             stage.box.setBackdrop(state.backdrop);
+            stage.box.setInset(state.inset);
+            stage.box.setOrbit(state.orbit3d);
             stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho, model: showModel ? sim.modelPath : null,
-                basis: rel.basis, rT: rel.rT, t: state.t });
+                basis: rel.basis, rT: rel.rT, t: state.t, targetCoe: sim.target });
         }
         if (stage.inertial) stage.inertial.update({ t: state.t, rho: rel.rho, basis: rel.basis, rT: rel.rT, from, to, ghost: state.trail !== 'off' });
         updateLive(rel);
@@ -394,6 +379,7 @@
         const select = $('preset');
         const groups = {};
         PRESETS.forEach((p, k) => {
+            if (!p.group) { select.appendChild(new Option(p.name, String(k))); return; }
             if (!groups[p.group]) { groups[p.group] = document.createElement('optgroup'); groups[p.group].label = p.group; select.appendChild(groups[p.group]); }
             groups[p.group].appendChild(new Option(p.name, String(k)));
         });
@@ -504,7 +490,7 @@
     });
     Kit.bindSegmented($('camera-pick'), v => { state.camera = v; applyViewOptions(); dirty = true; });
     [['opt-axes', 'axes'], ['opt-equator', 'equator'], ['opt-orbits', 'orbits'], ['opt-carried', 'carried'],
-     ['opt-shadows', 'shadows'], ['opt-backdrop', 'backdrop'], ['opt-labels', 'labels']].forEach(([id, key]) => {
+     ['opt-shadows', 'shadows'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
     $('opt-model').addEventListener('change', e => { state.model = e.target.checked; refit(); dirty = true; });
