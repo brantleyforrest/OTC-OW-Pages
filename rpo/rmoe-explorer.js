@@ -44,6 +44,8 @@
         { name: 'NMC', rmoe: { C: 10 }, notice: 'C = 10 km and nothing else: a 2-by-1 ellipse, 20 km tall and 40 km long, centered on the target. It does not drift because x_C = 0. Move y_C0 to slide it along the track.' },
         { name: 'Drifting NMC', rmoe: { xc: 2, C: 6, yc0: 40 }, notice: 'An NMC whose center is 2 km above the target, so the loops walk backward about 19 km each rev. Below the target they walk forward.' },
         { name: 'Cross-Track', rmoe: { yc0: -20, zmax: 10 }, notice: 'A perch 20 km behind that swings 10 km left and right once per rev. Watch the view from behind.' },
+        { name: 'Cross-Track NMC', rmoe: { C: 10, zmax: 10 }, second: 'box',
+          notice: 'The NMC from before, plus a 10 km swing left and right once per rev. The ellipse tilts out of the target’s plane but still closes on itself, because x_C = 0. ΔM_0 sets which way it tilts.' },
         { name: 'Corkscrew', rmoe: { xc: -1.5, C: 5, zmax: 5, yc0: -40, dM0: 270 }, second: 'box',
           notice: 'Drift, ellipse, and swing together: a corkscrew. In the 3D box, ΔM_0 decides which part of each loop is farthest to the side.' }
     ];

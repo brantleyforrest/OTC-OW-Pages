@@ -17,7 +17,7 @@
         { value: 'drifting-nmc', html: 'Drifting NMC' },
         { value: 'cross-track', html: 'Cross-track motion' },
         { value: 'drifting-cross-track', html: 'Drift with cross-track motion' },
-        { value: 'nmc-cross-track', html: 'NMC with cross-track motion' },
+        { value: 'nmc-cross-track', html: 'Cross-Track NMC' },
         { value: 'corkscrew', html: 'Corkscrew' }
     ];
     const LABEL = Object.fromEntries(MOTIONS.map(m => [m.value, m.html]));

@@ -33,18 +33,25 @@
           notice: 'Size and shape both differ: the NMC ellipse and the drift happen together, so the loops walk forward. A drifting NMC.' },
         { name: 'Cross-Track', target: 'geo', diff: { di: 0.02 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Only the tilt differs. The two orbit planes cross twice per rev, so chase swings left and right of the target’s plane once per rev. Watch the view from behind.' },
+        { name: 'Cross-Track NMC', target: 'geo', diff: { de: 0.0003, di: 0.02 }, span: 2, range: 'small', scale: 'mag',
+          notice: 'Same period, but shape and tilt both differ: the NMC ellipse also swings left and right once per rev. The loop tilts out of the target’s plane but still closes on itself, so it never drifts. A cross-track NMC. Turn the 3D box to see it.' },
         { name: 'Corkscrew', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag',
           notice: 'Size, shape, and tilt all differ: a drifting NMC that also swings side to side. A corkscrew. Turn the 3D box to see it.' }
     ];
     const DEFAULT_PRESET = 'NMC';
 
-    // Slider ranges for the Difference column: [min, max, step].
+    // Slider ranges for the Difference column: [min, max, step], by the nearest target shortcut.
+    // Large is the old Small; Small is finer still (owner, 2026-11-17: the sliders were too coarse).
     const SMALL = {
+        geo: { da: [-10, 10, 0.1], de: [0, 0.0004, 0.000005], di: [-0.03, 0.03, 0.0005], draan: [-0.03, 0.03, 0.0005], dargp: [-180, 180, 1], dnu: [-0.06, 0.06, 0.0005] },
+        gps: { da: [-6, 6, 0.1], de: [0, 0.0004, 0.000005], di: [-0.03, 0.03, 0.0005], draan: [-0.03, 0.03, 0.0005], dargp: [-180, 180, 1], dnu: [-0.06, 0.06, 0.0005] },
+        leo: { da: [-2, 2, 0.02], de: [0, 0.0008, 0.00001], di: [-0.04, 0.04, 0.001], draan: [-0.04, 0.04, 0.001], dargp: [-180, 180, 1], dnu: [-0.08, 0.08, 0.001] }
+    };
+    const LARGE = {
         geo: { da: [-50, 50, 1], de: [0, 0.001, 0.00005], di: [-0.05, 0.05, 0.005], draan: [-0.05, 0.05, 0.005], dargp: [-180, 180, 5], dnu: [-0.1, 0.1, 0.005] },
         gps: { da: [-30, 30, 1], de: [0, 0.001, 0.00005], di: [-0.05, 0.05, 0.005], draan: [-0.05, 0.05, 0.005], dargp: [-180, 180, 5], dnu: [-0.1, 0.1, 0.005] },
         leo: { da: [-10, 10, 0.5], de: [0, 0.002, 0.0001], di: [-0.1, 0.1, 0.01], draan: [-0.1, 0.1, 0.01], dargp: [-180, 180, 5], dnu: [-0.2, 0.2, 0.01] }
     };
-    const LARGE = { da: [-1000, 1000, 10], de: [0, 0.3, 0.005], di: [-30, 30, 0.5], draan: [-30, 30, 0.5], dargp: [-180, 180, 5], dnu: [-30, 30, 0.5] };
     const TARGET_LIMITS = { a: [6500, 50000], e: [0, 0.9], i: [0, 180], raan: [0, 360], argp: [0, 360], nu: [0, 360] };
     const ROWS = [
         { key: 'a', d: 'da', name: 'a', unit: 'km', digits: 3 },
@@ -277,9 +284,8 @@
         });
     }
     function sliderRanges() {
-        if (state.range === 'large') return LARGE;
         const near = SHORTCUTS.slice().sort((p, q) => Math.abs(TARGETS[p].a - state.target.a) - Math.abs(TARGETS[q].a - state.target.a))[0];
-        return SMALL[near];
+        return (state.range === 'large' ? LARGE : SMALL)[near];
     }
     function fillTable(skip) {
         const chase = chaseOf(state.target, state.diff);

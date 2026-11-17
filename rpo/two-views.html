@@ -234,8 +234,9 @@
                                 <button type="button" data-value="gps" aria-pressed="false">GPS-type</button>
                                 <button type="button" data-value="leo" aria-pressed="false">LEO</button>
                             </div>
-                            <span>Differences</span>
-                            <div class="segmented" id="range-pick" role="group" aria-label="Difference slider ranges">
+                            <!-- Hidden (owner, 2026-11-17): the slider ranges stay on Small; remove display: none to bring the setting back. -->
+                            <span style="display: none;">Differences</span>
+                            <div class="segmented" id="range-pick" role="group" aria-label="Difference slider ranges" style="display: none;">
                                 <button type="button" data-value="small" aria-pressed="true">Small</button>
                                 <button type="button" data-value="large" aria-pressed="false">Large</button>
                             </div>
@@ -351,6 +352,7 @@
                             <li><b>NMC</b>: natural motion circumnavigation, the 2-by-1 ellipse chase traces around a fixed center with no burns.</li>
                             <li><b>Drift</b>: chase slides steadily along the track, backward when its orbit is larger, forward when smaller.</li>
                             <li><b>Drifting NMC</b>: both at once, NMC loops that walk along the track.</li>
+                            <li><b>Cross-Track NMC</b>: an NMC that also swings left and right of the target’s plane, so the ellipse tilts but stays put.</li>
                             <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track, the way the target is moving.</li>
                         </ul>
                     </div>
