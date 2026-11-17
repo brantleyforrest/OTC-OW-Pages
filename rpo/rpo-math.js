@@ -350,7 +350,7 @@
         '010': ['stationary-nmc', 'NMC'],
         '110': ['drifting-nmc', 'Drifting NMC'],
         '001': ['cross-track', 'Cross-track motion'],
-        '101': ['drifting-cross-track', 'Drift with cross-track motion'],
+        '101': ['drifting-cross-track', 'Snake'],
         '011': ['nmc-cross-track', 'Cross-Track NMC'],
         '111': ['corkscrew', 'Corkscrew']
     };

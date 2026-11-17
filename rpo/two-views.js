@@ -35,6 +35,8 @@
           notice: 'Size and shape both differ: the NMC ellipse and the drift happen together, so the loops walk forward. A drifting NMC.' },
         { group: 'Two-Component', name: 'Cross-Track NMC', target: 'geo', diff: { de: 0.0003, di: 0.02 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Same period, but shape and tilt both differ: the NMC ellipse also swings left and right once per rev. The loop tilts out of the target’s plane but still closes on itself, so it never drifts. A cross-track NMC. Turn the 3D box to see it.' },
+        { group: 'Two-Component', name: 'Snake', target: 'geo', diff: { da: -2, di: 0.02 }, span: 3, range: 'small', scale: 'mag',
+          notice: 'Size and tilt differ, shape does not: chase drifts forward along the track while it swings left and right once per rev. Seen from above, the path winds like a snake. Turn the 3D box to Above to see it.' },
         { group: 'Three-Component', name: 'Corkscrew', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag',
           notice: 'Size, shape, and tilt all differ: a drifting NMC that also swings side to side. A corkscrew. Turn the 3D box to see it.' }
     ];
@@ -76,7 +78,7 @@
         preset: PRESETS.findIndex(p => p.name === DEFAULT_PRESET),
         target: null, diff: null,
         range: 'small', span: 2,
-        t: 0, playing: true, speed: 0.05,
+        t: 0, playing: true, speed: 0.02,
         trail: 'full', roll: 1, stepSize: 0.0625,
         scale: 'mag', mag: 'auto',
         frame: 'ECI', camera: 'earth',

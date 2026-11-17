@@ -168,9 +168,9 @@
                             <input type="range" id="scrubber" min="0" max="1000" step="1" value="0">
                         </div>
                         <div class="segmented" id="speed" role="group" aria-label="Speed">
-                            <button type="button" data-value="0.05" aria-pressed="true">Slow</button>
-                            <button type="button" data-value="0.1" aria-pressed="false">Normal</button>
-                            <button type="button" data-value="0.25" aria-pressed="false">Fast</button>
+                            <button type="button" data-value="0.01" aria-pressed="false">Slow</button>
+                            <button type="button" data-value="0.02" aria-pressed="true">Normal</button>
+                            <button type="button" data-value="0.05" aria-pressed="false">Fast</button>
                         </div>
                     </div>
                     <div class="ctl-row">
@@ -292,6 +292,7 @@
                             <li><b>Drift</b>: chase slides steadily along the track, backward when its orbit is larger, forward when smaller.</li>
                             <li><b>Drifting NMC</b>: both at once, NMC loops that walk along the track.</li>
                             <li><b>Cross-Track NMC</b>: an NMC that also swings left and right of the target’s plane, so the ellipse tilts but stays put.</li>
+                            <li><b>Snake</b>: a drift that also swings left and right of the target’s plane; from above it winds like a snake.</li>
                             <li><b>Course model</b>: the linear (CW) equations, good for a circular target orbit and a chase close to it.</li>
                             <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track.</li>
                         </ul>

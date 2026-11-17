@@ -478,6 +478,88 @@
         // when looking down at the target.
         const BG_FOV = 38;
         let backdropOn = true, insetOn = false, orbitOn = true, orbitKey = '', haveBasis = false, orbitR = 1;
+        // A closed line a few pixels wide (WebGL draws ordinary lines 1 pixel wide on most systems).
+        // Each segment is a quad widened in screen space; a segment that runs behind the camera is
+        // cut at the near plane. setPoints(points, count) takes a Float32Array of count x, y, z.
+        const TRACE_PX = 2.5;
+        function fatLoop(color, opacity) {
+            const mat = new THREE.ShaderMaterial({
+                uniforms: {
+                    color: { value: new THREE.Color(color) }, opacity: { value: opacity },
+                    width: { value: TRACE_PX }, resolution: { value: new THREE.Vector2(1, 1) }
+                },
+                vertexShader: [
+                    'uniform float width;',
+                    'uniform vec2 resolution;',
+                    'attribute vec3 end;',
+                    'attribute vec2 corner;',
+                    'void main() {',
+                    '    vec4 s = modelViewMatrix * vec4(position, 1.0);',
+                    '    vec4 e = modelViewMatrix * vec4(end, 1.0);',
+                    '    float nz = -0.5 * projectionMatrix[3][2] / projectionMatrix[2][2];',
+                    '    if (s.z > nz && e.z > nz) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }',
+                    '    float cut = (nz - s.z) / (e.z - s.z);',
+                    '    if (s.z > nz) s.xyz = mix(s.xyz, e.xyz, cut);',
+                    '    else if (e.z > nz) e.xyz = mix(s.xyz, e.xyz, cut);',
+                    '    vec4 cs = projectionMatrix * s;',
+                    '    vec4 ce = projectionMatrix * e;',
+                    '    vec2 d = (ce.xy / ce.w - cs.xy / cs.w) * resolution;',
+                    '    float l = length(d);',
+                    '    vec2 nrm = l > 1e-6 ? vec2(-d.y, d.x) / l : vec2(0.0, 1.0);',
+                    '    vec4 c = corner.x < 0.5 ? cs : ce;',
+                    '    c.xy += nrm * corner.y * width / resolution * c.w;',
+                    '    gl_Position = c;',
+                    '}'
+                ].join('\n'),
+                fragmentShader: [
+                    'uniform vec3 color;',
+                    'uniform float opacity;',
+                    'void main() {',
+                    '    gl_FragColor = vec4(color, opacity);',
+                    '    #include <colorspace_fragment>',
+                    '}'
+                ].join('\n'),
+                transparent: true, depthWrite: false, side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+            mesh.frustumCulled = false;
+            mesh.visible = false;
+            mesh.userData.ready = false;
+            let n = 0, startArr = null, endArr = null;
+            mesh.setPoints = (pts, count) => {
+                if (count !== n) {
+                    n = count;
+                    startArr = new Float32Array(n * 12);
+                    endArr = new Float32Array(n * 12);
+                    const corner = new Float32Array(n * 8), index = new Uint32Array(n * 6);
+                    for (let k = 0; k < n; k++) {
+                        corner.set([0, -1, 0, 1, 1, -1, 1, 1], 8 * k);
+                        const v = 4 * k;
+                        index.set([v, v + 2, v + 1, v + 2, v + 3, v + 1], 6 * k);
+                    }
+                    mesh.geometry.dispose();
+                    const g = new THREE.BufferGeometry();
+                    g.setAttribute('position', new THREE.BufferAttribute(startArr, 3));
+                    g.setAttribute('end', new THREE.BufferAttribute(endArr, 3));
+                    g.setAttribute('corner', new THREE.BufferAttribute(corner, 2));
+                    g.setIndex(new THREE.BufferAttribute(index, 1));
+                    mesh.geometry = g;
+                }
+                for (let k = 0; k < n; k++) {
+                    const a = 3 * k, b = 3 * ((k + 1) % n);
+                    for (let j = 0; j < 4; j++) {
+                        const o = 12 * k + 3 * j;
+                        startArr[o] = pts[a]; startArr[o + 1] = pts[a + 1]; startArr[o + 2] = pts[a + 2];
+                        endArr[o] = pts[b]; endArr[o + 1] = pts[b + 1]; endArr[o + 2] = pts[b + 2];
+                    }
+                }
+                mesh.geometry.getAttribute('position').needsUpdate = true;
+                mesh.geometry.getAttribute('end').needsUpdate = true;
+                mesh.userData.ready = true;
+            };
+            mesh.setResolution = (wd, ht) => mat.uniforms.resolution.value.set(Math.max(1, wd), Math.max(1, ht));
+            return mesh;
+        }
         const bg = (() => {
             if (!window.EarthScene || !window.RpoMath) return null;
             const bgScene = new THREE.Scene();
@@ -507,16 +589,10 @@
             bgScene.add(marker, radial);
             // The target's whole orbit, in ECI inside the world group, so it passes through the
             // target and curves down around Earth as the frame turns.
-            const orbit = new THREE.LineLoop(new THREE.BufferGeometry(),
-                new THREE.LineBasicMaterial({ color: COLORS.target, transparent: true, opacity: 0.55 }));
-            orbit.frustumCulled = false;
-            orbit.visible = false;
+            const orbit = fatLoop(COLORS.target, 0.6);
             world.add(orbit);
             // The chase's whole orbit, the same way, from its position and velocity now.
-            const chaseOrbit = new THREE.LineLoop(new THREE.BufferGeometry(),
-                new THREE.LineBasicMaterial({ color: COLORS.chase, transparent: true, opacity: 0.55 }));
-            chaseOrbit.frustumCulled = false;
-            chaseOrbit.visible = false;
+            const chaseOrbit = fatLoop(COLORS.chase, 0.6);
             world.add(chaseOrbit);
             return { scene: bgScene, camera: bgCamera, world, holder, earth, stars, insetCamera, marker, radial, orbit, chaseOrbit };
         })();
@@ -573,6 +649,7 @@
             renderer.setScissor(x, y, iw, ih);
             renderer.setClearColor(0x03060c, 1);
             renderer.clear();
+            bg.orbit.setResolution(iw, ih); bg.chaseOrbit.setResolution(iw, ih);
             renderer.render(bg.scene, ic);
             renderer.setClearColor(0x000000, 0);
             renderer.setScissorTest(false);
@@ -592,9 +669,7 @@
                     const r = M.coesToRv({ a: coe.a, e: coe.e, i: coe.i, raan: coe.raan, argp: coe.argp, nu: k * 360 / count }).r;
                     arr[3 * k] = r[0] / RE; arr[3 * k + 1] = r[1] / RE; arr[3 * k + 2] = r[2] / RE;
                 }
-                bg.orbit.geometry.dispose();
-                bg.orbit.geometry = new THREE.BufferGeometry();
-                bg.orbit.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+                bg.orbit.setPoints(arr, count);
                 orbitKey = key;
             }
             bg.orbit.visible = orbitOn;
@@ -625,9 +700,7 @@
                 const rr = p / (1 + e * Math.cos(nu)) / RE, c = Math.cos(nu), s = Math.sin(nu);
                 for (let a = 0; a < 3; a++) chaseRing[3 * k + a] = rr * (c * P[a] + s * Q[a]);
             }
-            const g = bg.chaseOrbit.geometry;
-            if (!g.getAttribute('position')) g.setAttribute('position', new THREE.BufferAttribute(chaseRing, 3));
-            else g.getAttribute('position').needsUpdate = true;
+            bg.chaseOrbit.setPoints(chaseRing, CHASE_RING);
             bg.chaseOrbit.visible = orbitOn;
         }
         function setBackdropFrame(basis, rT, t) {
@@ -793,6 +866,7 @@
                 bg.stars.follow(bg.camera);
                 renderer.autoClear = false;
                 renderer.clear();
+                bg.orbit.setResolution(w, h); bg.chaseOrbit.setResolution(w, h);
                 renderer.render(bg.scene, bg.camera);
                 renderer.clearDepth();
                 renderer.render(scene, camera);
@@ -882,7 +956,7 @@
             setInset(on) { if (insetOn !== !!on) { insetOn = !!on; render(); } },
             // The target's and chase's orbits traced through the backdrop (on by default); they need
             // targetCoe and chaseRv ({ r, v } in ECI, km and km/s) in update().
-            setOrbit(on) { if (orbitOn !== !!on) { orbitOn = !!on; if (bg) { bg.orbit.visible = orbitOn && !!orbitKey; bg.chaseOrbit.visible = orbitOn && !!bg.chaseOrbit.geometry.getAttribute('position'); } render(); } },
+            setOrbit(on) { if (orbitOn !== !!on) { orbitOn = !!on; if (bg) { bg.orbit.visible = orbitOn && !!orbitKey; bg.chaseOrbit.visible = orbitOn && bg.chaseOrbit.userData.ready; } render(); } },
             chaseOrbitShown: () => !!(bg && bg.chaseOrbit.visible),
             orbitShown: () => !!(bg && bg.orbit.visible),
             hasBackdrop: () => !!(bg && backdropOn && haveBasis),

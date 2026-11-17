@@ -16,7 +16,7 @@
         { value: 'stationary-nmc', html: 'NMC' },
         { value: 'drifting-nmc', html: 'Drifting NMC' },
         { value: 'cross-track', html: 'Cross-track motion' },
-        { value: 'drifting-cross-track', html: 'Drift with cross-track motion' },
+        { value: 'drifting-cross-track', html: 'Snake' },
         { value: 'nmc-cross-track', html: 'Cross-Track NMC' },
         { value: 'corkscrew', html: 'Corkscrew' }
     ];

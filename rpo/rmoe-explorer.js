@@ -46,6 +46,8 @@
         { group: 'Two-Component', name: 'Drifting NMC', rmoe: { xc: 2, C: 6, yc0: 40 }, notice: 'An NMC whose center is 2 km above the target, so the loops walk backward about 19 km each rev. Below the target they walk forward.' },
         { group: 'Two-Component', name: 'Cross-Track NMC', rmoe: { C: 10, zmax: 10 }, second: 'box',
           notice: 'The NMC from before, plus a 10 km swing left and right once per rev. The ellipse tilts out of the target’s plane but still closes on itself, because x_C = 0. ΔM_0 sets which way it tilts.' },
+        { group: 'Two-Component', name: 'Snake', rmoe: { xc: -1.5, zmax: 10, yc0: -40 }, second: 'above',
+          notice: 'A drift and a swing with no ellipse: x_C = −1.5 km walks chase forward about 14 km each rev while it swings 10 km left and right. From above the path winds like a snake.' },
         { group: 'Three-Component', name: 'Corkscrew', rmoe: { xc: -1.5, C: 5, zmax: 5, yc0: -40, dM0: 270 }, second: 'box',
           notice: 'Drift, ellipse, and swing together: a corkscrew. In the 3D box, ΔM_0 decides which part of each loop is farthest to the side.' }
     ];
@@ -60,7 +62,7 @@
         preset: PRESETS.findIndex(p => p.name === DEFAULT_PRESET),
         target: 'geo',
         rmoe: { ...ZERO },
-        t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.05,
+        t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
         second: 'behind',
         annot: { center: true, size: false, corners: false, cross: false },
         hot: null, lastRow: null,

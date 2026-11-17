@@ -19,7 +19,7 @@
           types: [['random', 'Random'], ['arrows', 'Arrows'], ['cards', 'Cards']] },
         { key: 'motion', label: 'Elements to Motion', module: window.Test2MotionProblems,
           types: [['random', 'Random'], ['perch', 'Perch'], ['linear-drift', 'Drift'], ['stationary-nmc', 'NMC'],
-              ['drifting-nmc', 'Drifting NMC'], ['cross-track', 'Cross-Track'], ['drifting-cross-track', 'Drift + Cross-Track'],
+              ['drifting-nmc', 'Drifting NMC'], ['cross-track', 'Cross-Track'], ['drifting-cross-track', 'Snake'],
               ['nmc-cross-track', 'Cross-Track NMC'], ['corkscrew', 'Corkscrew']] },
         { key: 'concepts', label: 'Concepts', module: window.Test2ConceptsProblems,
           types: [['random', 'Random'], ['assumptions', 'CW Assumptions'], ['rmoe', 'RMOEs'], ['elements', 'Elements'], ['burns', 'Burns']] }
