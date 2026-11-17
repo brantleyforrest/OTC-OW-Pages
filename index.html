@@ -61,24 +61,22 @@
         }
 
         .nav-inner {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 0 1.5rem;
-            height: 60px;
+            padding: 0 24px;
+            height: 52px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 1rem;
+            gap: 16px;
         }
 
         .nav-brand {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 12px;
             text-decoration: none;
             color: #ffffff;
             font-weight: 700;
-            font-size: 1.05rem;
+            font-size: 16.8px;
             letter-spacing: -0.01em;
             transition: opacity 0.2s;
             flex-shrink: 0;
@@ -103,17 +101,17 @@
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 8px;
         }
 
         .nav-link {
             display: inline-flex;
             align-items: center;
-            gap: 0.45rem;
-            padding: 0.5rem 0.9rem;
+            gap: 7.2px;
+            padding: 8px 14.4px;
             border-radius: 6px;
             text-decoration: none;
-            font-size: 0.88rem;
+            font-size: 14.08px;
             font-weight: 500;
             color: var(--text-muted);
             transition: all 0.2s ease;
@@ -175,30 +173,21 @@
             to { opacity: 1; }
         }
 
-        /* Hero Header */
+        /* Each view's title is kept for screen readers only. The active tab names the view on screen. */
         header.hero {
-            padding: 3.5rem 1.5rem 2.5rem;
-            max-width: 900px;
-            margin: 0 auto;
-            text-align: center;
-            width: 100%;
-        }
-
-        .hero h1 {
-            font-size: clamp(2rem, 5.5vw, 2.85rem);
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            line-height: 1.2;
-            background: linear-gradient(135deg, #ffffff 40%, #c5d4ea 80%, var(--accent-gold) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
         }
 
         /* Main Content Layout */
         main.content {
             max-width: 900px;
             margin: 0 auto;
-            padding: 0.5rem 1.5rem 4rem;
+            padding: 1.5rem 1.5rem 4rem;
             width: 100%;
             flex-grow: 1;
         }
@@ -826,14 +815,14 @@
             }
 
             .nav-inner {
-                padding: 0 1rem;
-                height: 54px;
-                gap: 0.5rem;
+                padding: 0 16px;
+                height: 52px;
+                gap: 8px;
             }
 
             .nav-brand {
-                font-size: 0.95rem;
-                gap: 0.5rem;
+                font-size: 15.2px;
+                gap: 8px;
             }
 
             .nav-brand-icon {
@@ -847,13 +836,13 @@
             }
 
             .nav-links {
-                gap: 0.25rem;
+                gap: 4px;
             }
 
             .nav-link {
-                padding: 0.4rem 0.55rem;
-                font-size: 0.78rem;
-                gap: 0.3rem;
+                padding: 6.4px 8.8px;
+                font-size: 12.48px;
+                gap: 4.8px;
             }
 
             .nav-link svg {
@@ -874,12 +863,8 @@
                 display: none;
             }
 
-            header.hero {
-                padding: 2.25rem 1rem 1.75rem;
-            }
-
             main.content {
-                padding: 0.25rem 1rem 3rem;
+                padding: 1rem 1rem 3rem;
             }
 
             .portal-card {
@@ -904,16 +889,12 @@
            conditions keep laptops and desktops out, however small the window. */
         @media (max-width: 640px) and (orientation: portrait),
                (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+            .nav-inner {
+                height: 44px;
+            }
+
             .nav-link {
                 min-height: 44px;
-            }
-
-            #view-tools header.hero {
-                padding: 0.75rem 1rem 0.6rem;
-            }
-
-            #view-tools .hero h1 {
-                font-size: 1.4rem;
             }
 
             .search-toolbar {
@@ -1062,22 +1043,8 @@
             }
         }
 
-        /* Rotated phones: height is scarce, so lessons sit side by side and the nav bar shrinks.
-           The page title stays available to screen readers, and the Tools tab shows it on screen. */
+        /* Rotated phones: height is scarce, so lessons sit side by side. */
         @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-            .nav-inner {
-                height: 48px;
-            }
-
-            #view-tools header.hero {
-                position: absolute;
-                width: 1px;
-                height: 1px;
-                padding: 0;
-                overflow: hidden;
-                clip-path: inset(50%);
-            }
-
             #view-tools main.content {
                 padding-top: 0.6rem;
                 padding-bottom: 1.5rem;
@@ -1220,11 +1187,11 @@
 
             <!-- Tools Container -->
             <div id="lessons-container">
-                <!-- Two Views is published; the other relative frame pages are still dev-only. -->
+                <!-- Two Views and RMOE Explorer are published; the other relative frame pages are still dev-only. -->
                 <details class="lesson-group" open>
                     <summary class="lesson-summary">
                         <div class="lesson-meta"><h2 class="lesson-title">Relative Frame</h2></div>
-                        <div class="lesson-controls"><span class="lesson-count"><span class="dev-only">4 tools</span><span class="public-only">1 tool</span></span><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+                        <div class="lesson-controls"><span class="lesson-count"><span class="dev-only">4 tools</span><span class="public-only">2 tools</span></span><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
                     </summary>
                     <div class="lesson-content">
                         <div class="tool-grid">
@@ -1243,7 +1210,7 @@
                             <p class="card-desc">Two spacecraft on two orbits around Earth, seen from space and seen from one of them. Change how the orbits differ and watch both views on the same clock.</p>
                             <a href="rpo/two-views.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
-                        <div class="tool-card dev-only" data-tags="rmoe relative motion orbital elements ric nmc natural motion circumnavigation drift perch corkscrew cw clohessy wiltshire chase target rpo">
+                        <div class="tool-card" data-tags="rmoe relative motion orbital elements ric nmc natural motion circumnavigation drift perch corkscrew cw clohessy wiltshire chase target rpo">
                             <div class="card-top">
                                 <div class="card-icon">
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1252,7 +1219,6 @@
                                         <circle cx="18.7" cy="8.6" r="1.8" fill="currentColor"></circle>
                                     </svg>
                                 </div>
-                                <span class="status-pill wip">Work in Progress</span>
                             </div>
                             <h2 class="card-title">RMOE Explorer</h2>
                             <p class="card-desc">Six numbers describe any relative motion. Change each relative motion orbital element and see the one thing it moves, in the RIC frame and in the inertial frame side by side.</p>

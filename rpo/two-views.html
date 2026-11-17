@@ -156,13 +156,13 @@
     <main class="tool-main">
         <div class="tool-layout">
             <div class="col tool-stage-col">
-                <p class="tool-intro">Two spacecraft on two orbits around Earth, seen from space and seen from one of them. Change how the orbits differ and watch both.</p>
+                <p class="tool-intro" data-advanced>Two spacecraft on two orbits around Earth, seen from space and seen from one of them. Change how the orbits differ and watch both.</p>
 
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view" aria-label="The inertial view, a 3D RIC box, and the views from the left, from behind, and from above"></div>
                 </div>
 
-                <div class="panel controls">
+                <div class="panel controls" data-advanced>
                     <div class="ctl-row">
                         <div class="buttons">
                             <button class="btn primary" id="play" type="button">Pause</button>
@@ -221,6 +221,9 @@
 
             <aside class="tool-side">
                 <div class="col">
+                    <div class="mode-row">
+                        <button class="mode-switch" type="button" aria-checked="false" title="Show every control, readout, and note"><span class="track" aria-hidden="true"></span>Advanced</button>
+                    </div>
                     <div class="panel accent">
                         <div class="panel-title">Orbits</div>
                         <div class="preset-row">
@@ -231,7 +234,7 @@
                             <span>Target</span>
                             <div class="segmented" id="target-pick" role="group" aria-label="Target orbit">
                                 <button type="button" data-value="geo" aria-pressed="false">GEO</button>
-                                <button type="button" data-value="gps" aria-pressed="false">GPS-type</button>
+                                <button type="button" data-value="gps" aria-pressed="false">MEO</button>
                                 <button type="button" data-value="leo" aria-pressed="false">LEO</button>
                             </div>
                             <!-- Hidden (owner, 2026-11-17): the slider ranges stay on Small; remove display: none to bring the setting back. -->
@@ -242,7 +245,7 @@
                             </div>
                         </div>
                         <div class="el-table" id="el-table"></div>
-                        <div class="sub-row" id="starts-row">
+                        <div class="sub-row" id="starts-row" data-advanced>
                             <span>Chase starts at</span>
                             <div class="segmented" id="starts" role="group" aria-label="Where chase starts on its orbit">
                                 <button type="button" data-value="0" aria-pressed="false">Bottom</button>
@@ -252,10 +255,10 @@
                             </div>
                         </div>
                         <div class="el-msg" id="el-msg" role="status"></div>
-                        <ul class="el-notes" id="el-notes"></ul>
+                        <ul class="el-notes" id="el-notes" data-advanced></ul>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">View Options</div>
                         <div class="opt-row">
                             <span class="opt-label">Scale</span>
@@ -275,11 +278,6 @@
                                 <button type="button" data-value="ECI" aria-pressed="true">ECI</button>
                                 <button type="button" data-value="ECEF" aria-pressed="false">ECEF</button>
                             </div>
-                            <span class="opt-label">Camera</span>
-                            <div class="segmented" id="camera-pick" role="group" aria-label="Camera">
-                                <button type="button" data-value="earth" aria-pressed="true">Earth</button>
-                                <button type="button" data-value="ride" aria-pressed="false">Ride Along</button>
-                            </div>
                         </div>
                         <!-- Hidden options (display: none) keep their controls and code and stay at their defaults. -->
                         <div class="ctl-checks">
@@ -296,12 +294,12 @@
                         </div>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">What to Notice</div>
                         <p class="panel-text" id="notice"></p>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">Live Values</div>
                         <div class="live-head">Time</div>
                         <div class="stat-grid">
@@ -340,7 +338,7 @@
                         <p class="panel-text muted" id="lv-nomodel" style="margin-top: 0.4rem;">The target's orbit is not circular, so the course model (RMOEs) does not apply.</p>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">Key Terms</div>
                         <ul class="terms">
                             <li><b>Target</b> (green square): the spacecraft the RIC frame rides on. It is the origin.</li>

@@ -97,40 +97,48 @@
 .rpo-stage > * + * { border-top: 1px solid var(--border-subtle); }
 
 /* ---------- Five-view stage (Tool 1) ----------
-   Stacked: inertial 38 percent of the height, the 3D box 34, the three flat panes 28. */
-.rpo-five .rpo-inertial { flex: 0 0 38%; }
-.rpo-five .rpo-ricside { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
-.rpo-five .rpo-box { flex: 0 0 54.8%; }
+   (owner, 2026-11-17) The inertial pane and the 3D RIC box side by side on top, 62 percent of
+   the height; the three flat panes in a row across the full width below. .rpo-ricside takes no
+   box of its own (display: contents), so the box and the flat panes sit straight in the grid. */
+.rpo-stage.rpo-five {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 62fr) minmax(0, 38fr);
+    grid-template-areas: "eci box" "planes planes";
+}
+.rpo-five .rpo-ricside { display: contents; }
+.rpo-five .rpo-inertial { grid-area: eci; }
+.rpo-five .rpo-box { grid-area: box; border-top: 0; border-left: 1px solid var(--border-subtle); }
 .rpo-five .rpo-planes {
-    flex: 1 1 0;
+    grid-area: planes;
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    background: #0d1828;
     border-top: 1px solid var(--border-subtle);
 }
-.rpo-five .rpo-planes .rpo-pane + .rpo-pane { border-top: 0; border-left: 1px solid var(--border-subtle); }
-
-@container (min-aspect-ratio: 3/2) {
-    .rpo-five { flex-direction: row; }
-    .rpo-five .rpo-inertial { flex: 0 0 42%; }
-    .rpo-five > * + * { border-top: 0; border-left: 1px solid var(--border-subtle); }
-    .rpo-five .rpo-box { flex: 0 0 58%; }
+/* Each flat pane framed on its own, so the 2D planes read apart from the 3D views above. */
+.rpo-five .rpo-planes .rpo-pane {
+    border: 1px solid #2a4266;
+    border-radius: 6px;
 }
+.rpo-five .rpo-planes .rpo-pane + .rpo-pane { border-top: 1px solid #2a4266; border-left: 1px solid #2a4266; }
 
-/* Small stage (phones): only the two 3D frames, the inertial pane and the 3D RIC box
+/* Small stage (phones): only the two 3D frames, the inertial pane above the 3D RIC box
    (owner, 2026-11-17). The flat panes and the pane switch are hidden; the box still turns by drag. */
 @container (max-width: 519px), (max-height: 419px) {
+    .rpo-stage.rpo-five {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-areas: "eci" "box";
+    }
+    .rpo-five .rpo-box { border-left: 0; border-top: 1px solid var(--border-subtle); }
     .rpo-five .rpo-viewbuttons.segmented { display: none; }
-    .rpo-five .rpo-inertial { flex: 1 1 0; }
-    .rpo-five .rpo-ricside { flex: 1 1 0; }
-    .rpo-five .rpo-box { flex: 1 1 0; }
     .rpo-five .rpo-planes { display: none; }
     /* A narrow inertial pane: lift its scale bar above the "Offsets magnified" label. */
     .rpo-five .rpo-inertial .rpo-scalebar { bottom: 1.6rem; }
-}
-@container (max-width: 519px) and (min-aspect-ratio: 1/1), (max-height: 419px) and (min-aspect-ratio: 1/1) {
-    .rpo-five { flex-direction: row; }
-    .rpo-five > * + * { border-top: 0; border-left: 1px solid var(--border-subtle); }
 }
 
 /* ---------- Dual stage (Tools 2 to 4, practice) ----------
@@ -209,12 +217,6 @@
 }
 .rpo-scalebar span { font-weight: 400; color: var(--text-muted); }
 
-/* A wide five-view stage that is not very wide: give the RIC side more room, so the three flat
-   panes are not too small to read (13-inch laptops at 150 percent scaling). */
-@container (min-aspect-ratio: 3/2) and (max-width: 940px) {
-    .rpo-five .rpo-inertial { flex-basis: 34%; }
-    .rpo-five .rpo-box { flex-basis: 50%; }
-}
 /* In the dual stage the 3D view buttons sit at the bottom of the second pane: keep the bar above them. */
 .rpo-dual .rpo-second .rpo-scalebar.left { bottom: 2.1rem; }
 

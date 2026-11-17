@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex">
     <title>RMOE Explorer | OTC OW</title>
     <meta name="description" content="Set the six relative motion orbital elements (RMOEs) with sliders and watch what each one does to the motion: the RIC views from the left, from behind, and from above, a 3D RIC box, and an inertial view, with the boundary tables and the chase orbit they imply.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -149,13 +148,13 @@
     <main class="tool-main">
         <div class="tool-layout">
             <div class="col tool-stage-col">
-                <p class="tool-intro">Six numbers describe any relative motion in the course model, and each one moves one thing in the picture. Move a slider and watch which part changes.</p>
+                <p class="tool-intro" data-advanced>Six numbers describe any relative motion in the course model, and each one moves one thing in the picture. Move a slider and watch which part changes.</p>
 
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view" aria-label="The inertial view, the 3D RIC box, and the RIC views from the left, from behind, and from above"></div>
                 </div>
 
-                <div class="panel controls">
+                <div class="panel controls" data-advanced>
                     <div class="ctl-row">
                         <div class="buttons">
                             <button class="btn primary" id="play" type="button">Pause</button>
@@ -195,6 +194,9 @@
 
             <aside class="tool-side">
                 <div class="col">
+                    <div class="mode-row">
+                        <button class="mode-switch" type="button" aria-checked="false" title="Show every control, readout, and note"><span class="track" aria-hidden="true"></span>Advanced</button>
+                    </div>
                     <div class="panel accent">
                         <div class="panel-title">RMOEs</div>
                         <div class="preset-row">
@@ -205,15 +207,15 @@
                             <span>Target</span>
                             <div class="segmented" id="target-pick" role="group" aria-label="Target orbit">
                                 <button type="button" data-value="geo" aria-pressed="true">GEO</button>
-                                <button type="button" data-value="gps" aria-pressed="false">GPS-type</button>
+                                <button type="button" data-value="gps" aria-pressed="false">MEO</button>
                                 <button type="button" data-value="leo" aria-pressed="false">LEO</button>
                             </div>
                         </div>
                         <div class="rm-table" id="rm-table">
                             <span class="rm-head"></span><span class="rm-head"></span><span class="rm-head">Epoch</span><span class="rm-head">Now</span>
                         </div>
-                        <div class="live-head">At epoch, in the RIC frame</div>
-                        <div class="stat-grid three">
+                        <div class="live-head" data-advanced>At epoch, in the RIC frame</div>
+                        <div class="stat-grid three" data-advanced>
                             <div class="stat-item"><span class="stat-label">R (km)</span><span class="stat-value small" id="s-x"></span></div>
                             <div class="stat-item"><span class="stat-label">I (km)</span><span class="stat-value small" id="s-y"></span></div>
                             <div class="stat-item"><span class="stat-label">C (km)</span><span class="stat-value small" id="s-z"></span></div>
@@ -221,22 +223,17 @@
                             <div class="stat-item"><span class="stat-label">İ (m/s)</span><span class="stat-value small" id="s-vy"></span></div>
                             <div class="stat-item"><span class="stat-label">Ċ (m/s)</span><span class="stat-value small" id="s-vz"></span></div>
                         </div>
-                        <div class="motion-name" id="motion"></div>
-                        <p class="panel-text muted" id="drift-read"></p>
+                        <div class="motion-name" id="motion" data-advanced></div>
+                        <p class="panel-text muted" id="drift-read" data-advanced></p>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">View Options</div>
                         <div class="opt-row">
                             <span class="opt-label">Frame</span>
                             <div class="segmented" id="frame-pick" role="group" aria-label="Inertial frame">
                                 <button type="button" data-value="ECI" aria-pressed="true">ECI</button>
                                 <button type="button" data-value="ECEF" aria-pressed="false">ECEF</button>
-                            </div>
-                            <span class="opt-label">Camera</span>
-                            <div class="segmented" id="camera-pick" role="group" aria-label="Camera">
-                                <button type="button" data-value="earth" aria-pressed="true">Earth</button>
-                                <button type="button" data-value="ride" aria-pressed="false">Ride Along</button>
                             </div>
                         </div>
                         <div class="mag-row" id="mag-row">
@@ -254,19 +251,19 @@
                         </div>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">What to Notice</div>
                         <p class="panel-text" id="notice"></p>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">Boundary Tables</div>
                         <p class="panel-text muted">Where chase is at each corner of the NMC and each point of the cross-track swing, now. The row nearest chase is marked.</p>
                         <div class="table-wrap"><table class="rpo-table" id="bt-plane"></table></div>
                         <div class="table-wrap"><table class="rpo-table" id="bt-cross"></table></div>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">Chase Orbit</div>
                         <div class="stat-grid">
                             <div class="stat-item"><span class="stat-label">a<sub>chase</sub> − a<sub>target</sub></span><span class="stat-value small" id="co-da"></span></div>
@@ -276,7 +273,7 @@
                         </div>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" data-advanced>
                         <div class="panel-title">Key Terms</div>
                         <ul class="terms">
                             <li><b>Target</b> (green square): the origin of the RIC frame. <b>Chase</b> (gold triangle): the other spacecraft.</li>

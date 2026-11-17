@@ -27,7 +27,7 @@
 
     const ORBITS = {
         geo: { key: 'geo', label: 'GEO', a: 42164, i: 0, raan: 0, ecef: true },
-        gps: { key: 'gps', label: 'GPS-type', a: 26562, i: 55, raan: 30, ecef: false },
+        gps: { key: 'gps', label: 'MEO', a: 26562, i: 55, raan: 30, ecef: false },
         leo: { key: 'leo', label: 'LEO', a: 7000, i: 51.6, raan: 30, ecef: false }
     };
 

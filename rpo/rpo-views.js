@@ -469,7 +469,12 @@
                 color: { value: new THREE.Color(color) }, opacity: { value: opacity },
                 width: { value: widthPx || TRACE_PX }, resolution: { value: new THREE.Vector2(1, 1) }
             },
+            // The logdepthbuf chunks matter in the inertial pane, whose renderer has a logarithmic
+            // depth buffer: without them the traces' depth is not comparable with Earth's, and Earth
+            // hides every part of a trace, even the parts in front of it.
             vertexShader: [
+                '#include <common>',
+                '#include <logdepthbuf_pars_vertex>',
                 'uniform float width;',
                 'uniform vec2 resolution;',
                 'attribute vec3 end;',
@@ -493,12 +498,15 @@
                 '    vec4 c = corner.x < 0.5 ? cs : ce;',
                 '    c.xy += nrm * corner.y * width / resolution * c.w;',
                 '    gl_Position = c;',
+                '    #include <logdepthbuf_vertex>',
                 '}'
             ].join('\n'),
             fragmentShader: [
+                '#include <logdepthbuf_pars_fragment>',
                 'uniform vec3 color;',
                 'uniform float opacity;',
                 'void main() {',
+                '    #include <logdepthbuf_fragment>',
                 '    gl_FragColor = vec4(color, opacity);',
                 '    #include <colorspace_fragment>',
                 '}'
@@ -569,6 +577,11 @@
         // when looking down at the target.
         const BG_FOV = 38;
         let backdropOn = true, insetOn = false, orbitOn = true, haveBasis = false, orbitR = 1;
+        // The farthest any drawn orbit ring gets from Earth's center (its apogee), in Earth radii.
+        // The cameras' far planes must reach across Earth to it, or the far side of the ring is cut
+        // off when looking down toward Earth (a GEO ring is 13 Earth radii across).
+        const ringReach = { target: 0, chase: 0 };
+        const reach = () => Math.max(orbitR, ringReach.target, ringReach.chase);
         const bg = (() => {
             if (!window.EarthScene || !window.RpoMath) return null;
             const bgScene = new THREE.Scene();
@@ -645,7 +658,7 @@
             ic.lookAt(0, 0, mid);
             ic.aspect = iw / ih;
             ic.near = dist * 0.05;
-            ic.far = (dist + orbitR + 3) * 1.3;
+            ic.far = (dist + orbitR / 2 + reach() + 1) * 1.1;
             ic.updateProjectionMatrix();
             const wasHolder = bg.holder.visible;
             bg.holder.visible = true;
@@ -672,7 +685,8 @@
         // up to 0.4 km at GEO, so the target seemed to shake against it as it moved.)
         const RING = 1440;
         const targetRing = new Float32Array(RING * 3), chaseRing = new Float32Array(RING * 3);
-        function setRing(mesh, arr, rv) {
+        function setRing(mesh, arr, rv, key) {
+            ringReach[key] = 0;
             const M = window.RpoMath, RE = M.RE, MU = M.MU;
             const ok = rv && rv.r && rv.v;
             const r = ok ? rv.r : null, v = ok ? rv.v : null;
@@ -695,10 +709,11 @@
             }
             mesh.setPoints(arr, RING);
             mesh.visible = orbitOn;
+            ringReach[key] = p / (1 - e) / RE;
         }
         // The target's ring needs its velocity (basis.v) as well as rT.
-        function setOrbit(rv) { if (bg) setRing(bg.orbit, targetRing, rv); }
-        function setChaseOrbit(rv) { if (bg) setRing(bg.chaseOrbit, chaseRing, rv); }
+        function setOrbit(rv) { if (bg) setRing(bg.orbit, targetRing, rv, 'target'); }
+        function setChaseOrbit(rv) { if (bg) setRing(bg.chaseOrbit, chaseRing, rv, 'chase'); }
         function setBackdropFrame(basis, rT, t) {
             if (!bg || !basis || !rT) { haveBasis = false; return; }
             const M = window.RpoMath, RE = M.RE;
@@ -819,6 +834,27 @@
         // Scale bar, bottom left: a length on screen for a line that faces the viewer, the same as
         // the tick spacing on the axes when that is long enough to see.
         const bar = canvas.parentElement ? scaleBarEl(canvas.parentElement, 'left') : null;
+        // The first frame that shows Earth costs the GPU a one-time setup (about 18 ms, a visible
+        // hitch the first time the user looks down). Pay it up front: once, before the first
+        // backdrop frame, draw the backdrop with a camera aimed straight at Earth. The real
+        // frame drawn right after clears and covers it, so it is never seen.
+        let earthWarm = false;
+        function warmUpEarth() {
+            if (earthWarm || !bg) return;
+            earthWarm = true;
+            const cam = new THREE.PerspectiveCamera(BG_FOV, w / h, 0.05, 100);
+            const center = new THREE.Vector3(0, 0, -orbitR);
+            cam.position.set(0, 0, -orbitR + 4);
+            cam.up.set(0, 1, 0);
+            cam.lookAt(center);
+            cam.updateMatrixWorld();
+            const wasHolder = bg.holder.visible;
+            bg.holder.visible = true;
+            bg.stars.follow(cam);
+            bg.orbit.setResolution(w, h); bg.chaseOrbit.setResolution(w, h);
+            renderer.render(bg.scene, cam);
+            bg.holder.visible = wasHolder;
+        }
         function render() {
             const az = view.az * Math.PI / 180, el = view.el * Math.PI / 180;
             const d = half * 10;
@@ -843,6 +879,7 @@
                 if (s.userData.at) s.position.set(s.userData.at[0] * half, s.userData.at[1] * half, s.userData.at[2] * half);
             });
             if (bg && backdropOn && haveBasis) {
+                warmUpEarth();
                 // Look the same way as the box camera, at the target, from the distance at which the
                 // target's depth has the box's scale.
                 const RE = window.RpoMath.RE;
@@ -852,7 +889,7 @@
                 bg.camera.fov = BG_FOV;
                 bg.camera.aspect = w / h;
                 bg.camera.near = D * 0.2;
-                bg.camera.far = D + orbitR + 3;
+                bg.camera.far = D + orbitR + reach() + 3;
                 bg.camera.updateProjectionMatrix();
                 // A camera set back below Earth's surface (a big box seen from below at LEO) would be
                 // inside the globe: leave Earth out then rather than draw it inside out.
@@ -1135,8 +1172,33 @@
         }));
         scene.add(equator);
 
+        // Distance rings in the equatorial plane, centered on Earth, in place of a scale bar (a bar
+        // is true at only one depth in a perspective view). The step is the largest of 1,000,
+        // 2,000, 5,000, 10,000, or 20,000 km that still gives three rings outside Earth, out to
+        // 1.2 times the farthest orbit radius. Rings inside Earth are not drawn.
+        const RING_MAX = 8;
+        const ringCircle = new THREE.BufferGeometry().setFromPoints(
+            Array.from({ length: 192 }, (_, j) => new THREE.Vector3(Math.cos(2 * Math.PI * j / 192), Math.sin(2 * Math.PI * j / 192), 0)));
+        const distRings = Array.from({ length: RING_MAX }, () => {
+            const ring = new THREE.LineLoop(ringCircle, new THREE.LineBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.32 }));
+            ring.visible = false;
+            scene.add(ring);
+            return ring;
+        });
+        let ringRadii = [];
+        function buildDistRings() {
+            const outer = 1.2 * s.rFar, inner = 1.02 * RE;
+            const radii = step => { const out = []; for (let r = step; r <= outer && out.length < RING_MAX; r += step) if (r > inner) out.push(r); return out; };
+            const steps = [20000, 10000, 5000, 2000, 1000];
+            const step = steps.find(st => radii(st).length >= 3) || steps[steps.length - 1];
+            ringRadii = radii(step);
+            distRings.forEach((ring, j) => {
+                ring.visible = j < ringRadii.length;
+                if (ring.visible) ring.scale.setScalar(ringRadii[j] / RE);
+            });
+        }
+
         const layer = options.labels && Kit ? new Kit.LabelLayer(options.labels) : null;
-        const sceneBar = canvas.parentElement ? scaleBarEl(canvas.parentElement, 'right') : null;
         const triadLabels = layer ? ['R', 'I', 'C'].map(n => layer.add('<b style="color:#f87171">' + n + '</b>', { rank: 1 })) : [];
         const eciLabels = layer ? ['Î', 'Ĵ', 'K̂'].map(n => layer.add('<b style="color:#60a5fa">' + n + '</b>', { rank: 2, optional: true })) : [];
 
@@ -1181,6 +1243,7 @@
             s.rFar = Math.max(apogee(s.target), s.mag === 1 ? apogee(s.chaseOrbit) : 0, RE * 1.2);
             eciAxes.scale.setScalar(1.25 * s.rFar / RE);
             equator.scale.setScalar(1.25 * s.rFar / RE);
+            buildDistRings();
         }
 
         // ---------- camera ----------
@@ -1341,14 +1404,6 @@
                 layer.place(w, h, options.avoid ? options.avoid() : []);
             }
             if (options.scaleLabel) options.scaleLabel.textContent = k === 1 ? 'True scale' : 'Offsets magnified ' + formatMag(k) + '×';
-            // Scale bar, true at the target's distance from the camera. With magnified offsets the
-            // same bar is also a much shorter distance between chase and target.
-            if (sceneBar) {
-                const dist = camera.position.distanceTo(tPos);
-                const kmPerPxHere = 2 * dist * Math.tan(camera.fov * Math.PI / 360) / h * RE;
-                const km = niceAtLeast(70 * kmPerPxHere);
-                sceneBar.set(km / kmPerPxHere, kmText(km) + ' km' + (k > 1 ? '<br><span>chase to target: ' + kmText(km / k) + ' km</span>' : ''));
-            }
         }
         function formatMag(k) {
             if (k >= 1000) return Math.round(k).toLocaleString('en-US');
@@ -1625,9 +1680,30 @@
         return stage;
     }
 
+    // The Advanced switch (a button.mode-switch in the page). Off, the default, the page shows only
+    // the views and the main adjustments: tool-theme.css hides everything marked data-advanced
+    // until body has the class advanced-on. The choice is remembered per page in this browser.
+    function setupAdvancedSwitch(button) {
+        const key = 'otc-advanced:' + location.pathname;
+        let on = false;
+        try { on = localStorage.getItem(key) === '1'; } catch (e) { /* storage blocked: stay off */ }
+        function apply() {
+            document.body.classList.toggle('advanced-on', on);
+            button.setAttribute('aria-checked', String(on));
+        }
+        button.setAttribute('role', 'switch');
+        button.addEventListener('click', () => {
+            on = !on;
+            apply();
+            try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) { /* not remembered */ }
+        });
+        apply();
+    }
+    if (typeof document !== 'undefined') document.querySelectorAll('.mode-switch').forEach(setupAdvancedSwitch);
+
     const RpoViews = {
         COLORS, PLANES, BOX_VIEWS, createRicPlane, createRicBox, boundingBox, fitPanes, drawThumbnail, gridStep, attachPanZoom,
-        framePath, createInertialView, createFiveViewStage, createDualStage
+        framePath, createInertialView, createFiveViewStage, createDualStage, setupAdvancedSwitch
     };
     if (typeof window !== 'undefined') window.RpoViews = RpoViews;
     if (typeof module !== 'undefined' && module.exports) module.exports = RpoViews;

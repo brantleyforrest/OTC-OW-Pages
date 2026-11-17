@@ -350,7 +350,7 @@
         sel.addEventListener('change', () => loadPreset(Number(sel.value)));
         $('reset-preset').addEventListener('click', () => loadPreset(state.preset));
     }
-    // Preset distances are for GEO; at GPS-type they are halved and at LEO scaled to the LEO ranges.
+    // Preset distances are for GEO; at MEO they are halved and at LEO scaled to the LEO ranges.
     const SCALE = { geo: 1, gps: 0.5, leo: 0.3 };
     function loadPreset(index) {
         const p = PRESETS[index];
@@ -434,7 +434,6 @@
         applyViewOptions();
         dirty = true;
     });
-    Kit.bindSegmented($('camera-pick'), v => { state.camera = v; applyViewOptions(); dirty = true; });
     [['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });

@@ -26,7 +26,7 @@
     function pickTargetA() { return chance(0.6) ? M.GEO_A : pick(OTHER_A); }
     function orbitName(a) {
         if (Math.abs(a - M.GEO_A) < 1) return 'GEO';
-        if (Math.abs(a - 26562) < 1) return 'GPS-type';
+        if (Math.abs(a - 26562) < 1) return 'MEO';
         return 'LEO';
     }
 
