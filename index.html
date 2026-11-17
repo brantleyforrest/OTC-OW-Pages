@@ -705,6 +705,10 @@
         html:not(.dev-mode) .dev-only {
             display: none !important;
         }
+        /* The public text that a dev-only text replaces, such as a group's tool count. */
+        html.dev-mode .public-only {
+            display: none !important;
+        }
 
         /* The dev mode switch sits unseen in the bottom right corner of the page. It shows when
            the pointer is over it, when it has keyboard focus, and while dev mode is on. */
@@ -1216,15 +1220,15 @@
 
             <!-- Tools Container -->
             <div id="lessons-container">
-                <!-- Every relative frame page is still being built, so the whole group is dev-only for now. -->
-                <details class="lesson-group dev-only" open>
+                <!-- Two Views is published; the other relative frame pages are still dev-only. -->
+                <details class="lesson-group" open>
                     <summary class="lesson-summary">
                         <div class="lesson-meta"><h2 class="lesson-title">Relative Frame</h2></div>
-                        <div class="lesson-controls"><span class="lesson-count">4 tools</span><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+                        <div class="lesson-controls"><span class="lesson-count"><span class="dev-only">4 tools</span><span class="public-only">1 tool</span></span><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
                     </summary>
                     <div class="lesson-content">
                         <div class="tool-grid">
-                        <div class="tool-card dev-only" data-tags="relative motion ric eci two views chase target orbital elements difference radial in-track cross-track rpo 3d orbit">
+                        <div class="tool-card" data-tags="relative motion ric eci two views chase target orbital elements difference radial in-track cross-track rpo 3d orbit">
                             <div class="card-top">
                                 <div class="card-icon">
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1234,7 +1238,6 @@
                                         <circle cx="16.8" cy="12" r="1.6" fill="currentColor"></circle>
                                     </svg>
                                 </div>
-                                <span class="status-pill wip">Work in Progress</span>
                             </div>
                             <h2 class="card-title">Relative Motion: Two Views</h2>
                             <p class="card-desc">Two spacecraft on two orbits around Earth, seen from space and seen from one of them. Change how the orbits differ and watch both views on the same clock.</p>

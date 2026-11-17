@@ -217,7 +217,12 @@
             stage.box.setBackdrop(state.backdrop);
             stage.box.setInset(state.inset);
             stage.box.setOrbit(state.orbit3d);
-            stage.box.update({ chase: now, trail, ghost: sim.path, basis, rT: basis.r, t, targetCoe: sim.coe });
+            // Chase's ECI state from the course model: r = rT + rho, v = vT + omega x rho + rho dot.
+            const w = basis.omega;
+            const rho = M.ricToEci(now, basis);
+            const dv = M.ricToEci([now[3] - w * now[1], now[4] + w * now[0], now[5]], basis);
+            const chaseRv = { r: basis.r.map((x, k) => x + rho[k]), v: basis.v.map((x, k) => x + dv[k]) };
+            stage.box.update({ chase: now, trail, ghost: sim.path, basis, rT: basis.r, t, targetCoe: sim.coe, chaseRv });
         }
         if (stage.inertial) {
             // ghost: the whole two-rev path is drawn faintly from the start, so the carried trail never

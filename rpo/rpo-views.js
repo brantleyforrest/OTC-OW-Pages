@@ -512,7 +512,13 @@
             orbit.frustumCulled = false;
             orbit.visible = false;
             world.add(orbit);
-            return { scene: bgScene, camera: bgCamera, world, holder, earth, stars, insetCamera, marker, radial, orbit };
+            // The chase's whole orbit, the same way, from its position and velocity now.
+            const chaseOrbit = new THREE.LineLoop(new THREE.BufferGeometry(),
+                new THREE.LineBasicMaterial({ color: COLORS.chase, transparent: true, opacity: 0.55 }));
+            chaseOrbit.frustumCulled = false;
+            chaseOrbit.visible = false;
+            world.add(chaseOrbit);
+            return { scene: bgScene, camera: bgCamera, world, holder, earth, stars, insetCamera, marker, radial, orbit, chaseOrbit };
         })();
         // The inset's outline and caption, laid over the canvas (the picture itself is drawn in WebGL).
         const insetEl = bg && canvas.parentElement ? (() => {
@@ -593,6 +599,37 @@
             }
             bg.orbit.visible = orbitOn;
         }
+        // The chase's orbit as an ECI ring in Earth radii, from its ECI position (km) and velocity
+        // (km/s). The ring starts at chase's own point, so it passes exactly through chase.
+        const CHASE_RING = 1440;
+        const chaseRing = new Float32Array(CHASE_RING * 3);
+        function setChaseOrbit(rv) {
+            if (!bg) return;
+            const M = window.RpoMath, RE = M.RE, MU = M.MU;
+            const ok = rv && rv.r && rv.v;
+            const r = ok ? rv.r : null, v = ok ? rv.v : null;
+            const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+            const len = a => Math.hypot(a[0], a[1], a[2]);
+            const h = ok ? cross(r, v) : null;
+            const hn = ok ? len(h) : 0, rn = ok ? len(r) : 0;
+            const ev = ok ? cross(v, h).map((x, k) => x / MU - r[k] / rn) : null;
+            const e = ok ? len(ev) : 1;
+            if (!ok || hn === 0 || e >= 0.99) { bg.chaseOrbit.visible = false; return; }
+            const hHat = h.map(x => x / hn);
+            const P = e > 1e-9 ? ev.map(x => x / e) : r.map(x => x / rn);
+            const Q = cross(hHat, P);
+            const p = hn * hn / MU;
+            const nu0 = Math.atan2(r[0] * Q[0] + r[1] * Q[1] + r[2] * Q[2], r[0] * P[0] + r[1] * P[1] + r[2] * P[2]);
+            for (let k = 0; k < CHASE_RING; k++) {
+                const nu = nu0 + 2 * Math.PI * k / CHASE_RING;
+                const rr = p / (1 + e * Math.cos(nu)) / RE, c = Math.cos(nu), s = Math.sin(nu);
+                for (let a = 0; a < 3; a++) chaseRing[3 * k + a] = rr * (c * P[a] + s * Q[a]);
+            }
+            const g = bg.chaseOrbit.geometry;
+            if (!g.getAttribute('position')) g.setAttribute('position', new THREE.BufferAttribute(chaseRing, 3));
+            else g.getAttribute('position').needsUpdate = true;
+            bg.chaseOrbit.visible = orbitOn;
+        }
         function setBackdropFrame(basis, rT, t) {
             if (!bg || !basis || !rT) { haveBasis = false; return; }
             const M = window.RpoMath, RE = M.RE;
@@ -606,7 +643,8 @@
             bg.world.matrixWorldNeedsUpdate = true;
             bg.stars.quaternion.setFromRotationMatrix(bg.world.matrix);
             bg.holder.position.set(-rT[0] / RE, -rT[1] / RE, -rT[2] / RE);
-            bg.orbit.position.copy(bg.holder.position);       // the ring is centered on Earth
+            bg.orbit.position.copy(bg.holder.position);       // the rings are centered on Earth
+            bg.chaseOrbit.position.copy(bg.holder.position);
             orbitR = Math.hypot(rT[0], rT[1], rT[2]) / RE;
             bg.earth.pivot.rotation.z = M.OMEGA_E * (t || 0);
             haveBasis = true;
@@ -842,8 +880,10 @@
             setBackdrop(on) { if (backdropOn !== !!on) { backdropOn = !!on; render(); } },
             // The zoomed-out Earth inset (off by default); it shows only with the backdrop on.
             setInset(on) { if (insetOn !== !!on) { insetOn = !!on; render(); } },
-            // The target's orbit traced through the backdrop (on by default); needs targetCoe in update().
-            setOrbit(on) { if (orbitOn !== !!on) { orbitOn = !!on; if (bg) bg.orbit.visible = orbitOn && !!orbitKey; render(); } },
+            // The target's and chase's orbits traced through the backdrop (on by default); they need
+            // targetCoe and chaseRv ({ r, v } in ECI, km and km/s) in update().
+            setOrbit(on) { if (orbitOn !== !!on) { orbitOn = !!on; if (bg) { bg.orbit.visible = orbitOn && !!orbitKey; bg.chaseOrbit.visible = orbitOn && !!bg.chaseOrbit.geometry.getAttribute('position'); } render(); } },
+            chaseOrbitShown: () => !!(bg && bg.chaseOrbit.visible),
             orbitShown: () => !!(bg && bg.orbit.visible),
             hasBackdrop: () => !!(bg && backdropOn && haveBasis),
             // For tests: where an ECI-relative point (km from the target, in box axes) lands in the backdrop.
@@ -861,6 +901,7 @@
             update(data) {
                 setBackdropFrame(data.basis, data.rT, data.t);
                 setOrbit(data.targetCoe || null);
+                setChaseOrbit(data.chaseRv || null);
                 fill(ghostLine, data.ghost || null, null);
                 fill(trailLine, data.trail, null);
                 fill(modelLine, data.model, null);

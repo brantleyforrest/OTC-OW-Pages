@@ -176,7 +176,7 @@
             stage.box.setInset(state.inset);
             stage.box.setOrbit(state.orbit3d);
             stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho, model: showModel ? sim.modelPath : null,
-                basis: rel.basis, rT: rel.rT, t: state.t, targetCoe: sim.target });
+                basis: rel.basis, rT: rel.rT, t: state.t, targetCoe: sim.target, chaseRv: M.coesToRv(M.coeAt(sim.chase, state.t)) });
         }
         if (stage.inertial) stage.inertial.update({ t: state.t, rho: rel.rho, basis: rel.basis, rT: rel.rT, from, to, ghost: state.trail !== 'off' });
         updateLive(rel);
