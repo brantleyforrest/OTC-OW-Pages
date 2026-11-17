@@ -182,11 +182,15 @@
         }
         if ((state.annot.cross || hot === 'zmax' || hot === 'dM0') && zmax > TINY) {
             const c = hot === 'zmax' || hot === 'dM0' ? COLORS.hot : COLORS.cross;
-            // Where chase will be at each cross-track point within the next rev.
+            // The cross-track points on the NMC chase is on now (drift held still), the same ellipse as
+            // the dotted NMC trace and the corner points. With the drift left in, they sat up to one
+            // rev of drift away from both, and past the end of the drawn path late in the span.
             const dmNow = rNow.dM0;
+            const still = Object.assign({}, rNow, { xc: 0 });
             [['+P.C. 0°', 0], ['Left 90°', 90], ['−P.C. 180°', 180], ['Right 270°', 270]].forEach(([text, ang]) => {
                 const dt = M.timeToAngle(dmNow, ang, sim.n);
-                const s = M.stateFromRmoe(rNow, sim.n, dt);
+                const s = M.stateFromRmoe(still, sim.n, dt);
+                s[0] += rNow.xc;
                 const q = P(s);
                 dot(q, c, 3);
                 if (pane.plane !== 'left' || hot === 'dM0' || state.annot.cross) label(text, q, c, 7, -9);

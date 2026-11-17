@@ -713,6 +713,7 @@
                 for (let a = 0; a < 3; a++) arr[3 * k + a] = rr * (c * P[a] + sn * Q[a]);
             }
             mesh.setPoints(arr, RING);
+            mesh.userData.ready = true;        // so turning the traces off and on again brings it back
             mesh.visible = orbitOn;
             ringReach[key] = p / (1 - e) / RE;
         }
@@ -845,6 +846,7 @@
         // backdrop frame, draw the backdrop with a camera aimed straight at Earth. The real
         // frame drawn right after clears and covers it, so it is never seen.
         let earthWarm = false;
+        const bgFwd = new THREE.Vector3(), bgLat = new THREE.Vector3();
         function warmUpEarth() {
             if (earthWarm || !bg) return;
             earthWarm = true;
@@ -897,6 +899,17 @@
                 bg.camera.near = D * 0.2;
                 bg.camera.far = D + orbitR + reach() + 3;
                 bg.camera.updateProjectionMatrix();
+                // The box is flat (orthographic) and the backdrop is in perspective, so a point nearer
+                // or farther than the target lands a little apart in the two. Slide chase's ring
+                // sideways (by a fraction of chase's offset, a few km at most) so its point at chase
+                // lands exactly on the chase marker.
+                bg.chaseOrbit.position.copy(bg.holder.position);
+                if (chase.visible) {
+                    const f = bgFwd.copy(bg.camera.position).normalize().negate();
+                    const v = bgLat.copy(chase.position).divideScalar(RE);
+                    const along = v.dot(f);
+                    bg.chaseOrbit.position.addScaledVector(v.addScaledVector(f, -along), along / D);
+                }
                 // A camera set back below Earth's surface (a big box seen from below at LEO) would be
                 // inside the globe: leave Earth out then rather than draw it inside out.
                 const pc = bg.camera.position;
@@ -1005,6 +1018,13 @@
                 const RE = window.RpoMath.RE;
                 const v = new THREE.Vector3(xyzKm[0] / RE, xyzKm[1] / RE, xyzKm[2] / RE).project(bg.camera);
                 return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h, v.z];
+            },
+            // For tests: where the chase ring's point at chase (its first sample, slid with the ring) lands.
+            chaseTraceToScreen() {
+                if (!bg) return null;
+                const RE = window.RpoMath.RE;
+                const v = chase.position.clone().divideScalar(RE).add(bg.chaseOrbit.position).sub(bg.holder.position).project(bg.camera);
+                return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h];
             },
             backdropEarthShown: () => !!(bg && bg.holder.visible),
             insetShown: () => !!(insetEl && insetEl.style.display !== 'none'),
