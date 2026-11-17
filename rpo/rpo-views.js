@@ -468,11 +468,15 @@
         const view = { az: BOX_VIEWS['3d'].az, el: BOX_VIEWS['3d'].el };
         let turn = null;
 
-        // Backdrop: Earth and the stars in their true directions around the target. It is a second
-        // scene in Earth radii, seen by a perspective camera that looks at the target along the box
-        // camera's line of sight, from 2.5 orbit radii back, so Earth stays in view below the box.
-        // The world group turns inertial vectors into the box axes (X = I, Y = C, Z = R), so Earth
-        // sits straight down -R and the stars stay fixed in inertial space.
+        // Backdrop: Earth and the stars where they truly are around the target, at true scale, as
+        // the Reference Frame Observatory draws its RIC view. It is a second scene in Earth radii.
+        // The world group turns inertial vectors into the box axes (X = I, Y = C, Z = R), so Earth's
+        // center sits one orbit radius straight down -R and the stars stay fixed in inertial space.
+        // A 38 degree perspective camera looks at the target along the box camera's line of sight,
+        // from just far enough back that the target's depth has the box's km per pixel. So at LEO
+        // Earth's surface fills the lower view, and at GEO Earth is too far below to appear except
+        // when looking down at the target.
+        const BG_FOV = 38;
         let backdropOn = true, haveBasis = false, orbitR = 1;
         const bg = (() => {
             if (!window.EarthScene || !window.RpoMath) return null;
@@ -484,13 +488,85 @@
             const holder = new THREE.Group();
             world.add(holder);
             const earth = window.EarthScene.addEarth(THREE, renderer, holder);
-            const stars = window.EarthScene.addStars(THREE, world);
+            const stars = window.EarthScene.addStars(THREE, bgScene);
             world.add(new THREE.AmbientLight(0xffffff, 0.5));
             const sun = new THREE.DirectionalLight(0xffffff, 2.1);
             sun.position.set(6000, 2000, 5000);         // the inertial pane's sun direction, far off
             world.add(sun);
-            return { scene: bgScene, camera: bgCamera, world, holder, earth, stars };
+            // The inset: the same scene from far enough back to hold Earth and the target, with a
+            // marker on the target and a line down -R to Earth's center. Both show only in the inset.
+            const insetCamera = new THREE.PerspectiveCamera(BG_FOV, 1.25, 0.05, 100);
+            insetCamera.up.set(0, 0, 1);
+            const marker = new THREE.Sprite(new THREE.SpriteMaterial({ color: COLORS.target, sizeAttenuation: false, depthTest: false }));
+            marker.scale.setScalar(0.05);
+            marker.renderOrder = 5;
+            const radial = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]),
+                new THREE.LineBasicMaterial({ color: COLORS.ric, transparent: true, opacity: 0.6 }));
+            marker.visible = radial.visible = false;
+            bgScene.add(marker, radial);
+            return { scene: bgScene, camera: bgCamera, world, holder, earth, stars, insetCamera, marker, radial };
         })();
+        // The inset's outline and caption, laid over the canvas (the picture itself is drawn in WebGL).
+        const insetEl = bg && canvas.parentElement ? (() => {
+            const el = document.createElement('div');
+            el.className = 'rpo-earthinset';
+            el.innerHTML = '<span>Earth, zoomed out</span>';
+            el.style.display = 'none';
+            canvas.parentElement.appendChild(el);
+            return el;
+        })() : null;
+        const INSET_TOP = 30, INSET_RIGHT = 6;
+        // True when some of Earth's disk is inside the backdrop camera's view.
+        function earthInView() {
+            if (!bg.holder.visible) return false;
+            bg.camera.updateMatrixWorld();
+            const v = new THREE.Vector3(0, 0, -orbitR).applyMatrix4(bg.camera.matrixWorldInverse);
+            const depth = -v.z;
+            if (depth < -1) return false;
+            const tanV = Math.tan(BG_FOV * Math.PI / 360), tanH = tanV * bg.camera.aspect;
+            const reach = Math.max(depth, 0);
+            return Math.abs(v.x) - 1 <= reach * tanH && Math.abs(v.y) - 1 <= reach * tanV;
+        }
+        function renderInset() {
+            // A narrow pane (the RMOE Explorer's second view) gives the inset half its width.
+            const iw = Math.round(Math.max(84, Math.min(170, w * (w < 300 ? 0.5 : 0.28)))), ih = Math.round(iw * 0.8);
+            const show = w >= 140 && h >= 170 && !earthInView();
+            if (insetEl) insetEl.style.display = show ? '' : 'none';
+            if (!show) return;
+            if (insetEl) {
+                insetEl.style.width = iw + 'px'; insetEl.style.height = ih + 'px';
+                insetEl.style.top = INSET_TOP + 'px'; insetEl.style.right = INSET_RIGHT + 'px';
+            }
+            // Seen from the box camera's side, a little above the target's level, so the target and
+            // Earth stay apart on screen; aimed between them.
+            const az = view.az * Math.PI / 180, el = 12 * Math.PI / 180;
+            const mid = -orbitR / 2, dist = Math.max(4.4, (orbitR + 1.5) * 1.75);
+            const ic = bg.insetCamera;
+            ic.position.set(dist * Math.cos(el) * Math.cos(az), dist * Math.cos(el) * Math.sin(az), mid + dist * Math.sin(el));
+            ic.lookAt(0, 0, mid);
+            ic.aspect = iw / ih;
+            ic.near = dist * 0.05;
+            ic.far = (dist + orbitR + 3) * 1.3;
+            ic.updateProjectionMatrix();
+            const wasHolder = bg.holder.visible;
+            bg.holder.visible = true;
+            bg.radial.scale.set(1, 1, orbitR);
+            bg.marker.visible = bg.radial.visible = true;
+            bg.stars.follow(ic);
+            const x = w - INSET_RIGHT - iw, y = h - INSET_TOP - ih;
+            renderer.setScissorTest(true);
+            renderer.setViewport(x, y, iw, ih);
+            renderer.setScissor(x, y, iw, ih);
+            renderer.setClearColor(0x03060c, 1);
+            renderer.clear();
+            renderer.render(bg.scene, ic);
+            renderer.setClearColor(0x000000, 0);
+            renderer.setScissorTest(false);
+            renderer.setViewport(0, 0, w, h);
+            bg.marker.visible = bg.radial.visible = false;
+            bg.holder.visible = wasHolder;
+        }
         function setBackdropFrame(basis, rT, t) {
             if (!bg || !basis || !rT) { haveBasis = false; return; }
             const M = window.RpoMath, RE = M.RE;
@@ -502,6 +578,7 @@
                 R[0], R[1], R[2], 0,
                 0, 0, 0, 1);
             bg.world.matrixWorldNeedsUpdate = true;
+            bg.stars.quaternion.setFromRotationMatrix(bg.world.matrix);
             bg.holder.position.set(-rT[0] / RE, -rT[1] / RE, -rT[2] / RE);
             orbitR = Math.hypot(rT[0], rT[1], rT[2]) / RE;
             bg.earth.pivot.rotation.z = M.OMEGA_E * (t || 0);
@@ -632,19 +709,32 @@
                 if (s.userData.at) s.position.set(s.userData.at[0] * half, s.userData.at[1] * half, s.userData.at[2] * half);
             });
             if (bg && backdropOn && haveBasis) {
-                // Look the same way as the box camera, at the target, from 2.5 orbit radii back.
-                bg.camera.position.copy(camera.position).normalize().multiplyScalar(2.5 * orbitR);
+                // Look the same way as the box camera, at the target, from the distance at which the
+                // target's depth has the box's scale.
+                const RE = window.RpoMath.RE;
+                const D = halfH / Math.tan(BG_FOV * Math.PI / 360) / RE;
+                bg.camera.position.copy(camera.position).normalize().multiplyScalar(D);
                 bg.camera.quaternion.copy(camera.quaternion);
+                bg.camera.fov = BG_FOV;
                 bg.camera.aspect = w / h;
+                bg.camera.near = D * 0.2;
+                bg.camera.far = D + orbitR + 3;
                 bg.camera.updateProjectionMatrix();
+                // A camera set back below Earth's surface (a big box seen from below at LEO) would be
+                // inside the globe: leave Earth out then rather than draw it inside out.
+                const pc = bg.camera.position;
+                const inside = Math.hypot(pc.x, pc.y, pc.z + orbitR) < 1.04;
+                bg.holder.visible = !inside;
                 bg.stars.follow(bg.camera);
                 renderer.autoClear = false;
                 renderer.clear();
                 renderer.render(bg.scene, bg.camera);
                 renderer.clearDepth();
                 renderer.render(scene, camera);
+                renderInset();
                 renderer.autoClear = true;
             } else {
+                if (insetEl) insetEl.style.display = 'none';
                 renderer.render(scene, camera);
             }
         }
@@ -724,6 +814,15 @@
             // Earth and stars behind the box (on by default). They need basis, rT, and t in update().
             setBackdrop(on) { if (backdropOn !== !!on) { backdropOn = !!on; render(); } },
             hasBackdrop: () => !!(bg && backdropOn && haveBasis),
+            // For tests: where an ECI-relative point (km from the target, in box axes) lands in the backdrop.
+            backdropToScreen(xyzKm) {
+                if (!bg) return null;
+                const RE = window.RpoMath.RE;
+                const v = new THREE.Vector3(xyzKm[0] / RE, xyzKm[1] / RE, xyzKm[2] / RE).project(bg.camera);
+                return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h, v.z];
+            },
+            backdropEarthShown: () => !!(bg && bg.holder.visible),
+            insetShown: () => !!(insetEl && insetEl.style.display !== 'none'),
             // chase: [x, y, z]; trail, ghost (the whole path, drawn faintly), and model: paths in RIC km.
             // basis ({R, I, C} unit vectors in ECI), rT (the target's ECI position in km), and t (s)
             // place Earth and the stars behind the box.
