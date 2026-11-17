@@ -82,7 +82,7 @@
         trail: 'full', roll: 1, stepSize: 0.0625,
         scale: 'mag', mag: 'auto',
         frame: 'ECI', camera: 'earth',
-        axes: false, equator: false, orbits: true, carried: true, shadows: false, backdrop: true, inset: false, orbit3d: true, labels: true, shared: true
+        axes: false, equator: false, orbits: true, carried: true, shadows: false, backdrop: true, inset: false, orbit3d: true, nmcTrace: true, labels: true, shared: true
     };
     let sim = null;          // everything derived from the inputs; rebuilt only when they change
     let dirty = true;
@@ -166,9 +166,13 @@
         const rel = M.relativeState(sim.target, sim.chase, state.t);
         const [from, to] = trailRange();
         const trail = to > from ? sim.rho.subarray(3 * from, 3 * (to + 1)) : null;
+        // The whole NMC chase is on now, from its true relative state, so the loop always passes
+        // through chase. Only for a circular target, where the course model applies.
+        const nmcLoop = state.nmcTrace && sim.circular ? M.nmcLoop(M.rmoeFromState([...rel.rho, ...rel.rhoDot], sim.n)) : null;
         const data = {
             chase: rel.rho,
             trail,
+            nmcLoop,
             ghosts: state.trail === 'off' ? [] : [sim.rho],
             n: sim.n
         };
@@ -178,7 +182,7 @@
             stage.box.setBackdrop(state.backdrop);
             stage.box.setInset(state.inset);
             stage.box.setOrbit(state.orbit3d);
-            stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho,
+            stage.box.update({ chase: rel.rho, trail, nmcLoop, ghost: state.trail === 'off' ? null : sim.rho,
                 basis: rel.basis, rT: rel.rT, t: state.t, targetCoe: sim.target, chaseRv: M.coesToRv(M.coeAt(sim.chase, state.t)) });
         }
         if (stage.inertial) stage.inertial.update({ t: state.t, rho: rel.rho, basis: rel.basis, rT: rel.rT, from, to, ghost: state.trail !== 'off' });
@@ -363,7 +367,6 @@
         if (!isGeoTarget()) state.frame = 'ECI';
         selectRange(state.range);
         $('span').value = String(state.span);
-        selectScale(state.scale);
         selectFrame(state.frame);
         $('notice').textContent = p.notice;
         $('preset').value = String(index);
@@ -469,12 +472,8 @@
         inertial.setExtras({ axes: state.axes, equator: state.equator, orbits: state.orbits });
         inertial.setLabels(state.labels);
     }
-    const selectScale = Kit.bindSegmented($('scale-pick'), v => {
-        state.scale = v;
-        applyViewOptions();
-        if (sim) { updateStaticPanels(); if (stage.inertial) stage.inertial.resetView(); }
-        dirty = true;
-    });
+    // The Scale toggle (True Scale | Magnified) was removed (owner, 2026-11-17): the scale is always
+    // Magnified. state.scale stays 'mag'; the true-scale branches are kept but unused.
     $('mag').addEventListener('input', e => {
         state.mag = magFromSlider(Number(e.target.value) / 1000);
         applyViewOptions();
@@ -487,7 +486,7 @@
         dirty = true;
     });
     [['opt-axes', 'axes'], ['opt-equator', 'equator'], ['opt-orbits', 'orbits'], ['opt-carried', 'carried'],
-     ['opt-shadows', 'shadows'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-labels', 'labels']].forEach(([id, key]) => {
+     ['opt-shadows', 'shadows'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-nmc', 'nmcTrace'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
     $('opt-shared').addEventListener('change', e => { state.shared = e.target.checked; refit(); dirty = true; });

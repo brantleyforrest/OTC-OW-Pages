@@ -24,6 +24,7 @@
         text: '#94a3b8',
         ghost: 'rgba(224, 182, 79, 0.28)',
         model: 'rgba(240, 244, 250, 0.6)',
+        nmc: 'rgba(224, 182, 79, 0.8)',
         keepOut: 'rgba(248, 113, 113, 0.7)'
     };
 
@@ -287,6 +288,10 @@
             strokePath(data.model, COLORS.model, 1, [5, 4]);
             strokePath(data.predicted, COLORS.chase, 1.2, [4, 4]);
             strokePath(data.trail, COLORS.chase, 3);
+            // The whole NMC chase is on now, dotted; it moves with chase as the center drifts.
+            ctx.lineCap = 'round';
+            strokePath(data.nmcLoop, COLORS.nmc, 1.6, [0.1, 4.5]);
+            ctx.lineCap = 'butt';
             drawNmc(data);
             (data.burns || []).forEach(b => {
                 const from = project(b.at);
@@ -809,6 +814,7 @@
         const ghostLine = makeLine(COLORS.chase, 0.3);
         const trailLine = makeLine(COLORS.chase, 1);
         const modelLine = makeLine(0xf0f4fa, 0.6, true);
+        const nmcLine = makeLine(COLORS.chase, 0.8, true);       // the current NMC, dotted
         const shadowLines = [makeLine(COLORS.chase, 0.3), makeLine(COLORS.chase, 0.3), makeLine(COLORS.chase, 0.3)];
         const p = [0, 0, 0];
 
@@ -1002,7 +1008,8 @@
             },
             backdropEarthShown: () => !!(bg && bg.holder.visible),
             insetShown: () => !!(insetEl && insetEl.style.display !== 'none'),
-            // chase: [x, y, z]; trail, ghost (the whole path, drawn faintly), and model: paths in RIC km.
+            // chase: [x, y, z]; trail, ghost (the whole path, drawn faintly), model, and nmcLoop (the
+            // NMC chase is on now, dotted): paths in RIC km.
             // basis ({R, I, C} unit vectors in ECI), rT (the target's ECI position in km), and t (s)
             // place Earth and the stars behind the box.
             update(data) {
@@ -1012,6 +1019,8 @@
                 fill(ghostLine, data.ghost || null, null);
                 fill(trailLine, data.trail, null);
                 fill(modelLine, data.model, null);
+                fill(nmcLine, data.nmcLoop || null, null);
+                nmcLine.material.dashSize = half / 80; nmcLine.material.gapSize = half / 35;
                 // Walls: C = -half is the view from the left; I = +half the view from behind; R = -half the view from above.
                 // The shadows are of the whole path when it is given, as the flat panes show it.
                 const shade = shadows ? (data.ghost || data.trail) : null;

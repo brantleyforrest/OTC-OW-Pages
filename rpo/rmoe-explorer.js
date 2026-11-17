@@ -65,7 +65,7 @@
         t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
         annot: { center: true, size: false, corners: false, cross: false },
         hot: null, lastRow: null,
-        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, backdrop: true, inset: false, orbit3d: true, labels: true
+        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, orbits: true, backdrop: true, inset: false, orbit3d: true, nmcTrace: true, labels: true
     };
     let sim = null, dirty = true;
 
@@ -210,8 +210,9 @@
         const rNow = M.rmoeAt(sim.rmoe, sim.n, t);
         const k = sampleIndex(t);
         const trail = sim.path.subarray(0, 3 * (k + 1));
+        const nmcLoop = state.nmcTrace ? M.nmcLoop(rNow) : null;   // the whole NMC chase is on now, dotted
         const data = {
-            chase: now, trail, ghosts: [sim.path],
+            chase: now, trail, ghosts: [sim.path], nmcLoop,
             rmoe: state.annot.center || state.hot === 'xc' || state.hot === 'yc0' ? rNow : null,
             showNmc: state.annot.size || state.annot.corners
         };
@@ -226,7 +227,7 @@
             const rho = M.ricToEci(now, basis);
             const dv = M.ricToEci([now[3] - w * now[1], now[4] + w * now[0], now[5]], basis);
             const chaseRv = { r: basis.r.map((x, k) => x + rho[k]), v: basis.v.map((x, k) => x + dv[k]) };
-            stage.box.update({ chase: now, trail, ghost: sim.path, basis, rT: basis.r, t, targetCoe: sim.coe, chaseRv });
+            stage.box.update({ chase: now, trail, nmcLoop, ghost: sim.path, basis, rT: basis.r, t, targetCoe: sim.coe, chaseRv });
         }
         if (stage.inertial) {
             // ghost: the whole two-rev path is drawn faintly from the start, so the carried trail never
@@ -423,7 +424,7 @@
         inertial.setFrame(state.frame);
         inertial.setCamera(state.camera);
         inertial.setTrails({ inertial: state.inertialTrail, carried: state.carried });
-        inertial.setExtras({ axes: false, equator: false, orbits: true });
+        inertial.setExtras({ axes: false, equator: false, orbits: state.orbits });
         inertial.setLabels(state.labels);
         updateMagRead();
     }
@@ -434,7 +435,7 @@
         applyViewOptions();
         dirty = true;
     });
-    [['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-labels', 'labels']].forEach(([id, key]) => {
+    [['opt-orbits', 'orbits'], ['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-nmc', 'nmcTrace'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
 

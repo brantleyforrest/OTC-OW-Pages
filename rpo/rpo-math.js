@@ -86,6 +86,22 @@
         ];
     }
 
+    // The whole NMC that chase is on right now: one revolution of the course model from these
+    // RMOEs with the drift held still, so the loop sits around the current center and moves with
+    // chase. count + 1 points [x, y, z, ...] in km, the last repeating the first to close it.
+    function nmcLoop(rmoe, count) {
+        count = count || 120;
+        const out = new Float64Array(3 * (count + 1));
+        const m0 = (rmoe.M0 === null ? 0 : rmoe.M0) * D2R, d0 = (rmoe.dM0 === null ? 0 : rmoe.dM0) * D2R;
+        for (let k = 0; k <= count; k++) {
+            const a = 2 * Math.PI * k / count;
+            out[3 * k] = rmoe.xc - rmoe.C * Math.cos(m0 + a);
+            out[3 * k + 1] = rmoe.yc0 + 2 * rmoe.C * Math.sin(m0 + a);
+            out[3 * k + 2] = rmoe.zmax * Math.sin(d0 + a);
+        }
+        return out;
+    }
+
     function rmoeAt(rmoe, n, t) {
         const adv = n * t * R2D;
         return {
@@ -439,7 +455,7 @@
     const RpoMath = {
         MU, RE, G0, GEO_A, OMEGA_E, D2R, R2D, ORBITS,
         meanMotion, period, wrap360, wrap180,
-        rmoeFromState, stateFromRmoe, rmoeAt, driftRate, planeCrossingM, boundaryTable, timeToAngle,
+        rmoeFromState, stateFromRmoe, rmoeAt, nmcLoop, driftRate, planeCrossingM, boundaryTable, timeToAngle,
         cwPropagate, stm, transferVelocity, applyBurn, rule,
         keplerE, meanFromTrue, trueFromMean, coeAt, orbitProblem, coesToRv, ricBasis, ricToEci,
         rmoeFromCoes, relativeState, sampleRelative, coeDifference, coeFromDifference, modelFit,

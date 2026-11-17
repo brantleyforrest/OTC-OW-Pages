@@ -258,15 +258,8 @@
                         <ul class="el-notes" id="el-notes" data-advanced></ul>
                     </div>
 
-                    <div class="panel" data-advanced>
+                    <div class="panel">
                         <div class="panel-title">View Options</div>
-                        <div class="opt-row">
-                            <span class="opt-label">Scale</span>
-                            <div class="segmented" id="scale-pick" role="group" aria-label="Scale">
-                                <button type="button" data-value="true" aria-pressed="false">True Scale</button>
-                                <button type="button" data-value="mag" aria-pressed="true">Magnified</button>
-                            </div>
-                        </div>
                         <div class="mag-row" id="mag-row">
                             <label for="mag">Magnification</label>
                             <input type="range" id="mag" min="0" max="1000" step="1" value="500">
@@ -289,6 +282,7 @@
                             <label class="check" title="Earth and the stars behind the 3D RIC box, in their true directions from the target"><input type="checkbox" id="opt-backdrop" checked>Earth and Stars</label>
                             <label class="check" style="display: none;" title="A zoomed-out view of the target and Earth in the 3D RIC view, when Earth is out of its view"><input type="checkbox" id="opt-inset">Earth Inset</label>
                             <label class="check" title="The target's and chase's whole orbits, traced through Earth and the stars behind the 3D RIC view"><input type="checkbox" id="opt-orbit3d" checked>3D Orbit Traces</label>
+                            <label class="check" title="The whole NMC chase is on right now, dotted; it moves with chase as the NMC center drifts"><input type="checkbox" id="opt-nmc" checked>NMC Trace</label>
                             <label class="check" style="display: none;"><input type="checkbox" id="opt-labels" checked>Labels</label>
                             <label class="check" style="display: none;"><input type="checkbox" id="opt-shared" checked>Shared Scale</label>
                         </div>

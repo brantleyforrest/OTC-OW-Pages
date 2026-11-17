@@ -781,14 +781,14 @@ footer.site-footer {
     .tool-side { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Advanced mode: a switch pinned to the bottom-left corner of the window (.mode-row), so it
+/* Advanced mode: a switch pinned to the bottom-right corner of the window (.mode-row), so it
    stays in reach while the page scrolls. Off (the default), anything marked data-advanced is
    hidden, leaving the views and the main adjustments. */
 body:not(.advanced-on) [data-advanced] { display: none !important; }
 
 .mode-row {
     position: fixed;
-    left: 16px;
+    right: 16px;
     bottom: 16px;
     z-index: 50;
     display: flex;
@@ -799,8 +799,10 @@ body:not(.advanced-on) [data-advanced] { display: none !important; }
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 .mode-row .mode-switch { margin-left: 0; }
-/* Room at the bottom so the last controls can scroll clear of the pinned switch. */
-body:has(.mode-row) { padding-bottom: 3.5rem; }
+/* Room under the side column's last control, so it can scroll clear of the pinned switch.
+   Kept inside the side column: padding on the page itself made a page that fits the window
+   (the wide layout in simple mode) scroll for no reason. */
+body:has(.mode-row) .tool-side > .col { padding-bottom: 3.5rem; }
 
 .mode-switch {
     display: inline-flex;
