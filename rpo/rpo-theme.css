@@ -1,0 +1,193 @@
+/* Styles shared by the RIC tools and Test 2 Practice: the dual and five-view stages, pane
+   badges, the scale label, and small tables. Page-only styles stay in each page. */
+
+/* The stage fills the view box and picks its arrangement from the box's own shape. */
+.rpo-host { container-type: size; }
+
+.rpo-stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.rpo-pane {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: #03060c;
+}
+
+.rpo-pane canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.rpo-pane .tool-status { font-size: 0.8rem; padding: 1rem; }
+
+.rpo-badge {
+    position: absolute;
+    top: 0.35rem;
+    left: 0.45rem;
+    padding: 0 0.3rem;
+    border-radius: 3px;
+    background: rgba(6, 11, 20, 0.72);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 2;
+}
+.rpo-badge.ric { color: var(--frame-ric); }
+.rpo-badge.eci { color: var(--frame-eci); }
+.rpo-badge.ecef { color: var(--frame-ecef); }
+
+/* "Offsets magnified N×" or "True scale": always visible on the inertial pane. */
+.rpo-scale {
+    position: absolute;
+    left: 0.45rem;
+    bottom: 0.35rem;
+    padding: 0 0.3rem;
+    border-radius: 3px;
+    background: rgba(6, 11, 20, 0.72);
+    color: var(--text-main);
+    font-size: 0.7rem;
+    line-height: 1.5;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.rpo-note {
+    position: absolute;
+    left: 50%;
+    bottom: 1.8rem;
+    transform: translateX(-50%);
+    max-width: 86%;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    background: rgba(6, 11, 20, 0.82);
+    border: 1px solid var(--border-subtle);
+    color: #fbbf24;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    text-align: center;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* The 3D box's view buttons, and the pane switch used on small stages. */
+.rpo-viewbuttons.segmented,
+.rpo-switch.segmented {
+    position: absolute;
+    z-index: 3;
+    font-size: 0.68rem;
+}
+.rpo-viewbuttons.segmented { top: 0.3rem; right: 0.35rem; }
+.rpo-viewbuttons.segmented button,
+.rpo-switch.segmented button { padding: 0.15rem 0.45rem; font-size: 0.68rem; }
+.rpo-switch.segmented { display: none; top: 0.3rem; right: 0.35rem; }
+
+.rpo-pane + .rpo-pane,
+.rpo-stage > * + * { border-top: 1px solid var(--border-subtle); }
+
+/* ---------- Five-view stage (Tool 1) ----------
+   Stacked: inertial 38 percent of the height, the 3D box 34, the three flat panes 28. */
+.rpo-five .rpo-inertial { flex: 0 0 38%; }
+.rpo-five .rpo-ricside { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.rpo-five .rpo-box { flex: 0 0 54.8%; }
+.rpo-five .rpo-planes {
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--border-subtle);
+}
+.rpo-five .rpo-planes .rpo-pane + .rpo-pane { border-top: 0; border-left: 1px solid var(--border-subtle); }
+
+@container (min-aspect-ratio: 3/2) {
+    .rpo-five { flex-direction: row; }
+    .rpo-five .rpo-inertial { flex: 0 0 42%; }
+    .rpo-five > * + * { border-top: 0; border-left: 1px solid var(--border-subtle); }
+    .rpo-five .rpo-box { flex: 0 0 58%; }
+}
+
+/* Small stage: the inertial pane and one RIC pane, chosen with the switch. */
+@container (max-width: 519px), (max-height: 419px) {
+    .rpo-five .rpo-switch.segmented { display: inline-flex; }
+    .rpo-five .rpo-viewbuttons.segmented { display: none; }
+    .rpo-five .rpo-inertial { flex: 1 1 0; }
+    .rpo-five .rpo-ricside { flex: 1 1 0; }
+    .rpo-five .rpo-box,
+    .rpo-five .rpo-planes .rpo-pane { display: none; }
+    .rpo-five .rpo-planes { grid-template-columns: minmax(0, 1fr); border-top: 0; }
+    .rpo-five .rpo-planes .rpo-pane + .rpo-pane { border-left: 0; }
+    .rpo-five[data-show="3d"] .rpo-box { display: block; flex: 1 1 0; }
+    .rpo-five[data-show="3d"] .rpo-planes { display: none; }
+    .rpo-five[data-show="left"] .rpo-left,
+    .rpo-five[data-show="behind"] .rpo-behind,
+    .rpo-five[data-show="above"] .rpo-above { display: block; }
+}
+@container (max-width: 519px) and (min-aspect-ratio: 1/1), (max-height: 419px) and (min-aspect-ratio: 1/1) {
+    .rpo-five { flex-direction: row; }
+    .rpo-five > * + * { border-top: 0; border-left: 1px solid var(--border-subtle); }
+    /* Keep the switch over the inertial pane, off the RIC pane's badge. */
+    .rpo-five .rpo-switch.segmented { right: calc(50% + 0.35rem); top: 1.75rem; }
+}
+
+/* ---------- Dual stage (Tools 2 to 4, practice) ----------
+   Two RIC panes side by side (the left view twice as wide), and the inertial pane. */
+.rpo-dual .rpo-ric {
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+.rpo-dual .rpo-ric .rpo-pane + .rpo-pane { border-top: 0; border-left: 1px solid var(--border-subtle); }
+.rpo-dual .rpo-inertial { flex: 1 1 0; }
+.rpo-dual .rpo-second canvas.rpo-hidden { display: none; }
+/* The second pane is narrow, so its 3D view buttons sit at the bottom, clear of the badge. */
+.rpo-dual .rpo-viewbuttons.segmented { top: auto; bottom: 0.3rem; }
+
+@container (min-aspect-ratio: 3/2) {
+    .rpo-dual { flex-direction: row; }
+    .rpo-dual .rpo-ric { flex: 0 0 58%; }
+    .rpo-dual > * + * { border-top: 0; border-left: 1px solid var(--border-subtle); }
+}
+
+@container (max-width: 519px) {
+    .rpo-dual .rpo-switch.segmented { display: inline-flex; }
+    .rpo-dual .rpo-ric { grid-template-columns: minmax(0, 1fr); }
+    .rpo-dual .rpo-ric .rpo-pane { display: none; }
+    .rpo-dual[data-show="left"] .rpo-left,
+    .rpo-dual[data-show="second"] .rpo-second { display: block; }
+}
+
+/* A dual stage that has no inertial pane (some practice views). */
+.rpo-dual.rpo-noinertial .rpo-inertial { display: none; }
+
+/* ---------- Tables ---------- */
+.rpo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+.rpo-table th,
+.rpo-table td {
+    padding: 0.2rem 0.3rem;
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: right;
+    white-space: nowrap;
+}
+.rpo-table th:first-child,
+.rpo-table td:first-child { text-align: left; }
+.rpo-table th { color: var(--text-muted); font-weight: 600; }
+.rpo-table td { font-family: var(--font-mono); }
+.rpo-table tr.hl td { background: rgba(224, 182, 79, 0.12); }
+.rpo-table td.changed { color: var(--accent-gold); }

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Relative Motion: Two Views | OTC OW</title>
+    <meta name="description" content="Two spacecraft on two orbits around Earth, seen from space and seen from one of them. Change how the orbits differ and watch the motion in the inertial view, a 3D RIC box, and three flat RIC views.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <link rel="stylesheet" href="rpo-theme.css">
+    <style>
+        .tool-stage-col > .panel { flex-shrink: 0; }
+        .controls .segmented button { padding: 0.28rem 0.55rem; font-size: 0.76rem; }
+        .controls .btn { padding: 0.32rem 0.65rem; font-size: 0.8rem; }
+        .ctl-inline { display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; color: var(--text-muted); }
+        .tv-select {
+            padding: 0.28rem 0.45rem;
+            font-family: inherit;
+            font-size: 0.8rem;
+            color: var(--text-main);
+            background: var(--surface-hover);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            max-width: 100%;
+        }
+        .tv-select:focus { outline: none; border-color: var(--accent-blue); }
+        .scrub { flex: 1 1 12rem; min-width: 10rem; }
+        .scrub input { width: 100%; }
+        .scrub-read { font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); white-space: nowrap; }
+        .ctl-off { opacity: 0.45; }
+        #roll-read { white-space: nowrap; min-width: 3.4rem; }
+        #lv-fit { white-space: normal; }
+
+        .preset-row { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem; }
+        .preset-row select { flex: 1 1 auto; min-width: 0; }
+        .sub-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin: 0.4rem 0; font-size: 0.76rem; color: var(--text-muted); }
+        .sub-row .segmented button { padding: 0.22rem 0.5rem; font-size: 0.74rem; }
+
+        /* The element table: Target | Difference | Chase, one row per element. */
+        .el-table { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 0.12rem 0.3rem; align-items: center; }
+        .el-head { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
+        .el-name { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap; }
+        .el-name small { font-weight: 400; color: var(--text-muted); font-size: 0.64rem; }
+        .el-diff { display: flex; flex-direction: column; min-width: 0; }
+        .el-diff input[type="range"] { width: 100%; margin: 0.1rem 0 0; accent-color: var(--accent-gold); }
+        .el-table input[type="number"] {
+            width: 100%;
+            min-width: 0;
+            padding: 0.12rem 0.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.76rem;
+            text-align: right;
+            color: #ffffff;
+            background: rgba(6, 11, 20, 0.6);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+        .el-table input[type="number"]::-webkit-outer-spin-button,
+        .el-table input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .el-table input[type="number"]:focus { outline: none; border-color: var(--accent-blue); }
+        .el-table input.bad { border-color: #f87171; }
+        .el-table .col-target input { color: #34d399; }
+        .el-table .col-chase input { color: #e0b64f; }
+        .el-msg { margin-top: 0.3rem; font-size: 0.76rem; color: #f87171; }
+        .el-msg:empty { display: none; }
+        .el-notes { margin: 0.3rem 0 0; padding: 0; list-style: none; }
+        .el-notes li { font-size: 0.74rem; line-height: 1.35; color: #fbbf24; margin-top: 0.2rem; }
+
+        .live-head { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0.55rem 0 0.25rem; }
+        .live-head:first-child { margin-top: 0; }
+        .stat-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .stat-value.small { font-size: 0.82rem; }
+        .motion-name { font-size: 0.9rem; font-weight: 600; color: var(--accent-gold); }
+        .fit-good { color: #34d399; }
+        .fit-fair { color: #fbbf24; }
+        .fit-poor { color: #f87171; }
+        .fit-na { color: var(--text-muted); }
+
+        .opt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin-bottom: 0.45rem; font-size: 0.76rem; color: var(--text-muted); }
+        .opt-row .segmented button { padding: 0.22rem 0.5rem; font-size: 0.74rem; }
+        .segmented button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .opt-label { min-width: 3.6rem; }
+        .mag-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 0.45rem; }
+        .mag-row input { flex: 1 1 auto; min-width: 0; }
+        .mag-row .mono { min-width: 4.5rem; text-align: right; color: var(--text-main); }
+
+        .terms { margin: 0; padding: 0; list-style: none; }
+        .terms li { font-size: 0.78rem; line-height: 1.4; color: var(--text-main); margin-bottom: 0.25rem; }
+        .terms b { color: #ffffff; }
+        .ric-c { color: var(--frame-ric); font-weight: 600; }
+        .eci-c { color: var(--frame-eci); font-weight: 600; }
+
+        @media (min-width: 1081px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 27rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Relative Motion: Two Views</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../index.html#study" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <div class="col tool-stage-col">
+                <p class="tool-intro">Two spacecraft on two orbits around Earth, seen from space and seen from one of them. Change how the orbits differ and watch both.</p>
+
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view" aria-label="The inertial view, a 3D RIC box, and the views from the left, from behind, and from above"></div>
+                </div>
+
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play" type="button">Pause</button>
+                            <button class="btn" id="restart" type="button">Restart</button>
+                            <button class="btn" id="step-back" type="button" title="Step back" aria-label="Step back">&#9664;</button>
+                            <button class="btn" id="step-fwd" type="button" title="Step forward" aria-label="Step forward">&#9654;</button>
+                        </div>
+                        <div class="scrub">
+                            <div class="control-label">
+                                <label for="scrubber">Time</label>
+                                <span class="scrub-read" id="time-read">0.00 rev</span>
+                            </div>
+                            <input type="range" id="scrubber" min="0" max="1000" step="1" value="0">
+                        </div>
+                        <div class="segmented" id="speed" role="group" aria-label="Speed">
+                            <button type="button" data-value="0.05" aria-pressed="false">Slow</button>
+                            <button type="button" data-value="0.1" aria-pressed="true">Normal</button>
+                            <button type="button" data-value="0.25" aria-pressed="false">Fast</button>
+                        </div>
+                    </div>
+                    <div class="ctl-row">
+                        <label class="ctl-inline">Span
+                            <select class="tv-select" id="span">
+                                <option value="1">1 rev</option>
+                                <option value="2">2 revs</option>
+                                <option value="5">5 revs</option>
+                                <option value="10">10 revs</option>
+                                <option value="20">20 revs</option>
+                            </select>
+                        </label>
+                        <div class="ctl-inline">Trail
+                            <div class="segmented" id="trail" role="group" aria-label="Trail">
+                                <button type="button" data-value="full" aria-pressed="true">Full</button>
+                                <button type="button" data-value="rolling" aria-pressed="false">Rolling</button>
+                                <button type="button" data-value="off" aria-pressed="false">Off</button>
+                            </div>
+                        </div>
+                        <label class="ctl-inline" id="roll-wrap">
+                            <input type="range" id="roll" min="0.25" max="5" step="0.25" value="1" aria-label="Rolling trail length">
+                            <span class="mono" id="roll-read">1 rev</span>
+                        </label>
+                        <label class="ctl-inline">Step
+                            <select class="tv-select" id="step-size">
+                                <option value="0.01">1/100 rev</option>
+                                <option value="0.0625" selected>1/16 rev</option>
+                                <option value="0.25">1/4 rev</option>
+                            </select>
+                        </label>
+                        <label class="check"><input type="checkbox" id="loop">Loop</label>
+                        <div class="buttons">
+                            <button class="btn" id="fit-views" type="button">Fit Views</button>
+                            <button class="btn" id="reset-view" type="button">Reset View</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="tool-side">
+                <div class="col">
+                    <div class="panel accent">
+                        <div class="panel-title">Orbits</div>
+                        <div class="preset-row">
+                            <select class="tv-select" id="preset" aria-label="Preset"></select>
+                            <button class="btn" id="reset-preset" type="button">Reset Preset</button>
+                        </div>
+                        <div class="sub-row">
+                            <span>Target</span>
+                            <div class="segmented" id="target-pick" role="group" aria-label="Target orbit">
+                                <button type="button" data-value="geo" aria-pressed="false">GEO</button>
+                                <button type="button" data-value="gps" aria-pressed="false">GPS-type</button>
+                                <button type="button" data-value="leo" aria-pressed="false">LEO</button>
+                            </div>
+                            <span>Differences</span>
+                            <div class="segmented" id="range-pick" role="group" aria-label="Difference slider ranges">
+                                <button type="button" data-value="small" aria-pressed="true">Small</button>
+                                <button type="button" data-value="large" aria-pressed="false">Large</button>
+                            </div>
+                        </div>
+                        <div class="el-table" id="el-table"></div>
+                        <div class="sub-row" id="starts-row">
+                            <span>Chase starts at</span>
+                            <div class="segmented" id="starts" role="group" aria-label="Where chase starts on its orbit">
+                                <button type="button" data-value="0" aria-pressed="false">Bottom</button>
+                                <button type="button" data-value="90" aria-pressed="false">Front</button>
+                                <button type="button" data-value="180" aria-pressed="false">Top</button>
+                                <button type="button" data-value="270" aria-pressed="false">Back</button>
+                            </div>
+                        </div>
+                        <div class="el-msg" id="el-msg" role="status"></div>
+                        <ul class="el-notes" id="el-notes"></ul>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">What to Notice</div>
+                        <p class="panel-text" id="notice"></p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Live Values</div>
+                        <div class="live-head">Time</div>
+                        <div class="stat-grid">
+                            <div class="stat-item"><span class="stat-label">Elapsed</span><span class="stat-value small" id="lv-time"></span></div>
+                            <div class="stat-item"><span class="stat-label">Period difference</span><span class="stat-value small" id="lv-dp"></span></div>
+                            <div class="stat-item"><span class="stat-label">Target period</span><span class="stat-value small" id="lv-pt"></span></div>
+                            <div class="stat-item"><span class="stat-label">Chase period</span><span class="stat-value small" id="lv-pc"></span></div>
+                        </div>
+                        <div class="live-head">Position in RIC (km)</div>
+                        <div class="stat-grid three">
+                            <div class="stat-item"><span class="stat-label">R</span><span class="stat-value small" id="lv-x"></span></div>
+                            <div class="stat-item"><span class="stat-label">I</span><span class="stat-value small" id="lv-y"></span></div>
+                            <div class="stat-item"><span class="stat-label">C</span><span class="stat-value small" id="lv-z"></span></div>
+                            <div class="stat-item"><span class="stat-label">Range</span><span class="stat-value small" id="lv-range"></span></div>
+                        </div>
+                        <div class="live-head">Rate in the RIC Frame (m/s)</div>
+                        <div class="stat-grid three">
+                            <div class="stat-item"><span class="stat-label">Ṙ</span><span class="stat-value small" id="lv-vx"></span></div>
+                            <div class="stat-item"><span class="stat-label">İ</span><span class="stat-value small" id="lv-vy"></span></div>
+                            <div class="stat-item"><span class="stat-label">Ċ</span><span class="stat-value small" id="lv-vz"></span></div>
+                        </div>
+                        <div id="lv-model">
+                            <div class="live-head">Course Model (RMOEs)</div>
+                            <div class="motion-name" id="lv-motion"></div>
+                            <div class="stat-grid three" style="margin-top: 0.3rem;">
+                                <div class="stat-item"><span class="stat-label">x<sub>C</sub> (km)</span><span class="stat-value small" id="lv-xc"></span></div>
+                                <div class="stat-item"><span class="stat-label">y<sub>C0</sub> (km)</span><span class="stat-value small" id="lv-yc0"></span></div>
+                                <div class="stat-item"><span class="stat-label">C (km)</span><span class="stat-value small" id="lv-c"></span></div>
+                                <div class="stat-item"><span class="stat-label">M<sub>0</sub></span><span class="stat-value small" id="lv-m0"></span></div>
+                                <div class="stat-item"><span class="stat-label">z<sub>max</sub> (km)</span><span class="stat-value small" id="lv-zmax"></span></div>
+                                <div class="stat-item"><span class="stat-label">ΔM<sub>0</sub></span><span class="stat-value small" id="lv-dm0"></span></div>
+                                <div class="stat-item"><span class="stat-label">Drift (km/rev)</span><span class="stat-value small" id="lv-drift"></span></div>
+                                <div class="stat-item" style="grid-column: span 2;"><span class="stat-label">Course model fit</span><span class="stat-value small" id="lv-fit"></span></div>
+                            </div>
+                        </div>
+                        <p class="panel-text muted" id="lv-nomodel" style="margin-top: 0.4rem;">The target's orbit is not circular, so the course model (RMOEs) does not apply.</p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">View Options</div>
+                        <div class="opt-row">
+                            <span class="opt-label">Scale</span>
+                            <div class="segmented" id="scale-pick" role="group" aria-label="Scale">
+                                <button type="button" data-value="true" aria-pressed="false">True Scale</button>
+                                <button type="button" data-value="mag" aria-pressed="true">Magnified</button>
+                            </div>
+                        </div>
+                        <div class="mag-row" id="mag-row">
+                            <label for="mag">Magnification</label>
+                            <input type="range" id="mag" min="0" max="1000" step="1" value="500">
+                            <span class="mono" id="mag-read"></span>
+                        </div>
+                        <div class="opt-row">
+                            <span class="opt-label">Frame</span>
+                            <div class="segmented" id="frame-pick" role="group" aria-label="Inertial frame">
+                                <button type="button" data-value="ECI" aria-pressed="true">ECI</button>
+                                <button type="button" data-value="ECEF" aria-pressed="false">ECEF</button>
+                            </div>
+                            <span class="opt-label">Camera</span>
+                            <div class="segmented" id="camera-pick" role="group" aria-label="Camera">
+                                <button type="button" data-value="earth" aria-pressed="true">Earth</button>
+                                <button type="button" data-value="ride" aria-pressed="false">Ride Along</button>
+                            </div>
+                        </div>
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="opt-axes">ECI Axes</label>
+                            <label class="check"><input type="checkbox" id="opt-equator">Equator</label>
+                            <label class="check"><input type="checkbox" id="opt-orbits" checked>Orbit Paths</label>
+                            <label class="check"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
+                            <label class="check"><input type="checkbox" id="opt-shadows" checked>Shadows</label>
+                            <label class="check"><input type="checkbox" id="opt-labels" checked>Labels</label>
+                            <label class="check"><input type="checkbox" id="opt-model">Course Model</label>
+                            <label class="check"><input type="checkbox" id="opt-shared" checked>Shared Scale</label>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Key Terms</div>
+                        <ul class="terms">
+                            <li><b>Target</b> (green square): the spacecraft the RIC frame rides on. It is the origin.</li>
+                            <li><b>Chase</b> (gold triangle): the other spacecraft.</li>
+                            <li><span class="ric-c">R</span>: radial, away from Earth (up).</li>
+                            <li><span class="ric-c">I</span>: in-track, the way the target is moving (forward).</li>
+                            <li><span class="ric-c">C</span>: cross-track, along the orbit's angular momentum (left).</li>
+                            <li><b>Rev</b>: one orbit of the target.</li>
+                            <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track, the way the target is moving.</li>
+                        </ul>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <script src="../assets/tool-kit.js"></script>
+    <script src="../assets/earth-land.js"></script>
+    <script src="../assets/earth-scene.js"></script>
+    <script src="rpo-math.js"></script>
+    <script src="rpo-views.js"></script>
+    <script src="two-views.js"></script>
+</body>
+</html>

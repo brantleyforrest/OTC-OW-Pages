@@ -11,3 +11,22 @@
 *.dotm
 ~$*.doc*
 
+# PDF files
+*.pdf
+
+# PowerPoint presentations and lock files
+*.ppt
+*.pptx
+*.pptm
+*.potx
+*.potm
+*.pps
+*.ppsx
+~$*.ppt*
+
+
+# Server: private files, local data, generated deploy files, and packages (never commit)
+_server/secrets/
+_server/data/
+_server/deploy/out/
+node_modules/

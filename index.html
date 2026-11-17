@@ -266,6 +266,12 @@
             border: 1px solid rgba(245, 158, 11, 0.3);
         }
 
+        .status-pill.todo {
+            background: rgba(148, 163, 184, 0.12);
+            color: var(--text-muted);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
         .portal-card h2 {
             font-size: 1.35rem;
             font-weight: 600;
@@ -695,8 +701,94 @@
             cursor: not-allowed;
         }
 
+        /* Dev mode: cards and tabs for pages that are still being built stay hidden unless it is on. */
+        html:not(.dev-mode) .dev-only {
+            display: none !important;
+        }
+
+        /* The dev mode switch sits unseen in the bottom right corner of the page. It shows when
+           the pointer is over it, when it has keyboard focus, and while dev mode is on. */
+        .dev-toggle {
+            position: absolute;
+            right: 0.4rem;
+            bottom: 0.3rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            height: 24px;
+            padding: 0 0.45rem;
+            border: 1px solid transparent;
+            border-radius: 9999px;
+            background: none;
+            color: var(--text-muted);
+            font-family: var(--font-sans);
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .dev-toggle:hover,
+        .dev-toggle:focus-visible,
+        .dev-toggle[aria-checked="true"] {
+            opacity: 1;
+        }
+
+        .dev-toggle:focus-visible {
+            outline: 2px solid var(--accent-blue);
+            outline-offset: 2px;
+        }
+
+        .dev-toggle-text {
+            display: none;
+        }
+
+        .dev-toggle:hover .dev-toggle-text,
+        .dev-toggle:focus-visible .dev-toggle-text,
+        .dev-toggle[aria-checked="true"] .dev-toggle-text {
+            display: inline;
+        }
+
+        .dev-toggle-track {
+            position: relative;
+            width: 24px;
+            height: 12px;
+            border-radius: 9999px;
+            background: var(--border-subtle);
+        }
+
+        .dev-toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: left 0.15s ease;
+        }
+
+        .dev-toggle[aria-checked="true"] {
+            color: var(--badge-amber);
+            border-color: rgba(245, 158, 11, 0.3);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .dev-toggle[aria-checked="true"] .dev-toggle-track {
+            background: rgba(245, 158, 11, 0.35);
+        }
+
+        .dev-toggle[aria-checked="true"] .dev-toggle-knob {
+            left: 14px;
+            background: var(--badge-amber);
+        }
+
         /* Footer */
         footer.site-footer {
+            position: relative;
             border-top: 1px solid var(--border-subtle);
             padding: 2.5rem 1.5rem;
             background: #040811;
@@ -771,6 +863,11 @@
 
             .nav-text-short {
                 display: inline;
+            }
+
+            /* With the third tab showing, the GitHub link keeps its icon and drops its label so the bar fits. */
+            html.dev-mode .nav-link-ext span {
+                display: none;
             }
 
             header.hero {
@@ -1003,6 +1100,15 @@
             }
         }
     </style>
+    <script>
+        // Dev mode shows the cards and tabs for pages that are still being built. The switch is in
+        // the bottom right corner of the page, and the choice is kept in this browser only.
+        try {
+            if (localStorage.getItem('otc-dev-mode') === '1') {
+                document.documentElement.classList.add('dev-mode');
+            }
+        } catch (e) { /* storage is blocked: dev mode starts off */ }
+    </script>
 </head>
 <body>
 
@@ -1038,6 +1144,15 @@
                     </svg>
                     <span class="nav-text-full">Study</span>
                     <span class="nav-text-short">Study</span>
+                </a>
+                <a href="#game" class="nav-link dev-only" id="nav-game" data-view="game">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <rect x="14" y="4" width="6.5" height="6.5"></rect>
+                        <path d="M3.5 20l3.5-7 3.5 7z"></path>
+                        <path d="M9 12c1.5-2.5 2.5-3.5 4.5-4" stroke-dasharray="2 2.5"></path>
+                    </svg>
+                    <span class="nav-text-full">Drift</span>
+                    <span class="nav-text-short">Drift</span>
                 </a>
                 <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
                     <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
@@ -1227,6 +1342,74 @@
                         <a href="orbits/inertial-rendezvous.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                     </div>
 
+                    <!-- Pages still being built. The dev-only class hides each card unless dev mode is on. -->
+                    <div class="tool-card dev-only" data-tags="relative motion ric eci two views chase target orbital elements difference radial in-track cross-track rpo 3d orbit">
+                        <div class="card-top">
+                            <div class="card-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2.5" y="5" width="19" height="14" rx="2"></rect>
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <circle cx="7.2" cy="12" r="1.6" fill="currentColor"></circle>
+                                    <circle cx="16.8" cy="12" r="1.6" fill="currentColor"></circle>
+                                </svg>
+                            </div>
+                            <span class="status-pill wip">Work in Progress</span>
+                        </div>
+                        <h2 class="card-title">Relative Motion: Two Views</h2>
+                        <p class="card-desc">Two spacecraft on two orbits around Earth, seen from space and seen from one of them. Change how the orbits differ and watch both views on the same clock.</p>
+                        <a href="rpo/two-views.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                    </div>
+
+                    <div class="tool-card dev-only" data-tags="rmoe relative motion orbital elements ric nmc natural motion circumnavigation drift perch corkscrew cw clohessy wiltshire chase target rpo">
+                        <div class="card-top">
+                            <div class="card-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <ellipse cx="12" cy="12" rx="9.5" ry="4.75"></ellipse>
+                                    <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+                                    <circle cx="18.7" cy="8.6" r="1.8" fill="currentColor"></circle>
+                                </svg>
+                            </div>
+                            <span class="status-pill wip">Work in Progress</span>
+                        </div>
+                        <h2 class="card-title">RMOE Explorer</h2>
+                        <p class="card-desc">Six numbers describe any relative motion. Change each relative motion orbital element and see the one thing it moves, in the RIC frame and in the inertial frame side by side.</p>
+                        <a href="rpo/rmoe-explorer.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                    </div>
+
+                    <div class="tool-card dev-only" data-tags="ric burn delta v radial in-track cross-track nmc drift maneuver relative motion rpo chase target">
+                        <div class="card-top">
+                            <div class="card-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 20c6 1.5 12 0 16-5" stroke-dasharray="2 3"></path>
+                                    <line x1="7" y1="15" x2="15" y2="7"></line>
+                                    <polyline points="10.5 7 15 7 15 11.5"></polyline>
+                                    <circle cx="7" cy="15" r="2" fill="currentColor"></circle>
+                                </svg>
+                            </div>
+                            <span class="status-pill todo">To Do</span>
+                        </div>
+                        <h2 class="card-title">RIC Burn Sandbox</h2>
+                        <p class="card-desc">A burn does not send you where it points. Fire radial, in-track, and cross-track burns and watch what each one does to the relative motion.</p>
+                        <a href="rpo/burn-sandbox.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                    </div>
+
+                    <div class="tool-card dev-only" data-tags="maneuver planner burn plan delta v rmoe ric perch nmc relative motion rpo passive safety chase target">
+                        <div class="card-top">
+                            <div class="card-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3.5 17c3-8 5.5-8 8.5-4s5.5 3 8.5-6"></path>
+                                    <circle cx="3.5" cy="17" r="1.8" fill="currentColor"></circle>
+                                    <circle cx="12" cy="13" r="1.8" fill="currentColor"></circle>
+                                    <circle cx="20.5" cy="7" r="1.8" fill="currentColor"></circle>
+                                </svg>
+                            </div>
+                            <span class="status-pill todo">To Do</span>
+                        </div>
+                        <h2 class="card-title">Maneuver Planner</h2>
+                        <p class="card-desc">Write a short list of small burns, see the whole path they produce, and check it against where you meant to go.</p>
+                        <a href="rpo/maneuver-planner.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                    </div>
+
                     <div class="tool-card" data-tags="reference frames eci ecef ric coordinates axes orbit 3d inertial">
                         <div class="card-top">
                             <div class="card-icon">
@@ -1291,6 +1474,31 @@
                 </div>
             </div>
 
+            <!-- Still being built. The dev-only class hides the card unless dev mode is on. -->
+            <div class="portal-card dev-only">
+                <div class="portal-card-icon gold">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                </div>
+
+                <span class="status-pill wip">Work in Progress</span>
+                <h2>Test 2 Practice</h2>
+                <p class="desc">
+                    Relative motion in the RIC frame: naming the RIC axes in a drawing, the relative motion that follows from two sets of orbital elements, and the ideas behind the CW equations, with card-matching drills. More sections are added as the topics are taught. Practice mode walks through the steps beside the picture. Test mode accepts answers only, then shows the solution.
+                </p>
+
+                <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
+                    <a href="practice/test-2-practice.html" class="btn-launch">
+                        Launch Tool
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
             <div class="portal-card">
                 <div class="portal-card-icon gold">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1319,40 +1527,82 @@
         </main>
     </div>
 
+    <!-- View 3: Drift (the game). Still being built: shown only in dev mode. -->
+    <div id="view-game" class="portal-view dev-only">
+        <header class="hero">
+            <h1>Drift</h1>
+        </header>
+
+        <main class="content">
+            <div class="portal-card">
+                <div class="portal-card-icon gold">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+                        <rect x="14" y="4" width="6.5" height="6.5"></rect>
+                        <path d="M3.5 20l3.5-7 3.5 7z"></path>
+                        <path d="M9 12c1.5-2.5 2.5-3.5 4.5-4" stroke-dasharray="2 2.5"></path>
+                    </svg>
+                </div>
+
+                <span class="status-pill wip">Work in Progress</span>
+                <h2>Drift</h2>
+                <p class="desc">
+                    A turn-based game of relative motion. Each turn you choose one small burn, then coast: stop a drift, move a perch, or circle the target on the least delta-V. Play alone, or join a room with a code.
+                </p>
+
+                <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
+                    <a href="https://brantleyforrest.github.io/OTC-OW-Drift/drift/" class="btn-launch">
+                        Play Drift
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
+
     <!-- Site Footer -->
     <footer class="site-footer">
         <p class="footer-credit">Developed by Brantley Forrest and Grant Nehls &middot; Copyright &copy; 2026 &middot; Licensed under <a href="LICENSE">GNU GPL v3</a></p>
+        <button type="button" id="dev-toggle" class="dev-toggle" role="switch" aria-checked="false" aria-label="Dev mode" title="Dev mode: show pages that are still being built">
+            <span class="dev-toggle-text">Dev mode</span>
+            <span class="dev-toggle-track" aria-hidden="true"><span class="dev-toggle-knob"></span></span>
+        </button>
     </footer>
 
     <!-- Seamless Client-Side Navigation Engine -->
     <script>
-        function switchView(target, pushState = true) {
-            const isGuides = target === 'guides';
-            const toolsView = document.getElementById('view-tools');
-            const guidesView = document.getElementById('view-guides');
-            const navTools = document.getElementById('nav-tools');
-            const navGuides = document.getElementById('nav-guides');
+        // One row per tab. A row with devOnly opens only while dev mode is on.
+        const VIEWS = {
+            tools:  { view: 'view-tools',  nav: 'nav-tools',  title: 'Interactive Tools | OTC OW', hash: '' },
+            guides: { view: 'view-guides', nav: 'nav-guides', title: 'Study | OTC OW',             hash: '#study' },
+            game:   { view: 'view-game',   nav: 'nav-game',   title: 'Drift | OTC OW',             hash: '#game', devOnly: true }
+        };
 
-            if (isGuides) {
-                const wasActive = guidesView.classList.contains('active');
-                toolsView.classList.remove('active');
-                guidesView.classList.add('active');
-                navTools.classList.remove('active');
-                navGuides.classList.add('active');
-                document.title = 'Study | OTC OW';
-                if (pushState && (!wasActive || window.location.hash.toLowerCase() !== '#study')) {
-                    history.pushState({ view: 'guides' }, '', '#study');
-                }
-            } else {
-                const wasActive = toolsView.classList.contains('active');
-                guidesView.classList.remove('active');
-                toolsView.classList.add('active');
-                navGuides.classList.remove('active');
-                navTools.classList.add('active');
-                document.title = 'Interactive Tools | OTC OW';
-                if (pushState && (!wasActive || window.location.hash)) {
+        function isDevMode() {
+            return document.documentElement.classList.contains('dev-mode');
+        }
+
+        function switchView(target, pushState = true) {
+            let name = Object.prototype.hasOwnProperty.call(VIEWS, target) ? target : 'tools';
+            if (VIEWS[name].devOnly && !isDevMode()) name = 'tools';
+            const chosen = VIEWS[name];
+            const wasActive = document.getElementById(chosen.view).classList.contains('active');
+
+            Object.keys(VIEWS).forEach(key => {
+                document.getElementById(VIEWS[key].view).classList.toggle('active', key === name);
+                document.getElementById(VIEWS[key].nav).classList.toggle('active', key === name);
+            });
+            document.title = chosen.title;
+
+            if (pushState) {
+                if (chosen.hash) {
+                    if (!wasActive || window.location.hash.toLowerCase() !== chosen.hash) {
+                        history.pushState({ view: name }, '', chosen.hash);
+                    }
+                } else if (!wasActive || window.location.hash) {
                     const cleanUrl = window.location.pathname + window.location.search;
-                    history.pushState({ view: 'tools' }, '', cleanUrl);
+                    history.pushState({ view: name }, '', cleanUrl);
                 }
             }
             window.scrollTo({ top: 0, behavior: 'instant' });
@@ -1370,6 +1620,8 @@
             const hash = window.location.hash.toLowerCase();
             if (hash === '#study' || hash === '#guides' || hash === '#study-guides') {
                 switchView('guides', false);
+            } else if (hash === '#game' || hash === '#drift') {
+                switchView('game', false);
             } else {
                 switchView('tools', false);
             }
@@ -1420,7 +1672,8 @@
                 searchResultsSection.style.display = 'block';
                 searchResultsGrid.innerHTML = '';
 
-                const cards = lessonsContainer.querySelectorAll('.tool-card');
+                // Cards for pages still being built can be found only while dev mode is on.
+                const cards = lessonsContainer.querySelectorAll(isDevMode() ? '.tool-card' : '.tool-card:not(.dev-only)');
                 let matchesCount = 0;
 
                 {
@@ -1463,6 +1716,38 @@
         }
 
         initToolSearch();
+
+        // Dev mode switch (bottom right corner of the page)
+        function initDevMode() {
+            const toggle = document.getElementById('dev-toggle');
+            if (!toggle) return;
+            toggle.setAttribute('aria-checked', isDevMode() ? 'true' : 'false');
+
+            toggle.addEventListener('click', () => {
+                const on = !isDevMode();
+                document.documentElement.classList.toggle('dev-mode', on);
+                toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+                try {
+                    if (on) localStorage.setItem('otc-dev-mode', '1');
+                    else localStorage.removeItem('otc-dev-mode');
+                } catch (e) { /* storage is blocked: the choice lasts until the page is closed */ }
+
+                // A tab that exists only in dev mode cannot stay open once dev mode is off,
+                // and a link to it starts working once dev mode is on.
+                const hash = window.location.hash.toLowerCase();
+                if (!on && document.getElementById('view-game').classList.contains('active')) {
+                    switchView('tools', true);
+                } else if (on && (hash === '#game' || hash === '#drift')) {
+                    checkHash();
+                }
+
+                // Redo an open search so its results match what is now shown.
+                const searchInput = document.getElementById('tool-search');
+                if (searchInput) searchInput.dispatchEvent(new Event('input'));
+            });
+        }
+
+        initDevMode();
     </script>
 </body>
 </html>
