@@ -191,3 +191,36 @@
 .rpo-table td { font-family: var(--font-mono); }
 .rpo-table tr.hl td { background: rgba(224, 182, 79, 0.12); }
 .rpo-table td.changed { color: var(--accent-gold); }
+
+/* ---------- Scale bars (3D box and inertial pane; the flat panes draw theirs on the canvas) ---------- */
+.rpo-scalebar {
+    position: absolute;
+    right: 0.4rem;
+    bottom: 0.35rem;
+    z-index: 2;
+    pointer-events: none;
+    padding: 0.2rem 0.35rem 0.15rem;
+    border-radius: 4px;
+    background: rgba(6, 11, 20, 0.72);
+    font: 600 10px "JetBrains Mono", monospace;
+    line-height: 1.25;
+    color: #e8edf5;
+    text-align: center;
+}
+.rpo-scalebar.left { right: auto; left: 0.4rem; }
+.rpo-scalebar .bar {
+    height: 5px;
+    margin: 0 auto 2px;
+    border: 1.5px solid #f0f4fa;
+    border-top: 0;
+}
+.rpo-scalebar span { font-weight: 400; color: var(--text-muted); }
+
+/* A wide five-view stage that is not very wide: give the RIC side more room, so the three flat
+   panes are not too small to read (13-inch laptops at 150 percent scaling). */
+@container (min-aspect-ratio: 3/2) and (max-width: 940px) {
+    .rpo-five .rpo-inertial { flex-basis: 34%; }
+    .rpo-five .rpo-box { flex-basis: 50%; }
+}
+/* In the dual stage the 3D view buttons sit at the bottom of the second pane: keep the bar above them. */
+.rpo-dual .rpo-second .rpo-scalebar.left { bottom: 2.1rem; }

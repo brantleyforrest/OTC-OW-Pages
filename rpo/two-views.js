@@ -84,11 +84,11 @@
         preset: PRESETS.findIndex(p => p.name === DEFAULT_PRESET),
         target: null, diff: null,
         range: 'small', span: 2,
-        t: 0, playing: true, speed: 0.1,
+        t: 0, playing: true, speed: 0.05,
         trail: 'full', roll: 1, stepSize: 0.0625,
         scale: 'mag', mag: 'auto',
         frame: 'ECI', camera: 'earth',
-        axes: false, equator: false, orbits: true, carried: true, shadows: true, labels: true, model: false, shared: true
+        axes: false, equator: false, orbits: true, carried: true, shadows: false, backdrop: true, labels: true, model: false, shared: true
     };
     let sim = null;          // everything derived from the inputs; rebuilt only when they change
     let dirty = true;
@@ -152,50 +152,12 @@
         }
     }
 
-    // Wheel or pinch on a flat pane zooms it about the pointer; with Shared Scale on, all RIC panes zoom.
-    function zoomPlane(plane, f, px, py) {
-        const [w, h] = plane.size();
-        const s0 = 1 / plane.kmPerPx(), s1 = s0 * f;
-        const anchor = px === undefined ? plane.toKm(w / 2, h / 2) : plane.toKm(px, py);
-        const ax = px === undefined ? w / 2 : px, ay = py === undefined ? h / 2 : py;
-        plane.setScale(s1, [anchor[0] + (ax - w / 2) / s1, anchor[1] + (ay - h / 2) / s1]);
-    }
-    planeNames.forEach(name => {
-        const canvas = view.querySelector('.rpo-' + name + ' canvas');
-        canvas.style.touchAction = 'none';
-        const pts = new Map();
-        let pinch = null;
-        function zoom(f, px, py) {
-            const plane = stage[name];
-            if (state.shared) planeNames.forEach(n => zoomPlane(stage[n], f, n === name ? px : undefined, n === name ? py : undefined));
-            else zoomPlane(plane, f, px, py);
-            dirty = true;
-        }
-        canvas.addEventListener('wheel', e => {
-            e.preventDefault();
-            const r = canvas.getBoundingClientRect();
-            zoom(Math.exp(-e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
-        }, { passive: false });
-        canvas.addEventListener('pointerdown', e => {
-            canvas.setPointerCapture(e.pointerId);
-            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
-        });
-        canvas.addEventListener('pointermove', e => {
-            if (!pts.has(e.pointerId)) return;
-            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            if (pts.size === 2 && pinch) {
-                const [a, b] = [...pts.values()];
-                const d = Math.hypot(a.x - b.x, a.y - b.y);
-                const r = canvas.getBoundingClientRect();
-                zoom(d / pinch, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
-                pinch = d;
-            }
-        });
-        const end = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
-        canvas.addEventListener('pointerup', end);
-        canvas.addEventListener('pointercancel', end);
-    });
+    // Drag a flat pane to slide it, wheel or pinch to zoom; with Shared Scale on, all flat panes move together.
+    planeNames.forEach(name => V.attachPanZoom(view.querySelector('.rpo-' + name + ' canvas'), {
+        plane: () => stage[name],
+        linked: () => (state.shared ? planeNames.map(n => stage[n]) : [stage[name]]),
+        onChange: () => { dirty = true; }
+    }));
 
     /* ---------- Drawing ---------- */
     function sampleIndex(t) {
@@ -227,7 +189,9 @@
         planeNames.forEach(n => stage[n].draw(data));
         if (stage.box) {
             stage.box.setShadows(state.shadows);
-            stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho, model: showModel ? sim.modelPath : null });
+            stage.box.setBackdrop(state.backdrop);
+            stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho, model: showModel ? sim.modelPath : null,
+                basis: rel.basis, rT: rel.rT, t: state.t });
         }
         if (stage.inertial) stage.inertial.update({ t: state.t, rho: rel.rho, basis: rel.basis, rT: rel.rT, from, to, ghost: state.trail !== 'off' });
         updateLive(rel);
@@ -540,7 +504,7 @@
     });
     Kit.bindSegmented($('camera-pick'), v => { state.camera = v; applyViewOptions(); dirty = true; });
     [['opt-axes', 'axes'], ['opt-equator', 'equator'], ['opt-orbits', 'orbits'], ['opt-carried', 'carried'],
-     ['opt-shadows', 'shadows'], ['opt-labels', 'labels']].forEach(([id, key]) => {
+     ['opt-shadows', 'shadows'], ['opt-backdrop', 'backdrop'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
     $('opt-model').addEventListener('change', e => { state.model = e.target.checked; refit(); dirty = true; });

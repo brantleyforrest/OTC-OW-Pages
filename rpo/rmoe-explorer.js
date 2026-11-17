@@ -60,11 +60,11 @@
         preset: PRESETS.findIndex(p => p.name === DEFAULT_PRESET),
         target: 'geo',
         rmoe: { ...ZERO },
-        t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.1,
+        t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.05,
         second: 'behind',
         annot: { center: true, size: false, corners: false, cross: false },
         hot: null, lastRow: null,
-        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, labels: true
+        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, backdrop: true, labels: true
     };
     let sim = null, dirty = true;
 
@@ -73,6 +73,12 @@
     try { THREE = await import(THREE_URL); } catch (err) { THREE = null; }
     const view = $('view');
     const stage = V.createDualStage(view, { THREE, second: 'behind', onResize: () => { if (sim) { refit(true); dirty = true; } } });
+
+    // Drag a flat pane to slide it, wheel or pinch to zoom; both flat panes move together.
+    // Fit Views, a new preset, or a slider puts them back.
+    const flatPanes = () => [stage.left, stage.secondPlane()].filter(Boolean);
+    V.attachPanZoom(view.querySelector('.rpo-left canvas'), { plane: () => stage.left, linked: flatPanes, onChange: () => { dirty = true; } });
+    V.attachPanZoom(view.querySelector('.rpo-second canvas.c2d'), { plane: () => stage.secondPlane() || stage.left, linked: flatPanes, onChange: () => { dirty = true; } });
 
     const targetCoe = () => TARGETS[state.target];
     // The RMOEs the math uses: M_0 and ΔM_0 are undefined when C or z_max is zero.
@@ -208,10 +214,15 @@
         };
         const panes = [stage.left].concat(stage.secondPlane() ? [stage.secondPlane()] : []);
         panes.forEach(p => { p.draw(data); annotate(p, now, rNow); });
-        if (stage.box && stage.second() === 'box') stage.box.update({ chase: now, trail });
+        const basis = M.ricBasis(sim.coe, t);
+        if (stage.box && stage.second() === 'box') {
+            stage.box.setBackdrop(state.backdrop);
+            stage.box.update({ chase: now, trail, ghost: sim.path, basis, rT: basis.r, t });
+        }
         if (stage.inertial) {
-            const basis = M.ricBasis(sim.coe, t);
-            stage.inertial.update({ t, rho: now, basis, rT: basis.r, from: 0, to: k });
+            // ghost: the whole two-rev path is drawn faintly from the start, so the carried trail never
+            // vanishes when the clock wraps back to epoch.
+            stage.inertial.update({ t, rho: now, basis, rT: basis.r, from: 0, to: k, ghost: true });
         }
         updateLive(now, rNow);
     }
@@ -415,7 +426,7 @@
         dirty = true;
     });
     Kit.bindSegmented($('camera-pick'), v => { state.camera = v; applyViewOptions(); dirty = true; });
-    [['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-labels', 'labels']].forEach(([id, key]) => {
+    [['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
 

@@ -66,6 +66,11 @@
         @media (min-width: 1081px) and (min-height: 600px) {
             .tool-layout { --aside-w: 27rem; }
         }
+        /* 13- and 14-inch laptops (about 1280 to 1440 CSS pixels wide): a narrower side column,
+           so the views keep their size. */
+        @media (min-width: 1081px) and (max-width: 1440px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 23rem; }
+        }
             /* The RMOE table: symbol | slider and number | now, with the meaning below */
         .rm-table { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) 4.6rem 4.4rem; gap: 0.1rem 0.4rem; align-items: center; }
         .rm-head { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); text-align: right; }
@@ -163,8 +168,8 @@
                             <input type="range" id="scrubber" min="0" max="1000" step="1" value="0">
                         </div>
                         <div class="segmented" id="speed" role="group" aria-label="Speed">
-                            <button type="button" data-value="0.05" aria-pressed="false">Slow</button>
-                            <button type="button" data-value="0.1" aria-pressed="true">Normal</button>
+                            <button type="button" data-value="0.05" aria-pressed="true">Slow</button>
+                            <button type="button" data-value="0.1" aria-pressed="false">Normal</button>
                             <button type="button" data-value="0.25" aria-pressed="false">Fast</button>
                         </div>
                     </div>
@@ -249,6 +254,7 @@
                         <div class="ctl-checks">
                             <label class="check"><input type="checkbox" id="opt-inertial" checked>Inertial Trail</label>
                             <label class="check"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
+                            <label class="check" title="Earth and the stars behind the 3D RIC view, in their true directions from the target"><input type="checkbox" id="opt-backdrop" checked>Earth and Stars</label>
                             <label class="check"><input type="checkbox" id="opt-labels" checked>Labels</label>
                         </div>
                     </div>

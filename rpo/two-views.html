@@ -98,6 +98,11 @@
         @media (min-width: 1081px) and (min-height: 600px) {
             .tool-layout { --aside-w: 27rem; }
         }
+        /* 13- and 14-inch laptops (about 1280 to 1440 CSS pixels wide): a narrower side column,
+           so the views keep their size. */
+        @media (min-width: 1081px) and (max-width: 1440px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 23rem; }
+        }
     </style>
 </head>
 <body>
@@ -174,8 +179,8 @@
                             <input type="range" id="scrubber" min="0" max="1000" step="1" value="0">
                         </div>
                         <div class="segmented" id="speed" role="group" aria-label="Speed">
-                            <button type="button" data-value="0.05" aria-pressed="false">Slow</button>
-                            <button type="button" data-value="0.1" aria-pressed="true">Normal</button>
+                            <button type="button" data-value="0.05" aria-pressed="true">Slow</button>
+                            <button type="button" data-value="0.1" aria-pressed="false">Normal</button>
                             <button type="button" data-value="0.25" aria-pressed="false">Fast</button>
                         </div>
                     </div>
@@ -281,7 +286,8 @@
                             <label class="check"><input type="checkbox" id="opt-equator">Equator</label>
                             <label class="check"><input type="checkbox" id="opt-orbits" checked>Orbit Paths</label>
                             <label class="check"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
-                            <label class="check"><input type="checkbox" id="opt-shadows" checked>Shadows</label>
+                            <label class="check"><input type="checkbox" id="opt-shadows">Shadows</label>
+                            <label class="check" title="Earth and the stars behind the 3D RIC box, in their true directions from the target"><input type="checkbox" id="opt-backdrop" checked>Earth and Stars</label>
                             <label class="check"><input type="checkbox" id="opt-labels" checked>Labels</label>
                             <label class="check"><input type="checkbox" id="opt-model">Course Model</label>
                             <label class="check"><input type="checkbox" id="opt-shared" checked>Shared Scale</label>

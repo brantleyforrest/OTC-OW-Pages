@@ -29,9 +29,9 @@
 
     // For each view: which state index runs across (h, positive to the LEFT) and which runs up (v).
     const PLANES = {
-        left: { h: 1, v: 0, badge: 'RIC · from the left', hLabel: '+I forward', vLabel: '+R up' },
-        behind: { h: 2, v: 0, badge: 'RIC · from behind', hLabel: '+C left', vLabel: '+R up' },
-        above: { h: 2, v: 1, badge: 'RIC · from above', hLabel: '+C left', vLabel: '+I forward' }
+        left: { h: 1, v: 0, badge: 'RIC · from the left', hLabel: '+I', vLabel: '+R' },
+        behind: { h: 2, v: 0, badge: 'RIC · from behind', hLabel: '+C', vLabel: '+R' },
+        above: { h: 2, v: 1, badge: 'RIC · from above', hLabel: '+C', vLabel: '+I' }
     };
 
     // A path is a Float64Array of x, y, z triples, or an array of [x, y, z].
@@ -54,6 +54,32 @@
         const pow = Math.pow(10, Math.floor(Math.log10(raw)));
         const m = raw / pow;
         return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * pow;
+    }
+    // The smallest value of the 1-2-5 series that is at least x.
+    function niceAtLeast(x) {
+        const pow = Math.pow(10, Math.floor(Math.log10(x)));
+        const m = x / pow;
+        return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * pow;
+    }
+    // A distance in km as people read it: 0.5, 20, 1,500.
+    function kmText(v) {
+        if (v >= 1) return Math.round(v).toLocaleString('en-US');
+        return String(Number(v.toPrecision(1)));
+    }
+    // An HTML scale bar laid over a pane: a bar of a given pixel length, with its distance under it.
+    function scaleBarEl(host, side) {
+        const el = document.createElement('div');
+        el.className = 'rpo-scalebar' + (side === 'left' ? ' left' : '');
+        el.innerHTML = '<div class="bar"></div><div class="txt"></div>';
+        host.appendChild(el);
+        return {
+            el,
+            set(px, text) {
+                el.style.display = px > 0 ? '' : 'none';
+                el.firstChild.style.width = Math.round(px) + 'px';
+                el.lastChild.innerHTML = text;
+            }
+        };
     }
     function stepText(step) {
         return step >= 1 ? String(Math.round(step)) : String(Number(step.toPrecision(1)));
@@ -151,8 +177,28 @@
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
             }
             if (compact) return;
-            ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-            ctx.fillText('grid ' + stepText(step) + ' km', w - 6, h - 5);
+            drawScaleBar(step);
+        }
+
+        // A bar one grid square long (or a longer 1-2-5 length if a square is under 30 px),
+        // labeled with its length, in the bottom right corner.
+        function drawScaleBar(step) {
+            const km = step * scale >= 30 ? step : niceAtLeast(30 / scale);
+            const len = km * scale;
+            const text = kmText(km) + ' km';
+            ctx.font = '600 10px "JetBrains Mono", monospace';
+            const tw = ctx.measureText(text).width;
+            const boxW = Math.max(len, tw) + 10;
+            const x1 = w - 6 - (boxW - len) / 2, x0 = x1 - len, y = h - 18;
+            ctx.fillStyle = 'rgba(6, 11, 20, 0.72)';
+            ctx.fillRect(w - 6 - boxW, y - 7, boxW, 24);
+            ctx.strokeStyle = '#f0f4fa'; ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x0, y - 4); ctx.lineTo(x0, y); ctx.lineTo(x1, y); ctx.lineTo(x1, y - 4);
+            ctx.stroke();
+            ctx.fillStyle = '#e8edf5';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.fillText(text, (x0 + x1) / 2, y + 2);
         }
 
         function drawFrameLabels() {
@@ -173,17 +219,20 @@
             ctx.fillRect(4, 4, bw + 8, 16);
             ctx.fillStyle = COLORS.ric;
             ctx.fillText(plane.badge, 8, 6);
-            const ox = 40, oy = 58;
-            arrow(ox, oy, ox - 26, oy, COLORS.ric, 1.5);
-            arrow(ox, oy, ox, oy - 26, COLORS.ric, 1.5);
+            // On a small pane the axis key shrinks, so it does not cover the picture.
+            const small = Math.min(w, h) < 220;
+            const L = small ? 16 : 26, ox = small ? 26 : 40, oy = small ? 42 : 58;
+            if (small) ctx.font = '600 10px Inter, sans-serif';
+            arrow(ox, oy, ox - L, oy, COLORS.ric, 1.5);
+            arrow(ox, oy, ox, oy - L, COLORS.ric, 1.5);
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-            ctx.fillText(plane.vLabel, ox + 6, oy - 20);
+            ctx.fillText(plane.vLabel, ox + 5, oy - L + 6);
             ctx.textBaseline = 'top';
-            ctx.fillText(plane.hLabel, ox - 26, oy + 5);
-            if (planeName === 'left') {
+            ctx.fillText(plane.hLabel, ox - L, oy + 4);
+            if (planeName === 'left' && w >= 230) {
                 ctx.fillStyle = COLORS.text; ctx.font = '10px Inter, sans-serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                ctx.fillText('To Earth ↓', w / 2, h - 5);
+                ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+                ctx.fillText('To Earth ↓', 8, h - 5);
             }
         }
 
@@ -267,6 +316,8 @@
 
         return {
             plane: planeName, canvas, resize, setExtent, setScale, fitScale, boxCenter, draw, toKm, toPx,
+            axes: [plane.h, plane.v],
+            center: () => center.slice(),
             kmPerPx: () => 1 / scale,
             size: () => [w, h]
         };
@@ -300,6 +351,82 @@
         const common = Math.min.apply(null, scales);
         panes.forEach((pane, k) => pane.setScale(shared === false ? scales[k] : common, pane.boxCenter(box)));
         return { box, scale: common };
+    }
+
+    // Drag to slide and wheel or pinch to zoom a flat pane.
+    // options: plane() -> the pane this canvas shows now; linked() -> every pane that moves with it
+    // (sliding moves each linked pane along the RIC axes it shares; zooming keeps one scale);
+    // onChange() after every move. Fit Views (fitPanes) puts the panes back.
+    function attachPanZoom(canvas, options) {
+        canvas.style.touchAction = 'none';
+        canvas.style.cursor = 'grab';
+        const pts = new Map();
+        let pinch = null;
+        const linked = () => { const l = options.linked ? options.linked() : []; return l.length ? l : [options.plane()]; };
+        function zoomPane(pane, f, px, py) {
+            const [w, h] = pane.size();
+            const s1 = f / pane.kmPerPx();
+            const ax = px === undefined ? w / 2 : px, ay = py === undefined ? h / 2 : py;
+            const anchor = pane.toKm(ax, ay);
+            pane.setScale(s1, [anchor[0] + (ax - w / 2) / s1, anchor[1] + (ay - h / 2) / s1]);
+        }
+        function zoom(f, px, py) {
+            const self = options.plane();
+            zoomPane(self, f, px, py);
+            // The other panes zoom about their middles, then take the zoomed pane's center on every
+            // axis they share with it, so a shared axis (R in the views from the left and from
+            // behind) stays lined up: the target sits at the same height in both.
+            const c = self.center(), at = [null, null, null];
+            at[self.axes[0]] = c[0]; at[self.axes[1]] = c[1];
+            linked().forEach(p => {
+                if (p === self) return;
+                zoomPane(p, f);
+                const q = p.center();
+                p.setScale(1 / p.kmPerPx(), [at[p.axes[0]] !== null ? at[p.axes[0]] : q[0], at[p.axes[1]] !== null ? at[p.axes[1]] : q[1]]);
+            });
+            if (options.onChange) options.onChange();
+        }
+        function slide(dx, dy) {
+            const self = options.plane();
+            const d = [0, 0, 0], k = self.kmPerPx();
+            d[self.axes[0]] = dx * k;          // dragging right moves the picture right
+            d[self.axes[1]] = dy * k;          // dragging down moves the picture down
+            const moved = [false, false, false];
+            moved[self.axes[0]] = moved[self.axes[1]] = true;
+            linked().forEach(p => {
+                const c = p.center();
+                p.setScale(1 / p.kmPerPx(), [c[0] + (moved[p.axes[0]] ? d[p.axes[0]] : 0), c[1] + (moved[p.axes[1]] ? d[p.axes[1]] : 0)]);
+            });
+            if (options.onChange) options.onChange();
+        }
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const r = canvas.getBoundingClientRect();
+            zoom(Math.exp(-e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
+        }, { passive: false });
+        canvas.addEventListener('pointerdown', e => {
+            canvas.setPointerCapture(e.pointerId);
+            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            canvas.style.cursor = 'grabbing';
+            if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
+        });
+        canvas.addEventListener('pointermove', e => {
+            const last = pts.get(e.pointerId);
+            if (!last) return;
+            const dx = e.clientX - last.x, dy = e.clientY - last.y;
+            last.x = e.clientX; last.y = e.clientY;
+            if (pts.size === 1) { if (dx || dy) slide(dx, dy); return; }
+            if (pts.size === 2 && pinch) {
+                const [a, b] = [...pts.values()];
+                const d = Math.hypot(a.x - b.x, a.y - b.y);
+                const r = canvas.getBoundingClientRect();
+                zoom(d / pinch, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+                pinch = d;
+            }
+        });
+        const end = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) canvas.style.cursor = 'grab'; };
+        canvas.addEventListener('pointerup', end);
+        canvas.addEventListener('pointercancel', end);
     }
 
     // A small static plot of one path with a direction arrow, for answer choices.
@@ -337,9 +464,49 @@
         const scene = new THREE.Scene();
         const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000);
         camera.up.set(0, 0, 1);
-        let w = 300, h = 150, half = 1, zoom = 1, shadows = true;
+        let w = 300, h = 150, half = 1, zoom = 1, shadows = false;
         const view = { az: BOX_VIEWS['3d'].az, el: BOX_VIEWS['3d'].el };
         let turn = null;
+
+        // Backdrop: Earth and the stars in their true directions around the target. It is a second
+        // scene in Earth radii, seen by a perspective camera that looks at the target along the box
+        // camera's line of sight, from 2.5 orbit radii back, so Earth stays in view below the box.
+        // The world group turns inertial vectors into the box axes (X = I, Y = C, Z = R), so Earth
+        // sits straight down -R and the stars stay fixed in inertial space.
+        let backdropOn = true, haveBasis = false, orbitR = 1;
+        const bg = (() => {
+            if (!window.EarthScene || !window.RpoMath) return null;
+            const bgScene = new THREE.Scene();
+            const bgCamera = new THREE.PerspectiveCamera(60, 2, 1e-4, 1e4);
+            const world = new THREE.Group();
+            world.matrixAutoUpdate = false;
+            bgScene.add(world);
+            const holder = new THREE.Group();
+            world.add(holder);
+            const earth = window.EarthScene.addEarth(THREE, renderer, holder);
+            const stars = window.EarthScene.addStars(THREE, world);
+            world.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const sun = new THREE.DirectionalLight(0xffffff, 2.1);
+            sun.position.set(6000, 2000, 5000);         // the inertial pane's sun direction, far off
+            world.add(sun);
+            return { scene: bgScene, camera: bgCamera, world, holder, earth, stars };
+        })();
+        function setBackdropFrame(basis, rT, t) {
+            if (!bg || !basis || !rT) { haveBasis = false; return; }
+            const M = window.RpoMath, RE = M.RE;
+            const n = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+            const I = n(basis.I), C = n(basis.C), R = n(basis.R);
+            bg.world.matrix.set(
+                I[0], I[1], I[2], 0,
+                C[0], C[1], C[2], 0,
+                R[0], R[1], R[2], 0,
+                0, 0, 0, 1);
+            bg.world.matrixWorldNeedsUpdate = true;
+            bg.holder.position.set(-rT[0] / RE, -rT[1] / RE, -rT[2] / RE);
+            orbitR = Math.hypot(rT[0], rT[1], rT[2]) / RE;
+            bg.earth.pivot.rotation.z = M.OMEGA_E * (t || 0);
+            haveBasis = true;
+        }
 
         function spriteFrom(drawFn, size) {
             const c = document.createElement('canvas');
@@ -376,7 +543,7 @@
         [[1, 0, 0], [0, 1, 0], [0, 0, 1]].forEach(a => frame.add(lineOf([a.map(v => -v), a], COLORS.ric, 0.7)));
         frame.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2, 2, 2)),
             new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.25 })));
-        [['+I forward', [1.16, 0, 0]], ['+C left', [0, 1.16, 0]], ['+R up', [0, 0, 1.12]]].forEach(([text, at]) => {
+        [['+I', [1.1, 0, 0]], ['+C', [0, 1.1, 0]], ['+R', [0, 0, 1.1]]].forEach(([text, at]) => {
             const s = textSprite(text);
             s.userData.at = at;
             sprites.push(s);
@@ -438,6 +605,9 @@
             line.visible = count > 1;
         }
 
+        // Scale bar, bottom left: a length on screen for a line that faces the viewer, the same as
+        // the tick spacing on the axes when that is long enough to see.
+        const bar = canvas.parentElement ? scaleBarEl(canvas.parentElement, 'left') : null;
         function render() {
             const az = view.az * Math.PI / 180, el = view.el * Math.PI / 180;
             const d = half * 10;
@@ -452,11 +622,31 @@
             camera.near = -d * 4; camera.far = d * 4;
             camera.updateProjectionMatrix();
             const kmPerPx = 2 * halfH / h;
+            if (bar) {
+                const step = gridStep(2 * half);
+                const km = step / kmPerPx >= 30 ? step : niceAtLeast(30 * kmPerPx);
+                bar.set(canvas.clientWidth ? km / kmPerPx : 0, kmText(km) + ' km' + (km === step ? ' <span>· tick spacing</span>' : ''));
+            }
             sprites.forEach(s => {
                 s.scale.setScalar(s.userData.px * kmPerPx);
                 if (s.userData.at) s.position.set(s.userData.at[0] * half, s.userData.at[1] * half, s.userData.at[2] * half);
             });
-            renderer.render(scene, camera);
+            if (bg && backdropOn && haveBasis) {
+                // Look the same way as the box camera, at the target, from 2.5 orbit radii back.
+                bg.camera.position.copy(camera.position).normalize().multiplyScalar(2.5 * orbitR);
+                bg.camera.quaternion.copy(camera.quaternion);
+                bg.camera.aspect = w / h;
+                bg.camera.updateProjectionMatrix();
+                bg.stars.follow(bg.camera);
+                renderer.autoClear = false;
+                renderer.clear();
+                renderer.render(bg.scene, bg.camera);
+                renderer.clearDepth();
+                renderer.render(scene, camera);
+                renderer.autoClear = true;
+            } else {
+                renderer.render(scene, camera);
+            }
         }
 
         function animate(now) {
@@ -531,8 +721,14 @@
             setView,
             setShadows(on) { shadows = !!on; shadowLines.forEach(l => { l.visible = shadows && l.visible; }); render(); },
             resetView() { zoom = 1; setView('3d', true); },
+            // Earth and stars behind the box (on by default). They need basis, rT, and t in update().
+            setBackdrop(on) { if (backdropOn !== !!on) { backdropOn = !!on; render(); } },
+            hasBackdrop: () => !!(bg && backdropOn && haveBasis),
             // chase: [x, y, z]; trail, ghost (the whole path, drawn faintly), and model: paths in RIC km.
+            // basis ({R, I, C} unit vectors in ECI), rT (the target's ECI position in km), and t (s)
+            // place Earth and the stars behind the box.
             update(data) {
+                setBackdropFrame(data.basis, data.rT, data.t);
                 fill(ghostLine, data.ghost || null, null);
                 fill(trailLine, data.trail, null);
                 fill(modelLine, data.model, null);
@@ -684,6 +880,7 @@
         scene.add(equator);
 
         const layer = options.labels && Kit ? new Kit.LabelLayer(options.labels) : null;
+        const sceneBar = canvas.parentElement ? scaleBarEl(canvas.parentElement, 'right') : null;
         const triadLabels = layer ? ['R', 'I', 'C'].map(n => layer.add('<b style="color:#f87171">' + n + '</b>', { rank: 1 })) : [];
         const eciLabels = layer ? ['Î', 'Ĵ', 'K̂'].map(n => layer.add('<b style="color:#60a5fa">' + n + '</b>', { rank: 2, optional: true })) : [];
 
@@ -791,7 +988,9 @@
             // The target, its RIC axes, and chase, all at this instant.
             const tmpA = [0, 0, 0];
             put(tmpA, 0, rT[0], rT[1], rT[2], th); tPos.set(tmpA[0], tmpA[1], tmpA[2]);
-            ['R', 'I', 'C'].forEach(n => { put(tmpA, 0, b[n][0], b[n][1], b[n][2], th); basisNow[n].set(tmpA[0], tmpA[1], tmpA[2]); });
+            // put() scales km to scene units (÷ R_E); the axes must be unit vectors again, because
+            // ArrowHelper.setDirection and the label offsets assume length 1.
+            ['R', 'I', 'C'].forEach(n => { put(tmpA, 0, b[n][0], b[n][1], b[n][2], th); basisNow[n].set(tmpA[0], tmpA[1], tmpA[2]).normalize(); });
             const off = [rho[0] * k, rho[1] * k, rho[2] * k];
             const cx = rT[0] + off[0] * b.R[0] + off[1] * b.I[0] + off[2] * b.C[0];
             const cy = rT[1] + off[0] * b.R[1] + off[1] * b.I[1] + off[2] * b.C[1];
@@ -886,6 +1085,14 @@
                 layer.place(w, h, options.avoid ? options.avoid() : []);
             }
             if (options.scaleLabel) options.scaleLabel.textContent = k === 1 ? 'True scale' : 'Offsets magnified ' + formatMag(k) + '×';
+            // Scale bar, true at the target's distance from the camera. With magnified offsets the
+            // same bar is also a much shorter distance between chase and target.
+            if (sceneBar) {
+                const dist = camera.position.distanceTo(tPos);
+                const kmPerPxHere = 2 * dist * Math.tan(camera.fov * Math.PI / 360) / h * RE;
+                const km = niceAtLeast(70 * kmPerPxHere);
+                sceneBar.set(km / kmPerPxHere, kmText(km) + ' km' + (k > 1 ? '<br><span>chase to target: ' + kmText(km / k) + ' km</span>' : ''));
+            }
         }
         function formatMag(k) {
             if (k >= 1000) return Math.round(k).toLocaleString('en-US');
@@ -954,6 +1161,8 @@
             setCamera(c) { s.cam = c === 'ride' ? 'ride' : 'earth'; },
             setMagnification(k) { s.mag = k === 'auto' ? 'auto' : Math.max(1, Number(k) || 1); refreshFar(); },
             magnification, autoMagnification,
+            // For checks in the browser console: the camera, the RIC triad arrows, and the target's place.
+            debug: () => ({ camera, triad, basisNow, tPos, earth }),
             setTrails(t) { Object.assign(s.trails, t); },
             setExtras(x) { Object.assign(s.extras, x); },
             setLabels(on) { s.labels = !!on; },
@@ -1161,7 +1370,7 @@
     }
 
     const RpoViews = {
-        COLORS, PLANES, BOX_VIEWS, createRicPlane, createRicBox, boundingBox, fitPanes, drawThumbnail, gridStep,
+        COLORS, PLANES, BOX_VIEWS, createRicPlane, createRicBox, boundingBox, fitPanes, drawThumbnail, gridStep, attachPanZoom,
         framePath, createInertialView, createFiveViewStage, createDualStage
     };
     if (typeof window !== 'undefined') window.RpoViews = RpoViews;
