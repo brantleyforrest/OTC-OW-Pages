@@ -1,7 +1,7 @@
 // Relative Motion: Two Views. One simulation, five views: both spacecraft are propagated on
 // their own two-body orbits (the exact model in RpoMath.relativeState), and every pane shows
 // that same relative position at the same time. No pane draws a path from a formula for
-// relative motion; the dashed course-model path is an overlay only.
+// relative motion.
 (async function () {
     'use strict';
 
@@ -13,8 +13,8 @@
      * To add a preset, add one row to PRESETS: group (an optional <optgroup>), name, target (a key of
      * TARGETS), diff (only the differences that are not zero: da in km, de, and di, draan, dargp,
      * dnu in degrees, always chase minus target), span in target revs, range ('small' or
-     * 'large', which slider ranges open), scale ('mag' or 'true'), model (Course Model on or
-     * off), and notice (the What to Notice text). The page treats every preset the same way. */
+     * 'large', which slider ranges open), scale ('mag' or 'true'), and notice (the What to
+     * Notice text). The page treats every preset the same way. */
     const TARGETS = {
         geo: { a: 42164, e: 0, i: 0, raan: 0, argp: 0, nu: 0 },
         gps: { a: 26562, e: 0, i: 55, raan: 30, argp: 0, nu: 0 },
@@ -23,17 +23,17 @@
     const SHORTCUTS = ['geo', 'gps', 'leo'];
 
     const PRESETS = [
-        { name: 'Perch', target: 'geo', diff: { dnu: 0.05 }, span: 2, range: 'small', scale: 'mag', model: false,
+        { name: 'Perch', target: 'geo', diff: { dnu: 0.05 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Same orbit, 37 km ahead. Only the position differs, so the gap never changes. In RIC chase sits still: a perch.' },
-        { name: 'Drift', target: 'geo', diff: { da: 5 }, span: 3, range: 'small', scale: 'mag', model: false,
+        { name: 'Drift', target: 'geo', diff: { da: 5 }, span: 3, range: 'small', scale: 'mag',
           notice: 'A larger orbit takes longer to go around (15 s per rev here), so chase falls about 47 km farther behind every rev: a drift backward. A smaller orbit drifts forward.' },
-        { name: 'NMC', target: 'geo', diff: { de: 0.0003 }, span: 2, range: 'small', scale: 'mag', model: false,
+        { name: 'NMC', target: 'geo', diff: { de: 0.0003 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Same period, different shape. Chase dips below and speeds up at perigee, then rises and slows at apogee. In RIC that is a 2-by-1 ellipse that stays put: an NMC.' },
-        { name: 'Drifting NMC', target: 'geo', diff: { da: -2, de: 0.0003 }, span: 3, range: 'small', scale: 'mag', model: false,
+        { name: 'Drifting NMC', target: 'geo', diff: { da: -2, de: 0.0003 }, span: 3, range: 'small', scale: 'mag',
           notice: 'Size and shape both differ: the NMC ellipse and the drift happen together, so the loops walk forward. A drifting NMC.' },
-        { name: 'Cross-Track', target: 'geo', diff: { di: 0.02 }, span: 2, range: 'small', scale: 'mag', model: false,
+        { name: 'Cross-Track', target: 'geo', diff: { di: 0.02 }, span: 2, range: 'small', scale: 'mag',
           notice: 'Only the tilt differs. The two orbit planes cross twice per rev, so chase swings left and right of the target’s plane once per rev. Watch the view from behind.' },
-        { name: 'Corkscrew', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag', model: false,
+        { name: 'Corkscrew', target: 'geo', diff: { da: -2, de: 0.0003, di: 0.02 }, span: 3, range: 'small', scale: 'mag',
           notice: 'Size, shape, and tilt all differ: a drifting NMC that also swings side to side. A corkscrew. Turn the 3D box to see it.' }
     ];
     const DEFAULT_PRESET = 'NMC';
@@ -71,7 +71,7 @@
         trail: 'full', roll: 1, stepSize: 0.0625,
         scale: 'mag', mag: 'auto',
         frame: 'ECI', camera: 'earth',
-        axes: false, equator: false, orbits: true, carried: true, shadows: false, backdrop: true, inset: false, orbit3d: true, labels: true, model: false, shared: true
+        axes: false, equator: false, orbits: true, carried: true, shadows: false, backdrop: true, inset: false, orbit3d: true, labels: true, shared: true
     };
     let sim = null;          // everything derived from the inputs; rebuilt only when they change
     let dirty = true;
@@ -103,8 +103,7 @@
         const path = V.framePath(target, times, rho);
         const circular = isCircular(target);
         const rmoe = circular ? M.rmoeFromCoes(target, chase) : null;
-        const modelPath = circular ? M.sampleTrajectory(rmoe, n, 0, spanT, count) : null;
-        sim = { target, chase, PT, PC, n, spanT, count, times, rho, path, circular, rmoe, modelPath, maxRange: path.maxRho };
+        sim = { target, chase, PT, PC, n, spanT, count, times, rho, path, circular, rmoe, maxRange: path.maxRho };
         if (stage.inertial) {
             stage.inertial.setOrbit(target);
             stage.inertial.setChaseOrbit(chase);
@@ -119,9 +118,7 @@
 
     /* ---------- Fitting the RIC panes ---------- */
     function fitPaths() {
-        const paths = [sim.rho];
-        if (state.model && sim.modelPath) paths.push(sim.modelPath);
-        return paths;
+        return [sim.rho];
     }
     function refit() {
         if (!sim) return;
@@ -158,15 +155,10 @@
         const rel = M.relativeState(sim.target, sim.chase, state.t);
         const [from, to] = trailRange();
         const trail = to > from ? sim.rho.subarray(3 * from, 3 * (to + 1)) : null;
-        const showModel = state.model && sim.circular;
-        const modelNow = showModel ? M.stateFromRmoe(sim.rmoe, sim.n, state.t) : null;
         const data = {
             chase: rel.rho,
             trail,
             ghosts: state.trail === 'off' ? [] : [sim.rho],
-            model: showModel ? sim.modelPath : null,
-            modelChase: modelNow,
-            rmoe: showModel ? M.rmoeAt(sim.rmoe, sim.n, state.t) : null,
             n: sim.n
         };
         planeNames.forEach(n => stage[n].draw(data));
@@ -175,7 +167,7 @@
             stage.box.setBackdrop(state.backdrop);
             stage.box.setInset(state.inset);
             stage.box.setOrbit(state.orbit3d);
-            stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho, model: showModel ? sim.modelPath : null,
+            stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho,
                 basis: rel.basis, rT: rel.rT, t: state.t, targetCoe: sim.target, chaseRv: M.coesToRv(M.coeAt(sim.chase, state.t)) });
         }
         if (stage.inertial) stage.inertial.update({ t: state.t, rho: rel.rho, basis: rel.basis, rT: rel.rT, from, to, ghost: state.trail !== 'off' });
@@ -230,8 +222,6 @@
         const pct = 100 * sim.maxRange / sim.target.a;
         $('lv-fit').innerHTML = '<span class="fit-' + fit + '">' + words[fit] + '</span>' +
             (fit === 'na' ? '' : ' <span style="color: var(--text-muted); font-weight: 400;">(largest range ' + (pct < 0.01 ? pct.toExponential(1) : pct.toFixed(pct < 1 ? 3 : 2)) + '% of a)</span>');
-        $('opt-model').disabled = !sim.circular;
-        $('opt-model').closest('label').classList.toggle('ctl-off', !sim.circular);
         updateNotes();
         updateMagRead();
         // True scale with orbits that differ by less than a pixel.
@@ -359,12 +349,10 @@
         state.span = p.span;
         state.scale = p.scale;
         state.mag = 'auto';
-        state.model = p.model;
         state.t = 0;
         if (!isGeoTarget()) state.frame = 'ECI';
         selectRange(state.range);
         $('span').value = String(state.span);
-        $('opt-model').checked = state.model;
         selectScale(state.scale);
         selectFrame(state.frame);
         $('notice').textContent = p.notice;
@@ -493,7 +481,6 @@
      ['opt-shadows', 'shadows'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
-    $('opt-model').addEventListener('change', e => { state.model = e.target.checked; refit(); dirty = true; });
     $('opt-shared').addEventListener('change', e => { state.shared = e.target.checked; refit(); dirty = true; });
 
     /* ---------- Start ---------- */
