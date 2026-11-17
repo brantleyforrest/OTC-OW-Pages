@@ -1,6 +1,6 @@
 // RMOE Explorer, Set RMOEs mode. The six relative motion orbital elements are the inputs; the
 // course model (RpoMath.stateFromRmoe, the CW solution) gives chase's motion, which is drawn in the
-// view from the left, a second RIC view (behind, above, or the 3D box), and an inertial view.
+// three flat RIC views (from the left, from behind, from above), the 3D RIC box, and an inertial view.
 // Annotations mark what each RMOE controls. The Set Position and Velocity mode comes in a later
 // stage; the page is laid out so it can be added beside this one.
 (async function () {
@@ -12,7 +12,7 @@
 
     /* ---------- Data tables ----------
      * TARGETS: the three target orbits. RANGES: slider [min, max, step] per target; distances in km,
-     * angles in degrees. PRESETS: name, the RMOEs that are not zero, an optional second view, and
+     * angles in degrees. PRESETS: name, the RMOEs that are not zero, and
      * the What to Notice text. Add a preset by adding one row. */
     const TARGETS = {
         geo: { a: 42164, e: 0, i: 0, raan: 0, argp: 0, nu: 0 },
@@ -44,11 +44,11 @@
         { group: 'Simple', name: 'NMC', rmoe: { C: 10 }, notice: 'C = 10 km and nothing else: a 2-by-1 ellipse, 20 km tall and 40 km long, centered on the target. It does not drift because x_C = 0. Move y_C0 to slide it along the track.' },
         { group: 'Simple', name: 'Cross-Track', rmoe: { yc0: -20, zmax: 10 }, notice: 'A perch 20 km behind that swings 10 km left and right once per rev. Watch the view from behind.' },
         { group: 'Two-Component', name: 'Drifting NMC', rmoe: { xc: 2, C: 6, yc0: 40 }, notice: 'An NMC whose center is 2 km above the target, so the loops walk backward about 19 km each rev. Below the target they walk forward.' },
-        { group: 'Two-Component', name: 'Cross-Track NMC', rmoe: { C: 10, zmax: 10 }, second: 'box',
+        { group: 'Two-Component', name: 'Cross-Track NMC', rmoe: { C: 10, zmax: 10 },
           notice: 'The NMC from before, plus a 10 km swing left and right once per rev. The ellipse tilts out of the target’s plane but still closes on itself, because x_C = 0. ΔM_0 sets which way it tilts.' },
-        { group: 'Two-Component', name: 'Snake', rmoe: { xc: -1.5, zmax: 10, yc0: -40 }, second: 'above',
+        { group: 'Two-Component', name: 'Snake', rmoe: { xc: -1.5, zmax: 10, yc0: -40 },
           notice: 'A drift and a swing with no ellipse: x_C = −1.5 km walks chase forward about 14 km each rev while it swings 10 km left and right. From above the path winds like a snake.' },
-        { group: 'Three-Component', name: 'Corkscrew', rmoe: { xc: -1.5, C: 5, zmax: 5, yc0: -40, dM0: 270 }, second: 'box',
+        { group: 'Three-Component', name: 'Corkscrew', rmoe: { xc: -1.5, C: 5, zmax: 5, yc0: -40, dM0: 270 },
           notice: 'Drift, ellipse, and swing together: a corkscrew. In the 3D box, ΔM_0 decides which part of each loop is farthest to the side.' }
     ];
     const DEFAULT_PRESET = 'Drifting NMC';
@@ -63,7 +63,6 @@
         target: 'geo',
         rmoe: { ...ZERO },
         t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
-        second: 'behind',
         annot: { center: true, size: false, corners: false, cross: false },
         hot: null, lastRow: null,
         frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, backdrop: true, inset: false, orbit3d: true, labels: true
@@ -74,13 +73,15 @@
     let THREE = null;
     try { THREE = await import(THREE_URL); } catch (err) { THREE = null; }
     const view = $('view');
-    const stage = V.createDualStage(view, { THREE, second: 'behind', onResize: () => { if (sim) { refit(true); dirty = true; } } });
+    const stage = V.createFiveViewStage(view, { THREE, onResize: () => { if (sim) { refit(true); dirty = true; } } });
+    const PLANE_NAMES = ['left', 'behind', 'above'];
 
-    // Drag a flat pane to slide it, wheel or pinch to zoom; both flat panes move together.
+    // Drag a flat pane to slide it, wheel or pinch to zoom; the three flat panes move together.
     // Fit Views, a new preset, or a slider puts them back.
-    const flatPanes = () => [stage.left, stage.secondPlane()].filter(Boolean);
-    V.attachPanZoom(view.querySelector('.rpo-left canvas'), { plane: () => stage.left, linked: flatPanes, onChange: () => { dirty = true; } });
-    V.attachPanZoom(view.querySelector('.rpo-second canvas.c2d'), { plane: () => stage.secondPlane() || stage.left, linked: flatPanes, onChange: () => { dirty = true; } });
+    const flatPanes = () => stage.visiblePlanes();
+    PLANE_NAMES.forEach(name => {
+        V.attachPanZoom(view.querySelector('.rpo-' + name + ' canvas'), { plane: () => stage[name], linked: flatPanes, onChange: () => { dirty = true; } });
+    });
 
     const targetCoe = () => TARGETS[state.target];
     // The RMOEs the math uses: M_0 and ΔM_0 are undefined when C or z_max is zero.
@@ -214,10 +215,9 @@
             rmoe: state.annot.center || state.hot === 'xc' || state.hot === 'yc0' ? rNow : null,
             showNmc: state.annot.size || state.annot.corners
         };
-        const panes = [stage.left].concat(stage.secondPlane() ? [stage.secondPlane()] : []);
-        panes.forEach(p => { p.draw(data); annotate(p, now, rNow); });
+        stage.visiblePlanes().forEach(p => { p.draw(data); annotate(p, now, rNow); });
         const basis = M.ricBasis(sim.coe, t);
-        if (stage.box && stage.second() === 'box') {
+        if (stage.box && stage.boxVisible()) {
             stage.box.setBackdrop(state.backdrop);
             stage.box.setInset(state.inset);
             stage.box.setOrbit(state.orbit3d);
@@ -361,7 +361,7 @@
         Object.entries(p.rmoe).forEach(([key, value]) => { state.rmoe[key] = key === 'M0' || key === 'dM0' ? value : value * s; });
         state.lastRow = null;
         state.t = 0; state.revs = 2;
-        selectSecond(p.second || 'behind');
+        stage.selectBoxView('3d');
         rebuild();
         refit(true);
         updateInputs();
@@ -403,12 +403,6 @@
     $('fit-views').addEventListener('click', () => { refit(true); dirty = true; });
 
     /* ---------- View options ---------- */
-    const selectSecond = Kit.bindSegmented($('second-pick'), v => {
-        state.second = v;
-        stage.setSecond(v);
-        refit(true);
-        dirty = true;
-    });
     [['an-center', 'center'], ['an-size', 'size'], ['an-corners', 'corners'], ['an-cross', 'cross']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state.annot[key] = e.target.checked; dirty = true; });
     });

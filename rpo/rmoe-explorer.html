@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex">
     <title>RMOE Explorer | OTC OW</title>
-    <meta name="description" content="Set the six relative motion orbital elements (RMOEs) with sliders and watch what each one does to the motion: the view from the left, a second RIC view, and an inertial view, with the boundary tables and the chase orbit they imply.">
+    <meta name="description" content="Set the six relative motion orbital elements (RMOEs) with sliders and watch what each one does to the motion: the RIC views from the left, from behind, and from above, a 3D RIC box, and an inertial view, with the boundary tables and the chase orbit they imply.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -152,7 +152,7 @@
                 <p class="tool-intro">Six numbers describe any relative motion in the course model, and each one moves one thing in the picture. Move a slider and watch which part changes.</p>
 
                 <div class="tool-view">
-                    <div class="tool-canvas-box" id="view" aria-label="The view from the left, a second RIC view, and the inertial view"></div>
+                    <div class="tool-canvas-box" id="view" aria-label="The inertial view, the 3D RIC box, and the RIC views from the left, from behind, and from above"></div>
                 </div>
 
                 <div class="panel controls">
@@ -179,13 +179,6 @@
                             <button class="btn" type="button" data-jump="0.5">+1/2 rev</button>
                             <button class="btn" type="button" data-jump="1">+1 rev</button>
                             <button class="btn" type="button" id="epoch">Back to Epoch</button>
-                        </div>
-                        <div class="ctl-inline">Second view
-                            <div class="segmented" id="second-pick" role="group" aria-label="Second RIC view">
-                                <button type="button" data-value="behind" aria-pressed="true">Behind</button>
-                                <button type="button" data-value="above" aria-pressed="false">Above</button>
-                                <button type="button" data-value="box" aria-pressed="false">3D</button>
-                            </div>
                         </div>
                         <div class="buttons">
                             <button class="btn" id="fit-views" type="button">Fit Views</button>
