@@ -1,0 +1,11 @@
+// Which Test 2 Practice sections are published. Read by index.html and test-2-practice.js.
+//
+// The public page (test-2-practice.html) shows only the sections listed here. The dev version
+// (test-2-practice.html?dev), which the index opens while dev mode is on, shows every section
+// that is built. The Test 2 Practice card on the index shows to everyone as soon as this list
+// has one section in it; while it is empty, the card shows only in dev mode.
+//
+// To publish a section, add its key: 'axes', 'motion' or 'concepts'.
+window.Test2Release = {
+    published: []
+};

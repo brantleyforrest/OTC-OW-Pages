@@ -13,6 +13,12 @@
     const { math, prose } = window.PracticeMath;
     const V = window.RpoViews;
 
+    // The dev version (?dev, opened from the index while dev mode is on) shows every built
+    // section; the public page shows only the ones published in test-2-release.js.
+    const DEV = new URLSearchParams(location.search).has('dev');
+    const PUBLISHED = (window.Test2Release && window.Test2Release.published) || [];
+    document.documentElement.classList.toggle('dev-version', DEV);
+
     // In the order the topics are taught. types: the topic buttons, the first one the default.
     const SECTIONS = [
         { key: 'axes', label: 'RIC Axes', module: window.Test2AxesProblems,
@@ -23,8 +29,19 @@
               ['nmc-cross-track', 'Cross-Track NMC'], ['corkscrew', 'Corkscrew']] },
         { key: 'concepts', label: 'Concepts', module: window.Test2ConceptsProblems,
           types: [['random', 'Random'], ['assumptions', 'CW Assumptions'], ['rmoe', 'RMOEs'], ['elements', 'Elements'], ['burns', 'Burns']] }
-    ].filter(s => s.module);
+    ].filter(s => s.module && (DEV || PUBLISHED.includes(s.key)));
     const byKey = Object.fromEntries(SECTIONS.map(s => [s.key, s]));
+
+    // Nothing is published yet and this is not the dev version: say so instead of a problem.
+    if (!SECTIONS.length) {
+        document.querySelector('.tool-stage-col').style.display = 'none';
+        document.querySelector('.mode-row').closest('.panel').style.display = 'none';
+        ['given', 'answer-form', 'answer-limits', 'walk-panel', 'cards-panel']
+            .forEach((id) => { $(id).style.display = 'none'; });
+        $('problem-title').textContent = 'Coming soon';
+        $('problem-prompt').textContent = 'The Test 2 sections are still being built. Check back as the topics are taught.';
+        return;
+    }
 
     const MODE_CAPTIONS = {
         practice: 'The view starts with the problem as given, and the walkthrough builds the solution step by step.',
@@ -458,6 +475,10 @@
             b.type = 'button';
             b.dataset.value = s.key;
             b.textContent = s.label;
+            if (!PUBLISHED.includes(s.key)) {
+                b.classList.add('unpublished');
+                b.title = 'Not published: shows only in the dev version';
+            }
             b.setAttribute('aria-pressed', String(s.key === state.section));
             sectionGroup.appendChild(b);
         });

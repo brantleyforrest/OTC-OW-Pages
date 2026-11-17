@@ -1080,6 +1080,7 @@
             }
         } catch (e) { /* storage is blocked: dev mode starts off */ }
     </script>
+    <script src="practice/test-2-release.js"></script>
 </head>
 <body>
 
@@ -1460,8 +1461,10 @@
                 </div>
             </div>
 
-            <!-- Still being built. The dev-only class hides the card unless dev mode is on. -->
-            <div class="portal-card dev-only">
+            <!-- Still being built. The dev-only class hides the card unless dev mode is on; the script
+                 at the bottom removes it once practice/test-2-release.js publishes a section. In dev
+                 mode the Launch link opens the dev version (data-dev-href), which shows every section. -->
+            <div class="portal-card dev-only" id="card-test-2">
                 <div class="portal-card-icon gold">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 11l3 3L22 4"></path>
@@ -1476,7 +1479,7 @@
                 </p>
 
                 <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
-                    <a href="practice/test-2-practice.html" class="btn-launch">
+                    <a href="practice/test-2-practice.html" data-dev-href="practice/test-2-practice.html?dev" class="btn-launch">
                         Launch Tool
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -1704,7 +1707,17 @@
         initToolSearch();
 
         // Dev mode switch (bottom right corner of the page)
+        // A link with a dev version (data-dev-href) opens that version while dev mode is on.
+        function setDevLinks() {
+            const on = isDevMode();
+            document.querySelectorAll('a[data-dev-href]').forEach((a) => {
+                if (!a.dataset.publicHref) a.dataset.publicHref = a.getAttribute('href');
+                a.setAttribute('href', on ? a.dataset.devHref : a.dataset.publicHref);
+            });
+        }
+
         function initDevMode() {
+            setDevLinks();
             const toggle = document.getElementById('dev-toggle');
             if (!toggle) return;
             toggle.setAttribute('aria-checked', isDevMode() ? 'true' : 'false');
@@ -1717,6 +1730,7 @@
                     if (on) localStorage.setItem('otc-dev-mode', '1');
                     else localStorage.removeItem('otc-dev-mode');
                 } catch (e) { /* storage is blocked: the choice lasts until the page is closed */ }
+                setDevLinks();
 
                 // A tab that exists only in dev mode cannot stay open once dev mode is off,
                 // and a link to it starts working once dev mode is on.
@@ -1734,6 +1748,11 @@
         }
 
         initDevMode();
+
+        // Test 2 Practice: the card shows to everyone once a section is published.
+        if (window.Test2Release && window.Test2Release.published.length) {
+            document.getElementById('card-test-2').classList.remove('dev-only');
+        }
     </script>
 </body>
 </html>

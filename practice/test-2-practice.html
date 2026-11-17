@@ -118,6 +118,9 @@
             white-space: normal;
         }
 
+        /* Dev version only: a section that is not published yet gets a dashed outline. */
+        .sections button.unpublished { outline: 1px dashed currentColor; outline-offset: -4px; }
+
 
         /* Topic: which kind of maneuver is generated */
         .topics { flex-wrap: wrap; margin-top: 0.5rem; }
@@ -655,6 +658,7 @@
     <script src="test-2-motion-problems.js"></script>
     <script src="test-2-concepts-problems.js"></script>
     <script src="test-2-scene.js"></script>
+    <script src="test-2-release.js"></script>
     <script src="test-2-practice.js"></script>
 </body>
 </html>
