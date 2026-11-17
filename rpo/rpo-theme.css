@@ -117,27 +117,20 @@
     .rpo-five .rpo-box { flex: 0 0 58%; }
 }
 
-/* Small stage: the inertial pane and one RIC pane, chosen with the switch. */
+/* Small stage (phones): only the two 3D frames, the inertial pane and the 3D RIC box
+   (owner, 2026-11-17). The flat panes and the pane switch are hidden; the box still turns by drag. */
 @container (max-width: 519px), (max-height: 419px) {
-    .rpo-five .rpo-switch.segmented { display: inline-flex; }
     .rpo-five .rpo-viewbuttons.segmented { display: none; }
     .rpo-five .rpo-inertial { flex: 1 1 0; }
     .rpo-five .rpo-ricside { flex: 1 1 0; }
-    .rpo-five .rpo-box,
-    .rpo-five .rpo-planes .rpo-pane { display: none; }
-    .rpo-five .rpo-planes { grid-template-columns: minmax(0, 1fr); border-top: 0; }
-    .rpo-five .rpo-planes .rpo-pane + .rpo-pane { border-left: 0; }
-    .rpo-five[data-show="3d"] .rpo-box { display: block; flex: 1 1 0; }
-    .rpo-five[data-show="3d"] .rpo-planes { display: none; }
-    .rpo-five[data-show="left"] .rpo-left,
-    .rpo-five[data-show="behind"] .rpo-behind,
-    .rpo-five[data-show="above"] .rpo-above { display: block; }
+    .rpo-five .rpo-box { flex: 1 1 0; }
+    .rpo-five .rpo-planes { display: none; }
+    /* A narrow inertial pane: lift its scale bar above the "Offsets magnified" label. */
+    .rpo-five .rpo-inertial .rpo-scalebar { bottom: 1.6rem; }
 }
 @container (max-width: 519px) and (min-aspect-ratio: 1/1), (max-height: 419px) and (min-aspect-ratio: 1/1) {
     .rpo-five { flex-direction: row; }
     .rpo-five > * + * { border-top: 0; border-left: 1px solid var(--border-subtle); }
-    /* Keep the switch over the inertial pane, off the RIC pane's badge. */
-    .rpo-five .rpo-switch.segmented { right: calc(50% + 0.35rem); top: 1.75rem; }
 }
 
 /* ---------- Dual stage (Tools 2 to 4, practice) ----------
