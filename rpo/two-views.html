@@ -207,7 +207,6 @@
                                 <option value="0.25">1/4 rev</option>
                             </select>
                         </label>
-                        <label class="check"><input type="checkbox" id="loop">Loop</label>
                         <div class="buttons">
                             <button class="btn" id="fit-views" type="button">Fit Views</button>
                             <button class="btn" id="reset-view" type="button">Reset View</button>
@@ -252,6 +251,44 @@
                     </div>
 
                     <div class="panel">
+                        <div class="panel-title">View Options</div>
+                        <div class="opt-row">
+                            <span class="opt-label">Scale</span>
+                            <div class="segmented" id="scale-pick" role="group" aria-label="Scale">
+                                <button type="button" data-value="true" aria-pressed="false">True Scale</button>
+                                <button type="button" data-value="mag" aria-pressed="true">Magnified</button>
+                            </div>
+                        </div>
+                        <div class="mag-row" id="mag-row">
+                            <label for="mag">Magnification</label>
+                            <input type="range" id="mag" min="0" max="1000" step="1" value="500">
+                            <span class="mono" id="mag-read"></span>
+                        </div>
+                        <div class="opt-row">
+                            <span class="opt-label">Frame</span>
+                            <div class="segmented" id="frame-pick" role="group" aria-label="Inertial frame">
+                                <button type="button" data-value="ECI" aria-pressed="true">ECI</button>
+                                <button type="button" data-value="ECEF" aria-pressed="false">ECEF</button>
+                            </div>
+                            <span class="opt-label">Camera</span>
+                            <div class="segmented" id="camera-pick" role="group" aria-label="Camera">
+                                <button type="button" data-value="earth" aria-pressed="true">Earth</button>
+                                <button type="button" data-value="ride" aria-pressed="false">Ride Along</button>
+                            </div>
+                        </div>
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="opt-axes">ECI Axes</label>
+                            <label class="check"><input type="checkbox" id="opt-equator">Equator</label>
+                            <label class="check"><input type="checkbox" id="opt-orbits" checked>Orbit Paths</label>
+                            <label class="check"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
+                            <label class="check"><input type="checkbox" id="opt-shadows" checked>Shadows</label>
+                            <label class="check"><input type="checkbox" id="opt-labels" checked>Labels</label>
+                            <label class="check"><input type="checkbox" id="opt-model">Course Model</label>
+                            <label class="check"><input type="checkbox" id="opt-shared" checked>Shared Scale</label>
+                        </div>
+                    </div>
+
+                    <div class="panel">
                         <div class="panel-title">What to Notice</div>
                         <p class="panel-text" id="notice"></p>
                     </div>
@@ -293,44 +330,6 @@
                             </div>
                         </div>
                         <p class="panel-text muted" id="lv-nomodel" style="margin-top: 0.4rem;">The target's orbit is not circular, so the course model (RMOEs) does not apply.</p>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">View Options</div>
-                        <div class="opt-row">
-                            <span class="opt-label">Scale</span>
-                            <div class="segmented" id="scale-pick" role="group" aria-label="Scale">
-                                <button type="button" data-value="true" aria-pressed="false">True Scale</button>
-                                <button type="button" data-value="mag" aria-pressed="true">Magnified</button>
-                            </div>
-                        </div>
-                        <div class="mag-row" id="mag-row">
-                            <label for="mag">Magnification</label>
-                            <input type="range" id="mag" min="0" max="1000" step="1" value="500">
-                            <span class="mono" id="mag-read"></span>
-                        </div>
-                        <div class="opt-row">
-                            <span class="opt-label">Frame</span>
-                            <div class="segmented" id="frame-pick" role="group" aria-label="Inertial frame">
-                                <button type="button" data-value="ECI" aria-pressed="true">ECI</button>
-                                <button type="button" data-value="ECEF" aria-pressed="false">ECEF</button>
-                            </div>
-                            <span class="opt-label">Camera</span>
-                            <div class="segmented" id="camera-pick" role="group" aria-label="Camera">
-                                <button type="button" data-value="earth" aria-pressed="true">Earth</button>
-                                <button type="button" data-value="ride" aria-pressed="false">Ride Along</button>
-                            </div>
-                        </div>
-                        <div class="ctl-checks">
-                            <label class="check"><input type="checkbox" id="opt-axes">ECI Axes</label>
-                            <label class="check"><input type="checkbox" id="opt-equator">Equator</label>
-                            <label class="check"><input type="checkbox" id="opt-orbits" checked>Orbit Paths</label>
-                            <label class="check"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
-                            <label class="check"><input type="checkbox" id="opt-shadows" checked>Shadows</label>
-                            <label class="check"><input type="checkbox" id="opt-labels" checked>Labels</label>
-                            <label class="check"><input type="checkbox" id="opt-model">Course Model</label>
-                            <label class="check"><input type="checkbox" id="opt-shared" checked>Shared Scale</label>
-                        </div>
                     </div>
 
                     <div class="panel">

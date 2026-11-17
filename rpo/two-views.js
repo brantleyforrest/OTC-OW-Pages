@@ -84,8 +84,8 @@
         preset: PRESETS.findIndex(p => p.name === DEFAULT_PRESET),
         target: null, diff: null,
         range: 'small', span: 2,
-        t: 0, playing: !Kit.prefersReducedMotion(), speed: 0.1,
-        trail: 'full', roll: 1, stepSize: 0.0625, loop: false,
+        t: 0, playing: true, speed: 0.1,
+        trail: 'full', roll: 1, stepSize: 0.0625,
         scale: 'mag', mag: 'auto',
         frame: 'ECI', camera: 'earth',
         axes: false, equator: false, orbits: true, carried: true, shadows: true, labels: true, model: false, shared: true
@@ -227,9 +227,9 @@
         planeNames.forEach(n => stage[n].draw(data));
         if (stage.box) {
             stage.box.setShadows(state.shadows);
-            stage.box.update({ chase: rel.rho, trail, model: showModel ? sim.modelPath : null });
+            stage.box.update({ chase: rel.rho, trail, ghost: state.trail === 'off' ? null : sim.rho, model: showModel ? sim.modelPath : null });
         }
-        if (stage.inertial) stage.inertial.update({ t: state.t, rho: rel.rho, basis: rel.basis, rT: rel.rT, from, to });
+        if (stage.inertial) stage.inertial.update({ t: state.t, rho: rel.rho, basis: rel.basis, rT: rel.rT, from, to, ghost: state.trail !== 'off' });
         updateLive(rel);
         updateTime();
     }
@@ -424,7 +424,7 @@
         rebuild();
         fillTable();
         if (stage.inertial) stage.inertial.resetView();
-        setPlaying(!Kit.prefersReducedMotion());
+        setPlaying(state.playing);
     }
     (function buildPresetSelect() {
         const select = $('preset');
@@ -461,7 +461,6 @@
         $('play').textContent = on ? 'Pause' : 'Play';
     }
     $('play').addEventListener('click', () => {
-        if (!state.playing && state.t >= sim.spanT - 1e-6) state.t = 0;
         setPlaying(!state.playing);
         dirty = true;
     });
@@ -488,7 +487,6 @@
         dirty = true;
     });
     $('step-size').addEventListener('change', e => { state.stepSize = Number(e.target.value); });
-    $('loop').addEventListener('change', e => { state.loop = e.target.checked; });
     $('fit-views').addEventListener('click', () => { refit(); dirty = true; });
     $('reset-view').addEventListener('click', () => {
         if (stage.box) { stage.box.resetView(); stage.selectBoxView('3d'); }
@@ -555,10 +553,8 @@
     Kit.startLoop(seconds => {
         if (state.playing && sim) {
             state.t += seconds * state.speed * sim.PT;
-            if (state.t >= sim.spanT) {
-                if (state.loop) state.t = 0;
-                else { state.t = sim.spanT; setPlaying(false); }
-            }
+            // Playback never stops by itself: at the end of the span it starts over.
+            if (state.t >= sim.spanT) state.t = 0;
             dirty = true;
         }
         if (!dirty) return;

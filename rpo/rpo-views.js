@@ -413,6 +413,7 @@
             ticks.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
         }
 
+        const ghostLine = makeLine(COLORS.chase, 0.3);
         const trailLine = makeLine(COLORS.chase, 1);
         const modelLine = makeLine(0xf0f4fa, 0.6, true);
         const shadowLines = [makeLine(COLORS.chase, 0.3), makeLine(COLORS.chase, 0.3), makeLine(COLORS.chase, 0.3)];
@@ -530,14 +531,17 @@
             setView,
             setShadows(on) { shadows = !!on; shadowLines.forEach(l => { l.visible = shadows && l.visible; }); render(); },
             resetView() { zoom = 1; setView('3d', true); },
-            // chase: [x, y, z]; trail and model: paths in RIC km.
+            // chase: [x, y, z]; trail, ghost (the whole path, drawn faintly), and model: paths in RIC km.
             update(data) {
+                fill(ghostLine, data.ghost || null, null);
                 fill(trailLine, data.trail, null);
                 fill(modelLine, data.model, null);
                 // Walls: C = -half is the view from the left; I = +half the view from behind; R = -half the view from above.
-                fill(shadowLines[0], shadows ? data.trail : null, [1, -half]);
-                fill(shadowLines[1], shadows ? data.trail : null, [0, half]);
-                fill(shadowLines[2], shadows ? data.trail : null, [2, -half]);
+                // The shadows are of the whole path when it is given, as the flat panes show it.
+                const shade = shadows ? (data.ghost || data.trail) : null;
+                fill(shadowLines[0], shade, [1, -half]);
+                fill(shadowLines[1], shade, [0, half]);
+                fill(shadowLines[2], shade, [2, -half]);
                 chase.visible = !!data.chase;
                 if (data.chase) chase.position.set(data.chase[1], data.chase[2], data.chase[0]);
                 render();
@@ -643,9 +647,12 @@
         }
         const targetRing = makeLine(COLORS.target, 0.55, true);
         const chaseRing = makeLine(COLORS.chase, 0.45, true);
+        const inertialGhost = makeLine(COLORS.chase, 0.3);
+        const carriedGhost = makeLine(COLORS.ric, 0.3);
         const inertialTrail = makeLine(COLORS.chase, 0.95);
         const carriedTrail = makeLine(COLORS.ric, 0.95);
         let trailBuf = new Float32Array(3), carriedBuf = new Float32Array(3);
+        let ghostBuf = new Float32Array(3), carriedGhostBuf = new Float32Array(3);
 
         // The translucent rectangle in the R-I plane that the carried trail is drawn on.
         const plate = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
@@ -692,7 +699,14 @@
         }
         function autoMagnification() {
             if (!s.path || !s.target || s.path.maxRho < 1e-9) return 1;
-            return Math.max(1, 0.2 * s.target.a / s.path.maxRho);
+            // The largest offset is drawn at 30 percent of the orbit radius, so the motion is easy to see.
+            let k = 0.3 * s.target.a / s.path.maxRho;
+            // Keep the magnified path clear of Earth: its lowest point, the target's perigee radius plus
+            // k times the most negative R, stays at or above 1.06 Earth radii (just outside the
+            // atmosphere shell). This matters for low orbits, where 30 percent of a is more than the altitude.
+            const down = -s.path.box.min[0];
+            if (down > 1e-9) k = Math.min(k, (s.target.a * (1 - s.target.e) - 1.06 * RE) / down);
+            return Math.max(1, k);
         }
         // Rotate (x, y) by -th about Z, scale km to scene units, write into out at index k.
         function put(out, k, x, y, z, th) {
@@ -766,6 +780,7 @@
             if (data) {
                 s.t = data.t;
                 if (data.from !== undefined) { s.from = data.from; s.to = data.to; }
+                s.ghost = !!data.ghost;
                 s.now = data;
             }
             const now = s.now;
@@ -796,31 +811,41 @@
             const P = s.path;
             const from = Math.max(0, s.from), to = Math.min(P ? P.times.length - 1 : -1, s.to);
             const count = P && to >= from ? to - from + 1 : 0;
-            // Inertial trail: chase's own path around Earth (magnified offsets keep it a valid orbit shape).
-            if (s.trails.inertial && count > 1) {
-                if (trailBuf.length < count * 3) trailBuf = new Float32Array(count * 3);
-                for (let j = 0; j < count; j++) {
+            // Chase's own path around Earth (magnified offsets keep it a valid orbit shape), samples from..from+n-1.
+            function inertialPoints(buf, from, n) {
+                if (buf.length < n * 3) buf = new Float32Array(n * 3);
+                for (let j = 0; j < n; j++) {
                     const q = from + j, a = 3 * q;
                     const x = P.rho[a] * k, y = P.rho[a + 1] * k, z = P.rho[a + 2] * k;
-                    put(trailBuf, j,
+                    put(buf, j,
                         P.rT[a] + x * P.R[a] + y * P.I[a] + z * P.C[a],
                         P.rT[a + 1] + x * P.R[a + 1] + y * P.I[a + 1] + z * P.C[a + 1],
                         P.rT[a + 2] + x * P.R[a + 2] + y * P.I[a + 2] + z * P.C[a + 2], theta(P.times[q]));
                 }
-                setPoints(inertialTrail, trailBuf, count);
-            } else inertialTrail.visible = false;
-            // Carried trail: the RIC picture, drawn with this instant's axes where the target is now.
-            const carried = s.trails.carried && P && k > 1;
-            if (carried && count > 1) {
-                if (carriedBuf.length < count * 3) carriedBuf = new Float32Array(count * 3);
-                for (let j = 0; j < count; j++) {
+                return buf;
+            }
+            // The RIC picture, drawn with this instant's axes where the target is now.
+            function carriedPoints(buf, from, n) {
+                if (buf.length < n * 3) buf = new Float32Array(n * 3);
+                for (let j = 0; j < n; j++) {
                     const a = 3 * (from + j);
                     const x = P.rho[a] * k, y = P.rho[a + 1] * k, z = P.rho[a + 2] * k;
-                    put(carriedBuf, j, rT[0] + x * b.R[0] + y * b.I[0] + z * b.C[0],
+                    put(buf, j, rT[0] + x * b.R[0] + y * b.I[0] + z * b.C[0],
                         rT[1] + x * b.R[1] + y * b.I[1] + z * b.C[1], rT[2] + x * b.R[2] + y * b.I[2] + z * b.C[2], th);
                 }
-                setPoints(carriedTrail, carriedBuf, count);
-            } else carriedTrail.visible = false;
+                return buf;
+            }
+            const all = P ? P.times.length : 0;
+            const ghost = s.ghost && all > 1;
+            if (s.trails.inertial && count > 1) { trailBuf = inertialPoints(trailBuf, from, count); setPoints(inertialTrail, trailBuf, count); }
+            else inertialTrail.visible = false;
+            if (s.trails.inertial && ghost) { ghostBuf = inertialPoints(ghostBuf, 0, all); setPoints(inertialGhost, ghostBuf, all); }
+            else inertialGhost.visible = false;
+            const carried = s.trails.carried && P && k > 1;
+            if (carried && count > 1) { carriedBuf = carriedPoints(carriedBuf, from, count); setPoints(carriedTrail, carriedBuf, count); }
+            else carriedTrail.visible = false;
+            if (carried && ghost) { carriedGhostBuf = carriedPoints(carriedGhostBuf, 0, all); setPoints(carriedGhost, carriedGhostBuf, all); }
+            else carriedGhost.visible = false;
             plate.visible = plateEdge.visible = !!carried && P.maxRho > 1e-9;
             if (plate.visible) {
                 const bx = P.box, pad = 0.12;
