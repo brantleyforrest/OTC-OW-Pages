@@ -113,6 +113,7 @@
         mode: 'rmoe',
         rmoe: { ...ZERO },            // undefined angles are kept as 0; mathRmoe() turns them into null
         modeNote: '',
+        presetCustom: false,          // the user changed the numbers: the preset list reads Custom
         customTarget: false,          // Custom picked (or a typed): the target's a is the typed one
         t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
         annot: { center: true, size: false, corners: false, cross: false },
@@ -350,6 +351,7 @@
                 if (!Number.isFinite(value) || state.mode !== 'rmoe') return;
                 if ((row.key === 'C' || row.key === 'zmax') && value < 0) value = 0;
                 if (row.unit === '°') value = M.wrap360(value);
+                markCustom();
                 state.rmoe[row.key] = value;
                 state.lastRow = row.key;
                 rebuild();
@@ -421,8 +423,9 @@
         const P = sim.P;
         $('co-p').textContent = P > 7200 ? (P / 3600).toFixed(3) + ' h' : (P / 60).toFixed(2) + ' min';
         const row = state.mode === 'rmoe' ? ROWS.find(x => x.key === state.lastRow) : null;
-        const preset = PRESETS[state.preset];
-        $('notice').textContent = row ? row.notice : preset ? (state.mode === 'coe' ? preset.coeNotice : preset.notice) : '';
+        const preset = state.presetCustom ? null : PRESETS[state.preset];
+        $('notice').textContent = row ? row.notice : preset ? (state.mode === 'coe' ? preset.coeNotice : preset.notice)
+            : state.presetCustom ? 'These are your own numbers, not a preset’s. Reset Preset puts back ' + PRESETS[state.preset].name + '.' : '';
         updatePv();
         updateNotes();
     }
@@ -481,6 +484,8 @@
         $('el-msg').textContent = '';
     }
     // Try new orbits; keep the last valid ones on screen if either orbit is not allowed.
+    // A change the user made in the table: the numbers are no longer the preset's.
+    function userCommit(...args) { const ok = commit(...args); if (ok) markCustom(); return ok; }
     // quiet: a value still being typed; if it is not allowed, wait without an error.
     function commit(target, diff, field, final, quiet) {
         const chase = M.coeFromDifference(target, diff);
@@ -508,7 +513,7 @@
         const el = e.target;
         const row = EL_ROWS.find(r => r.key === el.dataset.key);
         if (!row) return;
-        if (el.dataset.col === 'slider') { commit({ ...state.target }, { ...state.diff, [row.d]: Number(el.value) }, el, false); return; }
+        if (el.dataset.col === 'slider') { userCommit({ ...state.target }, { ...state.diff, [row.d]: Number(el.value) }, el, false); return; }
         // A number field, live while typing: skip a half-typed value or one outside the limits,
         // and leave the field as typed (the change event below tidies it).
         const v = Number(el.value);
@@ -517,11 +522,11 @@
             if (row.key === 'a') { state.customTarget = true; showTargetPick(); }   // typing the target's a picks Custom
             const [lo, hi] = TARGET_LIMITS[row.key];
             if (v < lo || v > hi || (row.key === 'e' && !isAdvanced())) return;
-            commit({ ...state.target, [row.key]: v }, { ...state.diff }, el, false, true);
+            userCommit({ ...state.target, [row.key]: v }, { ...state.diff }, el, false, true);
         } else if (el.dataset.col === 'diff') {
-            commit({ ...state.target }, { ...state.diff, [row.d]: v }, el, false, true);
+            userCommit({ ...state.target }, { ...state.diff, [row.d]: v }, el, false, true);
         } else {
-            commit({ ...state.target }, M.coeDifference(state.target, { ...chaseCoe(), [row.key]: v }), el, false, true);
+            userCommit({ ...state.target }, M.coeDifference(state.target, { ...chaseCoe(), [row.key]: v }), el, false, true);
         }
     });
     elTable.addEventListener('change', e => {
@@ -535,12 +540,12 @@
             const [lo, hi] = TARGET_LIMITS[row.key];
             const target = { ...state.target, [row.key]: Math.min(hi, Math.max(lo, v)) };
             if (row.key === 'e' && !isAdvanced()) target.e = 0;
-            if (commit(target, { ...state.diff }, el)) fillElTable();
+            if (userCommit(target, { ...state.diff }, el)) fillElTable();
         } else if (el.dataset.col === 'diff') {
-            if (commit({ ...state.target }, { ...state.diff, [row.d]: v }, el)) fillElTable();
+            if (userCommit({ ...state.target }, { ...state.diff, [row.d]: v }, el)) fillElTable();
         } else {
             const chase = { ...chaseCoe(), [row.key]: v };
-            if (commit({ ...state.target }, M.coeDifference(state.target, chase), el)) fillElTable();
+            if (userCommit({ ...state.target }, M.coeDifference(state.target, chase), el)) fillElTable();
         }
     });
     Kit.bindSegmented($('starts'), value => {
@@ -549,7 +554,7 @@
         const Mc = M.meanFromTrue(chase.nu, chase.e) * M.R2D;
         chase.argp = M.wrap360(chase.argp + Mc - Mstar);
         chase.nu = M.trueFromMean(Mstar * M.D2R, chase.e);
-        commit({ ...state.target }, M.coeDifference(state.target, chase), null);
+        userCommit({ ...state.target }, M.coeDifference(state.target, chase), null);
     });
     function updateNotes() {
         if (state.mode !== 'coe') return;
@@ -590,6 +595,7 @@
                 if (!text || !Number.isFinite(value)) { if (final) updatePv(); return; }
                 const s = pvState();
                 s[k] = k < 3 ? value : value / 1000;
+                markCustom();
                 state.rmoe = stored(M.rmoeFromState(s, sim.n));
                 state.lastRow = null;
                 rebuild();
@@ -704,6 +710,14 @@
     }
 
     /* ---------- Presets and target ---------- */
+    // Any number the user changes (RMOEs, position and velocity, the element table, Chase Starts
+    // At) turns the preset list to Custom. Reset Preset still loads the last preset picked. Target
+    // buttons and a do not: a preset is the same motion at every target.
+    function markCustom() {
+        if (state.presetCustom) return;
+        state.presetCustom = true;
+        $('preset').value = 'custom';
+    }
     function fillPresets() {
         const sel = $('preset');
         // Presets with a group go in an <optgroup> of that name, in the order the groups first appear.
@@ -713,7 +727,11 @@
             if (!groups[p.group]) { groups[p.group] = document.createElement('optgroup'); groups[p.group].label = p.group; sel.appendChild(groups[p.group]); }
             groups[p.group].appendChild(new Option(p.name, String(k)));
         });
-        sel.addEventListener('change', () => loadPreset(Number(sel.value)));
+        // Custom: shown when the user changes any number; it cannot be picked from the list.
+        const custom = new Option('Custom', 'custom');
+        custom.hidden = true;
+        sel.appendChild(custom);
+        sel.addEventListener('change', () => { if (sel.value !== 'custom') loadPreset(Number(sel.value)); });
         $('reset-preset').addEventListener('click', () => loadPreset(state.preset));
     }
     // A preset in the current mode, on the nearest target button's orbit (made circular).
@@ -722,6 +740,7 @@
         const key = nearestKey();
         const s = SCALE[key];
         state.preset = index;
+        state.presetCustom = false;
         $('preset').value = String(index);
         // Custom keeps the typed orbit (made circular); the presets scale by the nearest button.
         state.target = state.customTarget ? { ...state.target, e: 0 } : { ...TARGETS[key] };
