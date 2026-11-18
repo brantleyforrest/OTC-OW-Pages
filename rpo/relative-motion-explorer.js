@@ -358,6 +358,9 @@
             };
             range.addEventListener('input', () => set(Number(range.value), false));
             range.addEventListener('change', () => { refit(true); dirty = true; });
+            // Live while typing (a half-typed value such as "-" is skipped); Enter or leaving the
+            // field rewrites it and fits the views.
+            num.addEventListener('input', () => { if (num.value.trim() !== '') set(Number(num.value), false); });
             num.addEventListener('change', () => set(Number(num.value), true));
             // Hovering or focusing a row highlights what it controls.
             const hotOn = () => { state.hot = row.key; wrap.classList.add('hot'); dirty = true; };
@@ -393,6 +396,7 @@
             b.setAttribute('aria-pressed', String(Math.abs(t.a - s.a) < 1e-9 && Math.abs(t.i - s.i) < 1e-9 && Math.abs(t.raan - s.raan) < 1e-9 && t.e < 1e-12));
         });
         $('frame-pick').querySelector('[data-value="ECEF"]').disabled = !isGeoTarget();
+        if (document.activeElement !== $('target-a')) { $('target-a').value = fmtNum(state.target.a, 3); $('target-a').classList.remove('bad'); }
         if (hasRmoe) {
             const r = sim.rmoe, n = sim.n;
             const s = M.stateFromRmoe(r, n, 0);
@@ -471,9 +475,11 @@
         $('el-msg').textContent = '';
     }
     // Try new orbits; keep the last valid ones on screen if either orbit is not allowed.
-    function commit(target, diff, field, final) {
+    // quiet: a value still being typed; if it is not allowed, wait without an error.
+    function commit(target, diff, field, final, quiet) {
         const chase = M.coeFromDifference(target, diff);
         const problem = M.orbitProblem(target) || M.orbitProblem(chase);
+        if (problem && quiet) return false;
         if (problem) {
             if (field) field.classList.add('bad');
             $('el-msg').textContent = MESSAGES[problem];
@@ -494,9 +500,22 @@
     }
     elTable.addEventListener('input', e => {
         const el = e.target;
-        if (el.dataset.col !== 'slider') return;
         const row = EL_ROWS.find(r => r.key === el.dataset.key);
-        commit({ ...state.target }, { ...state.diff, [row.d]: Number(el.value) }, el, false);
+        if (!row) return;
+        if (el.dataset.col === 'slider') { commit({ ...state.target }, { ...state.diff, [row.d]: Number(el.value) }, el, false); return; }
+        // A number field, live while typing: skip a half-typed value or one outside the limits,
+        // and leave the field as typed (the change event below tidies it).
+        const v = Number(el.value);
+        if (el.value.trim() === '' || !isFinite(v)) return;
+        if (el.dataset.col === 'target') {
+            const [lo, hi] = TARGET_LIMITS[row.key];
+            if (v < lo || v > hi || (row.key === 'e' && !isAdvanced())) return;
+            commit({ ...state.target, [row.key]: v }, { ...state.diff }, el, false, true);
+        } else if (el.dataset.col === 'diff') {
+            commit({ ...state.target }, { ...state.diff, [row.d]: v }, el, false, true);
+        } else {
+            commit({ ...state.target }, M.coeDifference(state.target, { ...chaseCoe(), [row.key]: v }), el, false, true);
+        }
     });
     elTable.addEventListener('change', e => {
         const el = e.target;
@@ -556,19 +575,23 @@
     const pvState = () => M.stateFromRmoe(mathRmoe(), sim.n, 0);
     function buildPv() {
         PV_IDS.forEach((id, k) => {
-            $(id).addEventListener('change', () => {
+            // final: Enter or leaving the field (fit the views, put back a bad entry); otherwise live
+            // while typing, skipping a half-typed value.
+            const apply = final => {
                 const text = $(id).value.trim();
                 const value = Number(text);
-                if (!text || !Number.isFinite(value)) { updatePv(); return; }
+                if (!text || !Number.isFinite(value)) { if (final) updatePv(); return; }
                 const s = pvState();
                 s[k] = k < 3 ? value : value / 1000;
                 state.rmoe = stored(M.rmoeFromState(s, sim.n));
                 state.lastRow = null;
                 rebuild();
-                refit(true);
+                refit(final);
                 updateInputs();
                 updateStatic();
-            });
+            };
+            $(id).addEventListener('input', () => apply(false));
+            $(id).addEventListener('change', () => apply(true));
         });
     }
     // KaTeX when it loaded, else the TeX source, so the numbers can still be read.
@@ -739,6 +762,34 @@
         updateStatic();
         fillElTable();
     });
+
+    // A typed target a (Set RMOEs and Set Position and Velocity; Set COEs has its own table). Only the
+    // size changes: the plane stays and the RMOEs keep their km, so the motion keeps its shape while
+    // n, the period, and the drift rate follow a. Live while typing; a value outside the limits
+    // waits, and on Enter or leaving the field it is marked and put back.
+    function setTargetA(final) {
+        const el = $('target-a'), [lo, hi] = TARGET_LIMITS.a;
+        const v = Number(el.value);
+        const ok = el.value.trim() !== '' && Number.isFinite(v) && v >= lo && v <= hi;
+        el.classList.toggle('bad', !ok && final);
+        if (!ok) {
+            if (final) { el.title = 'Use a value from ' + lo + ' to ' + hi + ' km.'; el.value = fmtNum(state.target.a, 3); }
+            return;
+        }
+        el.title = '';
+        if (Math.abs(v - state.target.a) < 1e-9 && !final) return;
+        state.target = { ...state.target, a: v, e: 0 };
+        state.modeNote = '';
+        if (!isGeoTarget() && state.frame === 'ECEF') { state.frame = 'ECI'; selectFrame('ECI'); }
+        rebuild();
+        applyViewOptions();
+        refit(final);
+        updateInputs();
+        updateStatic();
+        if (final) el.value = fmtNum(state.target.a, 3);
+    }
+    $('target-a').addEventListener('input', () => setTargetA(false));
+    $('target-a').addEventListener('change', () => setTargetA(true));
 
     /* ---------- Time ---------- */
     // The full controls (Advanced) and the simple playback bar share one clock and one speed.

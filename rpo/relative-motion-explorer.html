@@ -120,6 +120,14 @@
         .set-mode-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 0.3rem 0.1rem; }
         .set-mode .segmented { display: grid; grid-template-columns: 0.8fr 0.8fr 1.4fr; width: 100%; }
         .set-mode .segmented button { padding: 0.6rem 0.4rem; font-size: 0.92rem; font-weight: 600; line-height: 1.2; }
+        .a-field { display: inline-flex; align-items: center; gap: 0.3rem; }
+        .a-field input {
+            width: 5.6rem; padding: 0.15rem 0.3rem; font-family: var(--font-mono); font-size: 0.78rem; text-align: right; color: #34d399;
+            background: rgba(6, 11, 20, 0.6); border: 1px solid var(--border-subtle); border-radius: 4px; -moz-appearance: textfield; appearance: textfield;
+        }
+        .a-field input::-webkit-outer-spin-button, .a-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .a-field input:focus { outline: none; border-color: var(--accent-blue); }
+        .a-field input.bad { border-color: #f87171; }
         body.advanced-on .simple-play { display: none !important; }
         .simple-play .ctl-row { align-items: center; }
         #sp-time { min-width: 4.2rem; }
@@ -300,6 +308,7 @@
                                 <button type="button" data-value="gps" aria-pressed="false">MEO</button>
                                 <button type="button" data-value="leo" aria-pressed="false">LEO</button>
                             </div>
+                            <label class="a-field course-only" title="The target's semi-major axis (its orbit is circular here): type any value from 6500 to 50000 km">a <input type="number" step="any" min="6500" max="50000" id="target-a" aria-label="Target semi-major axis in km"> km</label>
                         </div>
                         <div class="coe-only" id="coe-block">
                             <div class="el-table" id="el-table"></div>
