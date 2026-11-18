@@ -351,6 +351,7 @@
     // KaTeX when it loaded, else the TeX source, so the numbers can still be read.
     const tex = s => (window.katex ? window.katex.renderToString(s, { throwOnError: false }) : '<code class="tex-source">' + s.replace(/</g, '&lt;') + '</code>');
     const tnum = (v, d) => { const s = (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d); return s.startsWith('-') ? '(' + s + ')' : s; };
+    const tres = (v, d) => (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d);   // a result: no parentheses
     const tsci = v => { const [m, e] = v.toExponential(4).split('e'); return m + '\\times10^{' + Number(e) + '}'; };
     function updatePv() {
         if (!sim) return;
@@ -367,10 +368,10 @@
         const nT = tsci(n);
         const rows = [];
         rows.push({ key: null, eq: `n = \\sqrt{\\mu / a^3} = \\sqrt{398600.44 / ${a}^3} = ${nT}\\ \\text{rad/s}` });
-        rows.push({ key: 'xc', eq: `x_C = 4x_0 + \\frac{2\\dot y_0}{n} = 4${tnum(x0, 4)} + \\frac{2\\,${ms(vy)}}{${nT}} = ${tnum(r.xc, 3)}\\ \\text{km}` });
-        rows.push({ key: 'yc0', eq: `y_{C0} = y_0 - \\frac{2\\dot x_0}{n} = ${tnum(y0, 4)} - \\frac{2\\,${ms(vx)}}{${nT}} = ${tnum(r.yc0, 3)}\\ \\text{km}` });
-        rows.push({ key: 'C', eq: `C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2} = \\sqrt{${tnum(r.xc - x0, 3)}^2 + ${tnum((r.yc0 - y0) / 2, 3)}^2} = ${tnum(r.C, 3)}\\ \\text{km}` });
-        rows.push({ key: 'zmax', eq: `z_{max} = \\sqrt{z_0^2 + (\\dot z_0 / n)^2} = \\sqrt{${tnum(z0, 4)}^2 + ${tnum(vz / n, 3)}^2} = ${tnum(r.zmax, 3)}\\ \\text{km}` });
+        rows.push({ key: 'xc', eq: `x_C = 4x_0 + \\frac{2\\dot y_0}{n} = 4${tnum(x0, 4)} + \\frac{2\\,${ms(vy)}}{${nT}} = ${tres(r.xc, 3)}\\ \\text{km}` });
+        rows.push({ key: 'yc0', eq: `y_{C0} = y_0 - \\frac{2\\dot x_0}{n} = ${tnum(y0, 4)} - \\frac{2\\,${ms(vx)}}{${nT}} = ${tres(r.yc0, 3)}\\ \\text{km}` });
+        rows.push({ key: 'C', eq: `C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2} = \\sqrt{${tnum(r.xc - x0, 3)}^2 + ${tnum((r.yc0 - y0) / 2, 3)}^2} = ${tres(r.C, 3)}\\ \\text{km}` });
+        rows.push({ key: 'zmax', eq: `z_{max} = \\sqrt{z_0^2 + (\\dot z_0 / n)^2} = \\sqrt{${tnum(z0, 4)}^2 + ${tnum(vz / n, 3)}^2} = ${tres(r.zmax, 3)}\\ \\text{km}` });
         if (r.M0 === null) rows.push({ key: 'M0', eq: 'M_0 = \\text{undefined}', why: tex('C = 0') + ': there is no ellipse, so there is no place on it.' });
         else {
             const base = Math.acos(Math.max(-1, Math.min(1, (r.xc - x0) / r.C))) * M.R2D;
@@ -380,12 +381,12 @@
         if (r.dM0 === null) rows.push({ key: 'dM0', eq: '\\Delta M_0 = \\text{undefined}', why: tex('z_{max} = 0') + ': there is no swing, so there is no place in it.' });
         else {
             const base = Math.asin(Math.max(-1, Math.min(1, z0 / r.zmax))) * M.R2D;
-            rows.push({ key: 'dM0', eq: `\\Delta M_0 = \\sin^{-1}\\frac{z_0}{z_{max}} = \\sin^{-1}${tnum(z0 / r.zmax, 4)} = ${tnum(base, 1)}^\\circ`,
+            rows.push({ key: 'dM0', eq: `\\Delta M_0 = \\sin^{-1}\\frac{z_0}{z_{max}} = \\sin^{-1}${tnum(z0 / r.zmax, 4)} = ${tres(base, 1)}^\\circ`,
                 why: vz < 0 ? `${tex('\\dot z_0 < 0')}, so ${tex(`\\Delta M_0 = 180^\\circ - ${tnum(base, 1)}^\\circ = ${r.dM0.toFixed(1)}^\\circ`)}`
                     : base < 0 ? `${tex('\\dot z_0 \\ge 0')}; wrapped to 0 to 360: ${tex(`\\Delta M_0 = ${r.dM0.toFixed(1)}^\\circ`)}` : `${tex('\\dot z_0 \\ge 0')}, so ${tex('\\Delta M_0')} stays ${tex(base.toFixed(1) + '^\\circ')}.` });
         }
         const drift = M.driftRate(r, n, a);
-        rows.push({ key: 'xc', eq: `\\dot y_C = -\\tfrac{3}{2} n x_C = ${tnum(drift.kmPerSec * 1000, 4)}\\ \\text{m/s} = -3\\pi x_C = ${tnum(drift.kmPerRev, 3)}\\ \\text{km/rev}` });
+        rows.push({ key: 'xc', eq: `\\dot y_C = -\\tfrac{3}{2} n x_C = ${tres(drift.kmPerSec * 1000, 4)}\\ \\text{m/s} = -3\\pi x_C = ${tres(drift.kmPerRev, 3)}\\ \\text{km/rev}` });
         const box = $('pv-eqs');
         box.innerHTML = rows.map(row => `<div class="pv-eq"${row.key ? ` data-key="${row.key}"` : ''}>${tex(row.eq)}${row.why ? `<div class="pv-why">${row.why}</div>` : ''}</div>`).join('');
         box.querySelectorAll('.pv-eq[data-key]').forEach(el => {

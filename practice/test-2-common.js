@@ -102,7 +102,9 @@
     }
 
     // Givens. A row of name = value items.
-    const givenItem = (texLhs, valueText, unit) => '<div class="given-item">$' + texLhs + ' = ' + texNum(valueText) + '$' + (unit ? ' ' + unit : '') + '</div>';
+    // Math is rendered here (PracticeMath is looked up when called, so Node can load this file first).
+    const proseOf = text => (global.PracticeMath ? global.PracticeMath.prose(text) : text);
+    const givenItem = (texLhs, valueText, unit) => '<div class="given-item">' + proseOf('$' + texLhs + ' = ' + texNum(valueText) + '$') + (unit ? ' ' + unit : '') + '</div>';
     function givenState(s) {
         return [givenItem('x_0', km(s[0]), 'km'), givenItem('y_0', km(s[1]), 'km'), givenItem('z_0', km(s[2]), 'km'),
             givenItem('\\dot x_0', ms(s[3]), 'm/s'), givenItem('\\dot y_0', ms(s[4]), 'm/s'), givenItem('\\dot z_0', ms(s[5]), 'm/s')].join('');
@@ -110,8 +112,8 @@
     function givenRmoe(r) {
         const ang = v => (v === null ? '\\text{undefined}' : fixed(v, 0) + '°');
         return [givenItem('x_C', plain(r.xc, 3), 'km'), givenItem('y_{C0}', plain(r.yc0, 3), 'km'), givenItem('C', plain(r.C, 3), 'km'),
-            '<div class="given-item">$M_0 = ' + ang(r.M0) + '$</div>', givenItem('z_{max}', plain(r.zmax, 3), 'km'),
-            '<div class="given-item">$\\Delta M_0 = ' + ang(r.dM0) + '$</div>'].join('');
+            '<div class="given-item">' + proseOf('$M_0 = ' + ang(r.M0) + '$') + '</div>', givenItem('z_{max}', plain(r.zmax, 3), 'km'),
+            '<div class="given-item">' + proseOf('$\\Delta M_0 = ' + ang(r.dM0) + '$') + '</div>'].join('');
     }
 
     // Round values to pick an answer from.

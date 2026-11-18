@@ -47,48 +47,48 @@
         const drift = M.driftRate(truth, n, a);
 
         const steps = [nStep(a, n)];
-        steps.push({ key: 'xc', title: 'Center height, x_C', result: '$x_C = ' + C2.texNum(C2.fixed(truth.xc, 3)) + '$ km',
-            caption: 'x_C is the height of the NMC center; above the target it drifts backward.',
+        steps.push({ key: 'xc', title: 'Center height, x<sub>C</sub>', result: '$x_C = ' + C2.texNum(C2.fixed(truth.xc, 3)) + '$ km',
+            caption: 'x<sub>C</sub> is the height of the NMC center; above the target it drifts backward.',
             methods: [{ name: 'Formula', html: calc('x_C = 4x_0 + \\frac{2\\dot y_0}{n}', ['4' + p(x0, 4) + ' + \\frac{2' + vms(vy) + '}{' + sci(n) + '}'], C2.fixed(truth.xc, 3) + '\\ \\text{km}') }] });
-        steps.push({ key: 'yc0', title: 'Center along the track, y_C0', result: '$y_{C0} = ' + C2.texNum(C2.fixed(truth.yc0, 3)) + '$ km',
-            caption: 'y_C0 is where the NMC center is along the track at epoch.',
+        steps.push({ key: 'yc0', title: 'Center along the track, y<sub>C0</sub>', result: '$y_{C0} = ' + C2.texNum(C2.fixed(truth.yc0, 3)) + '$ km',
+            caption: 'y<sub>C0</sub> is where the NMC center is along the track at epoch.',
             methods: [{ name: 'Formula', html: calc('y_{C0} = y_0 - \\frac{2\\dot x_0}{n}', [p(y0, 4) + ' - \\frac{2' + vms(vx) + '}{' + sci(n) + '}'], C2.fixed(truth.yc0, 3) + '\\ \\text{km}') }] });
         steps.push({ key: 'C', title: 'NMC size, C', result: '$C = ' + C2.fixed(truth.C, 3) + '$ km',
             caption: 'C is the radial half-height of the NMC; it is 2C long on each side of its center.',
             methods: [{ name: 'Formula', html: calc('C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2}',
                 ['\\sqrt{' + p(truth.xc - x0, 4) + '^2 + ' + p((truth.yc0 - y0) / 2, 4) + '^2}'], C2.fixed(truth.C, 3) + '\\ \\text{km}') +
                 (truth.C === 0 ? note('C is 0 (up to the rounding of the givens): there is no NMC.') : '') }] });
-        steps.push({ key: 'zmax', title: 'Cross-track size, z_max', result: '$z_{max} = ' + C2.fixed(truth.zmax, 3) + '$ km',
-            caption: 'z_max is how far chase swings to each side of the target’s plane.',
+        steps.push({ key: 'zmax', title: 'Cross-track size, z<sub>max</sub>', result: '$z_{max} = ' + C2.fixed(truth.zmax, 3) + '$ km',
+            caption: 'z<sub>max</sub> is how far chase swings to each side of the target’s plane.',
             methods: [{ name: 'Formula', html: calc('z_{max} = \\sqrt{z_0^2 + (\\dot z_0 / n)^2}',
                 ['\\sqrt{' + p(z0, 4) + '^2 + \\left(\\frac{' + vms(vz) + '}{' + sci(n) + '}\\right)^2}'], C2.fixed(truth.zmax, 3) + '\\ \\text{km}') +
                 (truth.zmax === 0 ? note('z_max is 0 (up to rounding): chase stays in the target’s plane.') : '') }] });
         if (truth.M0 === null) {
-            steps.push({ key: 'M0', title: 'Place on the NMC, M_0', result: 'undefined', caption: 'With no NMC there is no place on it.',
+            steps.push({ key: 'M0', title: 'Place on the NMC, M<sub>0</sub>', result: 'undefined', caption: 'With no NMC there is no place on it.',
                 methods: [{ name: 'Rule', html: rule('$C = 0$, so $M_0$ is undefined.', '$M_0 = \\text{undefined}$') }] });
         } else {
             const base = Math.acos(Math.max(-1, Math.min(1, (truth.xc - x0) / truth.C))) * M.R2D;
             const flip = vx < 0;
-            steps.push({ key: 'M0', title: 'Place on the NMC, M_0', result: '$M_0 = ' + deg1(truth.M0) + '$',
-                caption: 'M_0 is where chase is on the NMC: 0° bottom, 90° front, 180° top, 270° back.',
+            steps.push({ key: 'M0', title: 'Place on the NMC, M<sub>0</sub>', result: '$M_0 = ' + deg1(truth.M0) + '$',
+                caption: 'M<sub>0</sub> is where chase is on the NMC: 0° bottom, 90° front, 180° top, 270° back.',
                 methods: [{ name: 'Formula', html: calc('M_0 = \\cos^{-1}\\frac{x_C - x_0}{C}', ['\\cos^{-1}\\frac{' + p(truth.xc - x0, 4) + '}{' + C2.fixed(truth.C, 3) + '}'], deg1(base)) +
                     rule(flip ? '$\\dot x_0 < 0$ (chase is moving down), so $M_0 = 360° - ' + deg1(base) + '$.' : '$\\dot x_0 \\ge 0$, so $M_0$ stays ' + deg1(base) + '.', '$M_0 = ' + deg1(truth.M0) + '$') }] });
         }
         if (truth.dM0 === null) {
-            steps.push({ key: 'dM0', title: 'Place in the swing, ΔM_0', result: 'undefined', caption: 'With no swing there is no place in it.',
+            steps.push({ key: 'dM0', title: 'Place in the swing, ΔM<sub>0</sub>', result: 'undefined', caption: 'With no swing there is no place in it.',
                 methods: [{ name: 'Rule', html: rule('$z_{max} = 0$, so $\\Delta M_0$ is undefined.', '$\\Delta M_0 = \\text{undefined}$') }] });
         } else {
             const base = Math.asin(Math.max(-1, Math.min(1, z0 / truth.zmax))) * M.R2D;
             const flip = vz < 0;
             const text = flip ? '$\\dot z_0 < 0$ (chase is moving right), so $\\Delta M_0 = 180° - ' + p(base, 1) + '°$.'
                 : base < -1e-9 ? '$\\dot z_0 \\ge 0$; a negative angle wraps to $' + deg1(truth.dM0) + '$.' : '$\\dot z_0 \\ge 0$, so $\\Delta M_0$ stays ' + deg1(base) + '.';
-            steps.push({ key: 'dM0', title: 'Place in the swing, ΔM_0', result: '$\\Delta M_0 = ' + deg1(truth.dM0) + '$',
-                caption: 'ΔM_0 is where chase is in the swing: 0° +P.C., 90° far left, 180° −P.C., 270° far right.',
+            steps.push({ key: 'dM0', title: 'Place in the swing, ΔM<sub>0</sub>', result: '$\\Delta M_0 = ' + deg1(truth.dM0) + '$',
+                caption: 'ΔM<sub>0</sub> is where chase is in the swing: 0° +P.C., 90° far left, 180° −P.C., 270° far right.',
                 methods: [{ name: 'Formula', html: calc('\\Delta M_0 = \\sin^{-1}\\frac{z_0}{z_{max}}', ['\\sin^{-1}\\frac{' + p(z0, 4) + '}{' + C2.fixed(truth.zmax, 3) + '}'], p(base, 1) + '°') +
                     rule(text, '$\\Delta M_0 = ' + deg1(truth.dM0) + '$') }] });
         }
         steps.push({ key: 'drift', title: 'Drift rate', result: '$' + C2.texNum(C2.fixed(drift.kmPerRev, 3)) + '$ km/rev',
-            caption: 'The center drifts along the track at a steady rate set by x_C.',
+            caption: 'The center drifts along the track at a steady rate set by x<sub>C</sub>.',
             methods: [{ name: 'Per second', html: calc('\\dot y_C = -\\tfrac{3}{2} n x_C', ['-1.5 \\times ' + sci(n) + ' \\times ' + p(truth.xc, 3)], C2.fixed(drift.kmPerSec * 1000, 4) + '\\ \\text{m/s}') },
                 { name: 'Per rev', html: calc('\\dot y_C = -3\\pi x_C', ['-3\\pi \\times ' + p(truth.xc, 3)], C2.fixed(drift.kmPerRev, 3) + '\\ \\text{km/rev}') }] });
         steps.push({ key: 'answer', title: 'What the motion looks like', result: '', caption: 'The motion these RMOEs describe, over two revs.',
@@ -130,21 +130,21 @@
             caption: 'The in-track rate at every corner includes the drift.',
             methods: [{ name: 'Formula', html: calc('\\dot y_C = -\\tfrac{3}{2} n x_C', ['-1.5 \\times ' + sci(n) + ' \\times ' + p(truth.xc, 3) + '\\times 1000'], ms(yd) + '\\ \\text{m/s}') }] });
         steps.push({ key: 'M0', title: 'In the plane: the ' + corner, result: 'the ' + corner,
-            caption: 'M_0 = ' + truth.M0 + '° puts chase at the ' + corner + ' of the NMC. Read its row of the boundary table.',
+            caption: 'M<sub>0</sub> = ' + truth.M0 + '° puts chase at the ' + corner + ' of the NMC. Read its row of the boundary table.',
             methods: [{ name: 'Boundary table', html: rule('$M_0 = ' + truth.M0 + '°$: chase is at the ' + corner + '.') +
                 calc('x_0 = ' + cornerTeX[0], [], C2.fixed(s[0], 3) + '\\ \\text{km}') +
                 calc('y_0 = ' + cornerTeX[1], [], C2.fixed(s[1], 3) + '\\ \\text{km}') +
                 calc('\\dot x_0 = ' + cornerTeX[2], [], ms(s[3]) + '\\ \\text{m/s}') +
                 calc('\\dot y_0 = ' + cornerTeX[3], [], ms(s[4]) + '\\ \\text{m/s}') }] });
         if (truth.dM0 === null) {
-            steps.push({ key: 'dM0', title: 'Across the plane: no swing', result: '$z_0 = 0$', caption: 'With z_max = 0 chase stays in the target’s plane.',
+            steps.push({ key: 'dM0', title: 'Across the plane: no swing', result: '$z_0 = 0$', caption: 'With z<sub>max</sub> = 0 chase stays in the target’s plane.',
                 methods: [{ name: 'Rule', html: rule('$z_{max} = 0$, so $z_0 = 0$ and $\\dot z_0 = 0$.') }] });
         } else {
             const sw = C2.swingName(truth.dM0);
             const k = Math.round(truth.dM0 / 90) % 4;
             const zT = ['0', 'z_{max}', '0', '-z_{max}'][k], vzT = ['n z_{max}', '0', '-n z_{max}', '0'][k];
             steps.push({ key: 'dM0', title: 'Across the plane: ' + sw, result: sw,
-                caption: 'ΔM_0 = ' + truth.dM0 + '° puts chase at its ' + sw + '.',
+                caption: 'ΔM<sub>0</sub> = ' + truth.dM0 + '° puts chase at its ' + sw + '.',
                 methods: [{ name: 'Boundary table', html: rule('$\\Delta M_0 = ' + truth.dM0 + '°$: chase is at its ' + sw + '.') +
                     calc('z_0 = ' + zT, [], C2.fixed(s[2], 3) + '\\ \\text{km}') + calc('\\dot z_0 = ' + vzT, [], ms(s[5]) + '\\ \\text{m/s}') }] });
         }
