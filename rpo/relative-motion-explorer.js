@@ -630,23 +630,43 @@
         rows.push({ key: 'yc0', eq: `y_{C0} = y_0 - \\frac{2\\dot x_0}{n} = ${tnum(y0, 4)} - \\frac{2\\,${ms(vx)}}{${nT}} = ${tres(r.yc0, 3)}\\ \\text{km}` });
         rows.push({ key: 'C', eq: `C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2} = \\sqrt{${tnum(r.xc - x0, 3)}^2 + ${tnum((r.yc0 - y0) / 2, 3)}^2} = ${tres(r.C, 3)}\\ \\text{km}` });
         rows.push({ key: 'zmax', eq: `z_{max} = \\sqrt{z_0^2 + (\\dot z_0 / n)^2} = \\sqrt{${tnum(z0, 4)}^2 + ${tnum(vz / n, 3)}^2} = ${tres(r.zmax, 3)}\\ \\text{km}` });
+        // M_0 and ΔM_0: the inverse cosine or sine has two angles that fit, and the sign of the
+        // matching rate picks one. Shown as: the fraction with its numbers, the two angles, which
+        // one and why, then the answer on its own line.
+        const mps = v => tres(v * 1000, 4) + '\\ \\text{m/s}';
+        const deg = v => tres(v, 1) + '^\\circ';
+        const STILL = 1e-12;
         if (r.M0 === null) rows.push({ key: 'M0', eq: 'M_0 = \\text{undefined}', why: tex('C = 0') + ': there is no ellipse, so there is no place on it.' });
         else {
             const base = Math.acos(Math.max(-1, Math.min(1, (r.xc - x0) / r.C))) * M.R2D;
-            rows.push({ key: 'M0', eq: `M_0 = \\cos^{-1}\\frac{x_C - x_0}{C} = \\cos^{-1}${tnum((r.xc - x0) / r.C, 4)} = ${base.toFixed(1)}^\\circ`,
-                why: vx < 0 ? `${tex('\\dot x_0 < 0')}, so ${tex(`M_0 = 360^\\circ - ${base.toFixed(1)}^\\circ = ${r.M0.toFixed(1)}^\\circ`)}` : `${tex('\\dot x_0 \\ge 0')}, so ${tex('M_0')} stays ${tex(base.toFixed(1) + '^\\circ')}.` });
+            const other = 360 - base;
+            const why = Math.abs(vx) < STILL
+                ? `${tex('\\dot x_0 = 0')}: chase is at the bottom or top of the NMC, which ${tex('\\cos^{-1}')} gives directly.`
+                : `Two angles have this cosine: ${tex(deg(base))} and ${tex(`360^\\circ - ${deg(base)} = ${deg(other)}`)}. ` +
+                  (vx < 0 ? `${tex(`\\dot x_0 = ${mps(vx)}`)} is negative, so ${tex('\\sin M_0 < 0')}: ${tex('M_0')} is between 180° and 360°.`
+                      : `${tex(`\\dot x_0 = ${mps(vx)}`)} is positive, so ${tex('\\sin M_0 > 0')}: ${tex('M_0')} is between 0° and 180°.`);
+            rows.push({ key: 'M0', eq: `M_0 = \\cos^{-1}\\dfrac{x_C - x_0}{C} = \\cos^{-1}\\dfrac{${tnum(r.xc - x0, 3)}}{${tres(r.C, 3)}}`, why,
+                result: `M_0 = ${deg(r.M0)}` });
         }
         if (r.dM0 === null) rows.push({ key: 'dM0', eq: '\\Delta M_0 = \\text{undefined}', why: tex('z_{max} = 0') + ': there is no swing, so there is no place in it.' });
         else {
             const base = Math.asin(Math.max(-1, Math.min(1, z0 / r.zmax))) * M.R2D;
-            rows.push({ key: 'dM0', eq: `\\Delta M_0 = \\sin^{-1}\\frac{z_0}{z_{max}} = \\sin^{-1}${tnum(z0 / r.zmax, 4)} = ${tres(base, 1)}^\\circ`,
-                why: vz < 0 ? `${tex('\\dot z_0 < 0')}, so ${tex(`\\Delta M_0 = 180^\\circ - ${tnum(base, 1)}^\\circ = ${r.dM0.toFixed(1)}^\\circ`)}`
-                    : base < 0 ? `${tex('\\dot z_0 \\ge 0')}; wrapped to 0 to 360: ${tex(`\\Delta M_0 = ${r.dM0.toFixed(1)}^\\circ`)}` : `${tex('\\dot z_0 \\ge 0')}, so ${tex('\\Delta M_0')} stays ${tex(base.toFixed(1) + '^\\circ')}.` });
+            const other = 180 - base;
+            let why;
+            if (Math.abs(vz) < STILL) why = `${tex('\\dot z_0 = 0')}: chase is at the far left or far right, which ${tex('\\sin^{-1}')} gives directly` + (base < 0 ? `; ${tex(deg(base))} is ${tex(deg(r.dM0))}.` : '.');
+            else {
+                why = `Two angles have this sine: ${tex(deg(base))} and ${tex(`180^\\circ - ${tnum(base, 1)}^\\circ = ${deg(other)}`)}. `;
+                if (vz < 0) why += `${tex(`\\dot z_0 = ${mps(vz)}`)} is negative, so ${tex('\\cos \\Delta M_0 < 0')}: ${tex('\\Delta M_0')} is between 90° and 270°.`;
+                else why += `${tex(`\\dot z_0 = ${mps(vz)}`)} is positive, so ${tex('\\cos \\Delta M_0 > 0')}: ${tex('\\Delta M_0')} is between −90° and 90°` +
+                    (base < 0 ? `, so it is ${tex(deg(base))}, the same as ${tex(deg(r.dM0))}.` : '.');
+            }
+            rows.push({ key: 'dM0', eq: `\\Delta M_0 = \\sin^{-1}\\dfrac{z_0}{z_{max}} = \\sin^{-1}\\dfrac{${tnum(z0, 3)}}{${tres(r.zmax, 3)}}`, why,
+                result: `\\Delta M_0 = ${deg(r.dM0)}` });
         }
         const drift = M.driftRate(r, n, a);
         rows.push({ key: 'xc', eq: `\\dot y_C = -\\tfrac{3}{2} n x_C = ${tres(drift.kmPerSec * 1000, 4)}\\ \\text{m/s} = -3\\pi x_C = ${tres(drift.kmPerRev, 3)}\\ \\text{km/rev}` });
         const box = $('pv-eqs');
-        box.innerHTML = rows.map(row => `<div class="pv-eq"${row.key ? ` data-key="${row.key}"` : ''}>${tex(row.eq)}${row.why ? `<div class="pv-why">${row.why}</div>` : ''}</div>`).join('');
+        box.innerHTML = rows.map(row => `<div class="pv-eq"${row.key ? ` data-key="${row.key}"` : ''}>${tex(row.eq)}${row.why ? `<div class="pv-why">${row.why}</div>` : ''}${row.result ? `<div class="pv-result">${tex(row.result)}</div>` : ''}</div>`).join('');
         box.querySelectorAll('.pv-eq[data-key]').forEach(el => {
             const key = el.dataset.key;
             el.addEventListener('mouseenter', () => { state.hot = key; el.classList.add('hot'); dirty = true; });
