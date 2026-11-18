@@ -1589,14 +1589,15 @@
         container.classList.add('rpo-host');
         const root = document.createElement('div');
         root.className = 'rpo-stage rpo-five';
-        root.dataset.show = 'left';
+        root.dataset.show = '3d';
         root.innerHTML =
             paneHtml('rpo-inertial', ['eci', 'ECI'], INERTIAL_EXTRA) +
             '<div class="rpo-ricside">' +
                 paneHtml('rpo-box', ['ric', 'RIC · 3D'], segmentedHtml('rpo-viewbuttons', 'Turn the 3D box', [['3d', '3D'], ['left', 'Left'], ['behind', 'Behind'], ['above', 'Above']]) + '<div class="tool-status" style="display: none;"></div>') +
                 '<div class="rpo-planes">' + paneHtml('rpo-left') + paneHtml('rpo-behind') + paneHtml('rpo-above') + '</div>' +
             '</div>' +
-            segmentedHtml('rpo-switch', 'Choose the RIC view', [['3d', '3D'], ['left', 'Left'], ['behind', 'Behind'], ['above', 'Above']]);
+            // Small stages (phones) only: the two 3D views, or the RI and RC planes (from the left and from behind).
+            segmentedHtml('rpo-switch', 'Choose the views', [['3d', '3D'], ['flat', 'RI · RC']]);
         container.appendChild(root);
         const el = name => root.querySelector('.rpo-' + name);
 

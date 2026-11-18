@@ -136,8 +136,9 @@
 }
 .rpo-five .rpo-planes .rpo-pane + .rpo-pane { border-top: 1px solid #2a4266; border-left: 1px solid #2a4266; }
 
-/* Small stage (phones): only the two 3D frames, the inertial pane above the 3D RIC box
-   (owner, 2026-11-17). The flat panes and the pane switch are hidden; the box still turns by drag. */
+/* Small stage (phones): the two 3D frames, the inertial pane above the 3D RIC box (owner,
+   2026-11-17), or, from the switch, the RI and RC planes (owner, 2026-11-18). The box's own view
+   buttons are hidden; the box still turns by drag. */
 @container (max-width: 519px), (max-height: 419px) {
     .rpo-stage.rpo-five {
         grid-template-columns: minmax(0, 1fr);
@@ -149,6 +150,18 @@
     .rpo-five .rpo-planes { display: none; }
     /* A narrow inertial pane: lift its scale bar above the "Offsets magnified" label. */
     .rpo-five .rpo-inertial .rpo-scalebar { bottom: 1.6rem; }
+    /* The switch (top right): 3D shows the two 3D frames; RI · RC shows the view from the left
+       (radial and in-track) above the view from behind (radial and cross-track). */
+    .rpo-five .rpo-switch.segmented { display: inline-flex; }
+    .rpo-stage.rpo-five[data-show="flat"] { grid-template-rows: minmax(0, 1fr); grid-template-areas: "planes"; }
+    .rpo-five[data-show="flat"] .rpo-inertial,
+    .rpo-five[data-show="flat"] .rpo-box,
+    .rpo-five[data-show="flat"] .rpo-above { display: none; }
+    .rpo-five[data-show="flat"] .rpo-planes {
+        display: grid; border-top: 0;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    }
 }
 
 /* ---------- Dual stage (Tools 2 to 4, practice) ----------
