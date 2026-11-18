@@ -4,6 +4,16 @@
 /* The stage fills the view box and picks its arrangement from the box's own shape. */
 .rpo-host { container-type: size; }
 
+/* Wide but short windows, such as a 1920x1080 laptop at 150 percent scaling (about 1280 by
+   570 CSS pixels): the stage fills the window below the bar instead of 62 percent of it, so it
+   stays over the small-stage size and keeps the full view. */
+@media (min-width: 1081px) and (max-height: 599px) {
+    .rpo-host.tool-canvas-box {
+        height: max(440px, calc(100vh - var(--nav-h) - 1.5rem));
+        height: max(440px, calc(100svh - var(--nav-h) - 1.5rem));
+    }
+}
+
 .rpo-stage {
     position: absolute;
     inset: 0;

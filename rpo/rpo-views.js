@@ -812,8 +812,16 @@
             ticks.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
         }
 
-        const ghostLine = makeLine(COLORS.chase, 0.3);
-        const trailLine = makeLine(COLORS.chase, 1);
+        // The trail and the faint whole path are drawn a few pixels wide; a plain WebGL line is 1 pixel.
+        const fatLines = [];
+        function makeFat(color, opacity, widthPx) {
+            const line = createFatLine(THREE, color, opacity, false, widthPx);
+            scene.add(line);
+            fatLines.push(line);
+            return line;
+        }
+        const ghostLine = makeFat(COLORS.chase, 0.35, 2);
+        const trailLine = makeFat(COLORS.chase, 1, 3);
         const modelLine = makeLine(0xf0f4fa, 0.6, true);
         const nmcLine = makeLine(COLORS.chase, 0.8, true);       // the current NMC, dotted
         const shadowLines = [makeLine(COLORS.chase, 0.3), makeLine(COLORS.chase, 0.3), makeLine(COLORS.chase, 0.3)];
@@ -828,6 +836,7 @@
                 arr[3 * k] = p[1]; arr[3 * k + 1] = p[2]; arr[3 * k + 2] = p[0];
                 if (flatten) arr[3 * k + flatten[0]] = flatten[1];
             }
+            if (line.setPoints) { line.setPoints(arr, count); line.visible = count > 1; return; }
             line.geometry.dispose();
             line.geometry = new THREE.BufferGeometry();
             line.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
@@ -864,6 +873,7 @@
             bg.holder.visible = wasHolder;
         }
         function render() {
+            fatLines.forEach(l => l.setResolution(w, h));
             const az = view.az * Math.PI / 180, el = view.el * Math.PI / 180;
             const d = half * 10;
             camera.position.set(d * Math.cos(el) * Math.cos(az), d * Math.cos(el) * Math.sin(az), d * Math.sin(el));

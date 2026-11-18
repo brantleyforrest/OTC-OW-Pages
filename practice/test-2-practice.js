@@ -28,7 +28,17 @@
               ['drifting-nmc', 'Drifting NMC'], ['cross-track', 'Cross-Track'], ['drifting-cross-track', 'Snake'],
               ['nmc-cross-track', 'Cross-Track NMC'], ['corkscrew', 'Corkscrew']] },
         { key: 'concepts', label: 'Concepts', module: window.Test2ConceptsProblems,
-          types: [['random', 'Random'], ['assumptions', 'CW Assumptions'], ['rmoe', 'RMOEs'], ['elements', 'Elements'], ['burns', 'Burns']] }
+          types: [['random', 'Random'], ['assumptions', 'CW Assumptions'], ['rmoe', 'RMOEs'], ['elements', 'Elements'], ['burns', 'Burns']] },
+        { key: 'coeric', label: 'Elements to Position and Velocity', module: window.Test2CoericProblems,
+          types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'Cross-Track'], ['both', 'Both']] },
+        { key: 'rmoe', label: 'Position and Velocity to RMOEs', module: window.Test2RmoeProblems,
+          types: [['random', 'Random'], ['forward', 'State to RMOEs'], ['reverse', 'RMOEs to State']] },
+        { key: 'plots', label: 'Reading Plots', module: window.Test2PlotsProblems,
+          types: [['random', 'Random'], ['read', 'Read the RMOEs'], ['later', 'Position Later']] },
+        { key: 'drift', label: 'Drift', module: window.Test2DriftProblems,
+          types: [['random', 'Random'], ['perch', 'Perch and Δa'], ['degrees', 'Degrees at GEO']] },
+        { key: 'signs', label: 'RMOE Signs', module: window.Test2SignsProblems,
+          types: [['random', 'Random']] }
     ].filter(s => s.module && (DEV || PUBLISHED.includes(s.key)));
     const byKey = Object.fromEntries(SECTIONS.map(s => [s.key, s]));
 
@@ -152,11 +162,26 @@
         unit.className = 'answer-unit';
         unit.textContent = field.unit || '';
         box.append(input, unit);
+        // allowUndefined: an "undefined" box beside the field. Checked, the answer is the word
+        // 'undefined', which is right only when the true value is undefined (null).
+        let undef = null;
+        if (field.allowUndefined) {
+            const tick = document.createElement('label');
+            tick.className = 'answer-undef';
+            undef = document.createElement('input');
+            undef.type = 'checkbox';
+            tick.append(undef, document.createTextNode('undefined'));
+            box.appendChild(tick);
+            undef.addEventListener('change', () => {
+                input.disabled = undef.checked;
+                clearMarkOnChange(field);
+            });
+        }
         const noteEl = document.createElement('div');
         noteEl.className = 'answer-note';
         row.append(labelFor(field, input.id), box, noteEl);
         $('answers').appendChild(row);
-        answerRows[field.key] = { row, input, noteEl, kind: 'text' };
+        answerRows[field.key] = { row, input, undef, noteEl, kind: 'text' };
         input.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter') return;
             const next = fields[index + 1];
@@ -262,6 +287,7 @@
         const r = answerRows[field.key];
         if (r.kind === 'check') return r.input.checked ? '1' : '';
         if (r.kind === 'pick') { const on = r.inputs.find((i) => i.checked); return on ? on.value : ''; }
+        if (r.undef && r.undef.checked) return 'undefined';
         return r.input.value;
     }
 
@@ -314,7 +340,7 @@
                 const r = answerRows[field.key];
                 if (r.kind === 'pick') r.inputs.forEach((i) => { i.disabled = true; });
                 else if (r.kind === 'check') r.input.disabled = true;
-                else r.input.readOnly = true;
+                else { r.input.readOnly = true; if (r.undef) r.undef.disabled = true; }
             });
             problem.steps.forEach((step, index) => state.visited.add(index));
             applyLayout();

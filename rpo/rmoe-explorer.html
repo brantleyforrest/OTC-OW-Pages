@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
     <link rel="stylesheet" href="../assets/tool-theme.css">
     <link rel="stylesheet" href="rpo-theme.css">
     <style>
@@ -94,6 +95,29 @@
         .rpo-table tr.near td { color: var(--accent-gold); font-weight: 600; }
         .annot { margin-top: 0.3rem; }
         .jumps .btn { padding: 0.3rem 0.55rem; }
+
+        /* Set Position and Velocity mode: six fields, then each RMOE with its equation. The RMOE
+           table stays below as a read-only list of the epoch and current values. */
+        .pv-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.15rem 0.4rem; margin-bottom: 0.4rem; }
+        .pv-grid label { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pv-grid input {
+            width: 100%; min-width: 0; padding: 0.18rem 0.3rem; margin-bottom: 0.25rem;
+            font-family: var(--font-mono); font-size: 0.78rem; text-align: right; color: #ffffff;
+            background: rgba(6, 11, 20, 0.6); border: 1px solid var(--border-subtle); border-radius: 4px;
+            -moz-appearance: textfield; appearance: textfield;
+        }
+        .pv-grid input::-webkit-outer-spin-button, .pv-grid input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .pv-grid input:focus { outline: none; border-color: var(--accent-blue); }
+        .pv-eqs { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.55rem; }
+        .pv-eq { padding: 0.3rem 0.45rem; border-radius: 6px; background: rgba(6, 11, 20, 0.45); border: 1px solid transparent; overflow-x: auto; overflow-y: hidden; }
+        .pv-eq.hot { border-color: var(--accent-gold); }
+        .pv-eq .katex { font-size: 0.86rem; color: var(--text-main); }
+        .pv-eq .tex-source { font-size: 0.72rem; white-space: pre-wrap; }
+        .pv-eq .pv-why { font-size: 0.7rem; line-height: 1.3; color: var(--text-muted); margin-top: 0.15rem; }
+        .pv-eq .pv-why .katex { font-size: 0.78rem; color: var(--text-muted); }
+        body.mode-pv .rm-only { display: none !important; }
+        body.mode-pv .rm-table input[type="range"] { visibility: hidden; }
+        body.mode-pv .rm-table input[type="number"] { background: transparent; border-color: transparent; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -148,7 +172,7 @@
     <main class="tool-main">
         <div class="tool-layout">
             <div class="col tool-stage-col">
-                <p class="tool-intro" data-advanced>Six numbers describe any relative motion in the course model, and each one moves one thing in the picture. Move a slider and watch which part changes.</p>
+                <p class="tool-intro" data-advanced>Six numbers describe any relative motion in the course model, and each one moves one thing in the picture. Move a slider and watch which part changes, or set chase's position and velocity and see the six numbers they give.</p>
 
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view" aria-label="The inertial view, the 3D RIC box, and the RIC views from the left, from behind, and from above"></div>
@@ -211,11 +235,29 @@
                                 <button type="button" data-value="leo" aria-pressed="false">LEO</button>
                             </div>
                         </div>
+                        <div class="sub-row">
+                            <span>Set</span>
+                            <div class="segmented" id="mode-pick" role="group" aria-label="What to set">
+                                <button type="button" data-value="rmoe" aria-pressed="true">RMOEs</button>
+                                <button type="button" data-value="pv" aria-pressed="false">Position and Velocity</button>
+                            </div>
+                        </div>
+                        <div class="pv-block" id="pv-block" hidden>
+                            <div class="live-head">Chase at epoch, in the RIC frame</div>
+                            <div class="pv-grid">
+                                <label for="pv-x">x<sub>0</sub> (R, km)</label><label for="pv-y">y<sub>0</sub> (I, km)</label><label for="pv-z">z<sub>0</sub> (C, km)</label>
+                                <input type="number" step="any" id="pv-x" data-key="xc"><input type="number" step="any" id="pv-y" data-key="yc0"><input type="number" step="any" id="pv-z" data-key="zmax">
+                                <label for="pv-vx">ẋ<sub>0</sub> (m/s)</label><label for="pv-vy">ẏ<sub>0</sub> (m/s)</label><label for="pv-vz">ż<sub>0</sub> (m/s)</label>
+                                <input type="number" step="any" id="pv-vx" data-key="M0"><input type="number" step="any" id="pv-vy" data-key="xc"><input type="number" step="any" id="pv-vz" data-key="dM0">
+                            </div>
+                            <div class="live-head">The RMOEs these give</div>
+                            <div class="pv-eqs" id="pv-eqs"></div>
+                        </div>
                         <div class="rm-table" id="rm-table">
                             <span class="rm-head"></span><span class="rm-head"></span><span class="rm-head">Epoch</span><span class="rm-head">Now</span>
                         </div>
-                        <div class="live-head" data-advanced>At epoch, in the RIC frame</div>
-                        <div class="stat-grid three" data-advanced>
+                        <div class="live-head rm-only" data-advanced>At epoch, in the RIC frame</div>
+                        <div class="stat-grid three rm-only" data-advanced>
                             <div class="stat-item"><span class="stat-label">R (km)</span><span class="stat-value small" id="s-x"></span></div>
                             <div class="stat-item"><span class="stat-label">I (km)</span><span class="stat-value small" id="s-y"></span></div>
                             <div class="stat-item"><span class="stat-label">C (km)</span><span class="stat-value small" id="s-z"></span></div>
@@ -297,6 +339,7 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
     <script src="../assets/tool-kit.js"></script>
     <script src="../assets/earth-land.js"></script>
     <script src="../assets/earth-scene.js"></script>

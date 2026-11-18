@@ -1,8 +1,10 @@
-// RMOE Explorer, Set RMOEs mode. The six relative motion orbital elements are the inputs; the
-// course model (RpoMath.stateFromRmoe, the CW solution) gives chase's motion, which is drawn in the
-// three flat RIC views (from the left, from behind, from above), the 3D RIC box, and an inertial view.
-// Annotations mark what each RMOE controls. The Set Position and Velocity mode comes in a later
-// stage; the page is laid out so it can be added beside this one.
+// RMOE Explorer. Two modes set the same motion: Set RMOEs (the six relative motion orbital
+// elements, with sliders) and Set Position and Velocity (chase's RIC state at epoch, with each RMOE
+// worked from it by the equation-sheet forms). state.rmoe is the one source of truth in both modes;
+// the six position and velocity fields are always stateFromRmoe(state.rmoe) at epoch, so switching
+// modes never changes the motion. The course model (RpoMath.stateFromRmoe, the CW solution) gives
+// chase's motion, which is drawn in the three flat RIC views (from the left, from behind, from
+// above), the 3D RIC box, and an inertial view. Annotations mark what each RMOE controls.
 (async function () {
     'use strict';
 
@@ -61,6 +63,7 @@
     const state = {
         preset: PRESETS.findIndex(p => p.name === DEFAULT_PRESET),
         target: 'geo',
+        mode: 'rmoe',
         rmoe: { ...ZERO },
         t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
         annot: { center: true, size: false, corners: false, cross: false },
@@ -306,7 +309,8 @@
         $('s-vx').textContent = fmt(s[3] * 1000, 4); $('s-vy').textContent = fmt(s[4] * 1000, 4); $('s-vz').textContent = fmt(s[5] * 1000, 4);
         $('motion').textContent = M.classifyMotion(r).label;
         const drift = M.driftRate(r, n, sim.coe.a);
-        $('drift-read').textContent = Math.abs(r.xc) > TINY
+        // A drift that rounds to 0.00 km/rev (typed velocities a digit short of exact) reads as none.
+        $('drift-read').textContent = Math.abs(drift.kmPerRev) >= 0.005
             ? `Drift ${fmt(drift.kmPerRev, 2)} km/rev (${fmt(drift.degPerRev, 4)}°/rev), ${drift.kmPerRev < 0 ? 'backward' : 'forward'}.`
             : 'No drift: x_C = 0.';
         const aChase = sim.coe.a + r.xc;
@@ -318,7 +322,84 @@
         const row = ROWS.find(x => x.key === state.lastRow);
         const preset = PRESETS[state.preset];
         $('notice').textContent = row ? row.notice : preset ? preset.notice : '';
+        updatePv();
     }
+
+    /* ---------- Set Position and Velocity ---------- */
+    // Fields hold km and m/s; the state array holds km and km/s.
+    const PV_IDS = ['pv-x', 'pv-y', 'pv-z', 'pv-vx', 'pv-vy', 'pv-vz'];
+    const pvState = () => M.stateFromRmoe(mathRmoe(), sim.n, 0);
+    function buildPv() {
+        PV_IDS.forEach((id, k) => {
+            $(id).addEventListener('change', () => {
+                const text = $(id).value.trim();
+                const value = Number(text);
+                if (!text || !Number.isFinite(value)) { updatePv(); return; }
+                const s = pvState();
+                s[k] = k < 3 ? value : value / 1000;
+                const r = M.rmoeFromState(s, sim.n);
+                // An undefined angle is kept as 0 in state.rmoe; mathRmoe() turns it back into null.
+                state.rmoe = { xc: r.xc, yc0: r.yc0, C: r.C, zmax: r.zmax, M0: r.M0 === null ? 0 : r.M0, dM0: r.dM0 === null ? 0 : r.dM0 };
+                state.lastRow = null;
+                rebuild();
+                refit(true);
+                updateInputs();
+                updateStatic();
+            });
+        });
+    }
+    // KaTeX when it loaded, else the TeX source, so the numbers can still be read.
+    const tex = s => (window.katex ? window.katex.renderToString(s, { throwOnError: false }) : '<code class="tex-source">' + s.replace(/</g, '&lt;') + '</code>');
+    const tnum = (v, d) => { const s = (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d); return s.startsWith('-') ? '(' + s + ')' : s; };
+    const tsci = v => { const [m, e] = v.toExponential(4).split('e'); return m + '\\times10^{' + Number(e) + '}'; };
+    function updatePv() {
+        if (!sim) return;
+        const s = pvState();
+        PV_IDS.forEach((id, k) => {
+            if (document.activeElement === $(id)) return;
+            $(id).value = String(Number((k < 3 ? s[k] : s[k] * 1000).toFixed(k < 3 ? 4 : 6)));
+        });
+        if (state.mode !== 'pv') return;
+        const n = sim.n, a = sim.coe.a;
+        const [x0, y0, z0, vx, vy, vz] = s;
+        const r = M.rmoeFromState(s, n);
+        const ms = v => tnum(v * 1000, 6) + '/1000';     // a velocity typed in m/s, put into km/s
+        const nT = tsci(n);
+        const rows = [];
+        rows.push({ key: null, eq: `n = \\sqrt{\\mu / a^3} = \\sqrt{398600.44 / ${a}^3} = ${nT}\\ \\text{rad/s}` });
+        rows.push({ key: 'xc', eq: `x_C = 4x_0 + \\frac{2\\dot y_0}{n} = 4${tnum(x0, 4)} + \\frac{2\\,${ms(vy)}}{${nT}} = ${tnum(r.xc, 3)}\\ \\text{km}` });
+        rows.push({ key: 'yc0', eq: `y_{C0} = y_0 - \\frac{2\\dot x_0}{n} = ${tnum(y0, 4)} - \\frac{2\\,${ms(vx)}}{${nT}} = ${tnum(r.yc0, 3)}\\ \\text{km}` });
+        rows.push({ key: 'C', eq: `C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2} = \\sqrt{${tnum(r.xc - x0, 3)}^2 + ${tnum((r.yc0 - y0) / 2, 3)}^2} = ${tnum(r.C, 3)}\\ \\text{km}` });
+        rows.push({ key: 'zmax', eq: `z_{max} = \\sqrt{z_0^2 + (\\dot z_0 / n)^2} = \\sqrt{${tnum(z0, 4)}^2 + ${tnum(vz / n, 3)}^2} = ${tnum(r.zmax, 3)}\\ \\text{km}` });
+        if (r.M0 === null) rows.push({ key: 'M0', eq: 'M_0 = \\text{undefined}', why: tex('C = 0') + ': there is no ellipse, so there is no place on it.' });
+        else {
+            const base = Math.acos(Math.max(-1, Math.min(1, (r.xc - x0) / r.C))) * M.R2D;
+            rows.push({ key: 'M0', eq: `M_0 = \\cos^{-1}\\frac{x_C - x_0}{C} = \\cos^{-1}${tnum((r.xc - x0) / r.C, 4)} = ${base.toFixed(1)}^\\circ`,
+                why: vx < 0 ? `${tex('\\dot x_0 < 0')}, so ${tex(`M_0 = 360^\\circ - ${base.toFixed(1)}^\\circ = ${r.M0.toFixed(1)}^\\circ`)}` : `${tex('\\dot x_0 \\ge 0')}, so ${tex('M_0')} stays ${tex(base.toFixed(1) + '^\\circ')}.` });
+        }
+        if (r.dM0 === null) rows.push({ key: 'dM0', eq: '\\Delta M_0 = \\text{undefined}', why: tex('z_{max} = 0') + ': there is no swing, so there is no place in it.' });
+        else {
+            const base = Math.asin(Math.max(-1, Math.min(1, z0 / r.zmax))) * M.R2D;
+            rows.push({ key: 'dM0', eq: `\\Delta M_0 = \\sin^{-1}\\frac{z_0}{z_{max}} = \\sin^{-1}${tnum(z0 / r.zmax, 4)} = ${tnum(base, 1)}^\\circ`,
+                why: vz < 0 ? `${tex('\\dot z_0 < 0')}, so ${tex(`\\Delta M_0 = 180^\\circ - ${tnum(base, 1)}^\\circ = ${r.dM0.toFixed(1)}^\\circ`)}`
+                    : base < 0 ? `${tex('\\dot z_0 \\ge 0')}; wrapped to 0 to 360: ${tex(`\\Delta M_0 = ${r.dM0.toFixed(1)}^\\circ`)}` : `${tex('\\dot z_0 \\ge 0')}, so ${tex('\\Delta M_0')} stays ${tex(base.toFixed(1) + '^\\circ')}.` });
+        }
+        const drift = M.driftRate(r, n, a);
+        rows.push({ key: 'xc', eq: `\\dot y_C = -\\tfrac{3}{2} n x_C = ${tnum(drift.kmPerSec * 1000, 4)}\\ \\text{m/s} = -3\\pi x_C = ${tnum(drift.kmPerRev, 3)}\\ \\text{km/rev}` });
+        const box = $('pv-eqs');
+        box.innerHTML = rows.map(row => `<div class="pv-eq"${row.key ? ` data-key="${row.key}"` : ''}>${tex(row.eq)}${row.why ? `<div class="pv-why">${row.why}</div>` : ''}</div>`).join('');
+        box.querySelectorAll('.pv-eq[data-key]').forEach(el => {
+            const key = el.dataset.key;
+            el.addEventListener('mouseenter', () => { state.hot = key; el.classList.add('hot'); dirty = true; });
+            el.addEventListener('mouseleave', () => { if (state.hot === key) state.hot = null; el.classList.remove('hot'); dirty = true; });
+        });
+    }
+    const selectMode = Kit.bindSegmented($('mode-pick'), mode => {
+        state.mode = mode === 'pv' ? 'pv' : 'rmoe';
+        document.body.classList.toggle('mode-pv', state.mode === 'pv');
+        $('pv-block').hidden = state.mode !== 'pv';
+        updatePv();
+    });
 
     function updateLive(now, rNow) {
         const r = mathRmoe();
@@ -445,6 +526,7 @@
 
     /* ---------- Start ---------- */
     buildTable();
+    buildPv();
     fillPresets();
     loadPreset(state.preset);
     applyViewOptions();
@@ -463,7 +545,7 @@
 
     // For checks in the browser console.
     window.rmoeExplorer = {
-        state, sim: () => sim, stage, presets: PRESETS, loadPreset, drawNow: drawAll,
+        state, sim: () => sim, stage, presets: PRESETS, loadPreset, drawNow: drawAll, selectMode,
         set(values) { Object.assign(state.rmoe, values); rebuild(); refit(true); updateInputs(); updateStatic(); drawAll(); }
     };
 })();
