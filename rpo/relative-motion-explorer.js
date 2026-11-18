@@ -153,6 +153,8 @@
     function syncRmoeFromCoes() { if (isCircular()) state.rmoe = stored(M.rmoeFromCoes(state.target, chaseCoe())); }
 
     function rebuild() {
+        const oldP = sim ? sim.P : 0;
+        const rev = oldP > 0 ? state.t / oldP : 0;
         const coe = { ...state.target };
         const n = M.meanMotion(coe.a), P = 2 * Math.PI / n;
         const spanT = state.revs * P;
@@ -177,7 +179,7 @@
             stage.inertial.setChaseOrbit(sim.chase);
             stage.inertial.setPath(sim.frame);
         }
-        state.t = Math.min(state.t, spanT);
+        state.t = Math.min(rev, state.revs) * P;
         dirty = true;
     }
 
@@ -354,10 +356,13 @@
                 markCustom();
                 state.rmoe[row.key] = value;
                 state.lastRow = row.key;
+                if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
                 rebuild();
                 refit(final);
                 updateInputs(row.key);
                 updateStatic();
+                fillElTable();
+                drawAll();
             };
             range.addEventListener('input', () => set(Number(range.value), false));
             range.addEventListener('change', () => { refit(true); dirty = true; });
@@ -507,6 +512,7 @@
         updateInputs();
         updateStatic();
         fillElTable(field && field.type === 'number' ? field : null);
+        drawAll();
         return true;
     }
     elTable.addEventListener('input', e => {
@@ -587,6 +593,15 @@
     // Fields hold km and m/s; the state array holds km and km/s.
     const PV_IDS = ['pv-x', 'pv-y', 'pv-z', 'pv-vx', 'pv-vy', 'pv-vz'];
     const pvState = () => M.stateFromRmoe(mathRmoe(), sim.n, 0);
+    function currentPvInputs() {
+        return PV_IDS.map((id, k) => {
+            const el = $(id);
+            const val = el ? Number(el.value) : NaN;
+            if (Number.isFinite(val)) return k < 3 ? val : val / 1000;
+            const s = pvState();
+            return s[k];
+        });
+    }
     function buildPv() {
         PV_IDS.forEach((id, k) => {
             // final: Enter or leaving the field (fit the views, put back a bad entry); otherwise live
@@ -595,15 +610,18 @@
                 const text = $(id).value.trim();
                 const value = Number(text);
                 if (!text || !Number.isFinite(value)) { if (final) updatePv(); return; }
-                const s = pvState();
+                const s = currentPvInputs();
                 s[k] = k < 3 ? value : value / 1000;
                 markCustom();
                 state.rmoe = stored(M.rmoeFromState(s, sim.n));
                 state.lastRow = null;
+                if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
                 rebuild();
                 refit(final);
                 updateInputs();
                 updateStatic();
+                fillElTable();
+                drawAll();
             };
             $(id).addEventListener('input', () => apply(false));
             $(id).addEventListener('change', () => apply(true));
@@ -703,6 +721,7 @@
         updateInputs();
         updateStatic();
         if (mode === 'coe') fillElTable();
+        drawAll();
     }
     const selectMode = Kit.bindSegmented($('mode-pick'), mode => {
         if (mode !== state.mode) applyMode(mode === 'coe' || mode === 'pv' ? mode : 'rmoe');
@@ -789,6 +808,7 @@
         updateInputs();
         updateStatic();
         fillElTable();
+        drawAll();
     }
     // A target button keeps the motion's shape, scaled to the new target, as presets are.
     // Custom changes nothing by itself: it points to the a field, where typing sets the orbit.
@@ -825,6 +845,7 @@
         updateInputs();
         updateStatic();
         fillElTable();
+        drawAll();
     });
 
     // A typed target a (Set RMOEs and Set Position and Velocity; Set COEs has its own table). Only the
@@ -845,12 +866,23 @@
         if (Math.abs(v - state.target.a) < 1e-9 && !final) return;
         state.target = { ...state.target, a: v, e: 0 };
         state.modeNote = '';
+        if (state.mode === 'pv') {
+            const s = currentPvInputs();
+            state.rmoe = stored(M.rmoeFromState(s, M.meanMotion(v)));
+            if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
+        } else if (state.mode === 'rmoe') {
+            if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
+        } else if (state.mode === 'coe') {
+            syncRmoeFromCoes();
+        }
         if (!isGeoTarget() && state.frame === 'ECEF') { state.frame = 'ECI'; selectFrame('ECI'); }
         rebuild();
         applyViewOptions();
         refit(final);
         updateInputs();
         updateStatic();
+        fillElTable();
+        drawAll();
         if (final) el.value = fmtNum(state.target.a, 3);
     }
     // Typing in a picks Custom.
@@ -958,7 +990,12 @@
     window.relativeMotionExplorer = {
         state, sim: () => sim, stage, presets: PRESETS, loadPreset, drawNow: drawAll,
         selectMode,
-        set(values) { Object.assign(state.rmoe, values); rebuild(); refit(true); updateInputs(); updateStatic(); drawAll(); },
+        setTargetA: v => { $('target-a').value = String(v); setTargetA(true); },
+        set(values) {
+            Object.assign(state.rmoe, values);
+            if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
+            rebuild(); refit(true); updateInputs(); updateStatic(); fillElTable(); drawAll();
+        },
         setOrbits(target, diff) { return commit({ ...target }, { ...ZERO_DIFF, ...diff }, null); }
     };
 })();
