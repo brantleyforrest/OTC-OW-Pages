@@ -102,6 +102,9 @@
         @media (min-width: 1081px) and (max-width: 1440px) and (min-height: 600px) {
             .tool-layout { --aside-w: 23rem; }
         }
+        .moved-note { border-color: var(--accent-gold); }
+        .moved-note .panel-text { margin: 0; }
+        .moved-note a { color: var(--accent-gold); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -223,6 +226,9 @@
                 <div class="col">
                     <div class="mode-row">
                         <button class="mode-switch" type="button" aria-checked="false" title="Show every control, readout, and note"><span class="track" aria-hidden="true"></span>Advanced</button>
+                    </div>
+                    <div class="panel moved-note">
+                        <p class="panel-text">This tool is now part of the <a href="relative-motion-explorer.html">Relative Motion Explorer</a>, which sets the same motion from the COEs, the RMOEs, or chase's position and velocity, and switches between them.</p>
                     </div>
                     <div class="panel accent">
                         <div class="panel-title">Orbits</div>

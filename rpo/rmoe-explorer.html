@@ -115,9 +115,17 @@
         .pv-eq .tex-source { font-size: 0.72rem; white-space: pre-wrap; }
         .pv-eq .pv-why { font-size: 0.7rem; line-height: 1.3; color: var(--text-muted); margin-top: 0.15rem; }
         .pv-eq .pv-why .katex { font-size: 0.78rem; color: var(--text-muted); }
+        /* The mode switch: the first control in the side column, full width, with large buttons. */
+        .set-mode { flex-shrink: 0; margin-bottom: 0.1rem; }
+        .set-mode-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 0.3rem 0.1rem; }
+        .set-mode .segmented { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+        .set-mode .segmented button { padding: 0.6rem 0.5rem; font-size: 0.92rem; font-weight: 600; }
         body.mode-pv .rm-only { display: none !important; }
         body.mode-pv .rm-table input[type="range"] { visibility: hidden; }
         body.mode-pv .rm-table input[type="number"] { background: transparent; border-color: transparent; pointer-events: none; }
+        .moved-note { border-color: var(--accent-gold); }
+        .moved-note .panel-text { margin: 0; }
+        .moved-note a { color: var(--accent-gold); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -221,8 +229,18 @@
                     <div class="mode-row">
                         <button class="mode-switch" type="button" aria-checked="false" title="Show every control, readout, and note"><span class="track" aria-hidden="true"></span>Advanced</button>
                     </div>
+                    <div class="panel moved-note">
+                        <p class="panel-text">This tool is now part of the <a href="relative-motion-explorer.html">Relative Motion Explorer</a>, which sets the same motion from the COEs, the RMOEs, or chase's position and velocity, and switches between them.</p>
+                    </div>
+                    <div class="set-mode">
+                        <div class="set-mode-label">What you set</div>
+                        <div class="segmented" id="mode-pick" role="group" aria-label="What to set">
+                            <button type="button" data-value="rmoe" aria-pressed="true">RMOEs</button>
+                            <button type="button" data-value="pv" aria-pressed="false">Position and Velocity</button>
+                        </div>
+                    </div>
                     <div class="panel accent">
-                        <div class="panel-title">RMOEs</div>
+                        <div class="panel-title" id="set-title">RMOEs</div>
                         <div class="preset-row">
                             <select class="tv-select" id="preset" aria-label="Preset"></select>
                             <button class="btn" id="reset-preset" type="button">Reset Preset</button>
@@ -233,13 +251,6 @@
                                 <button type="button" data-value="geo" aria-pressed="true">GEO</button>
                                 <button type="button" data-value="gps" aria-pressed="false">MEO</button>
                                 <button type="button" data-value="leo" aria-pressed="false">LEO</button>
-                            </div>
-                        </div>
-                        <div class="sub-row">
-                            <span>Set</span>
-                            <div class="segmented" id="mode-pick" role="group" aria-label="What to set">
-                                <button type="button" data-value="rmoe" aria-pressed="true">RMOEs</button>
-                                <button type="button" data-value="pv" aria-pressed="false">Position and Velocity</button>
                             </div>
                         </div>
                         <div class="pv-block" id="pv-block" hidden>

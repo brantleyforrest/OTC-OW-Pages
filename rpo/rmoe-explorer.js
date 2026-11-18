@@ -399,6 +399,7 @@
         state.mode = mode === 'pv' ? 'pv' : 'rmoe';
         document.body.classList.toggle('mode-pv', state.mode === 'pv');
         $('pv-block').hidden = state.mode !== 'pv';
+        $('set-title').textContent = state.mode === 'pv' ? 'Position and Velocity' : 'RMOEs';
         updatePv();
     });
 
