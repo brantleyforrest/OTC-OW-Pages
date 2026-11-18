@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="robots" content="noindex">
     <title>RIC Views Check | OTC OW</title>
     <style>
@@ -32,8 +35,10 @@
     <p>What a correct picture shows:</p>
     <ul id="expect"></ul>
 
-    <script src="rpo-math.js"></script>
-    <script src="rpo-views.js"></script>
+    <script>
+        document.write('<script src="rpo-math.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="rpo-views.js?t=' + Date.now() + '"><\/script>');
+    </script>
     <script>
         (function () {
             const M = window.RpoMath, V = window.RpoViews;

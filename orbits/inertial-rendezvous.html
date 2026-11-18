@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="robots" content="noindex">
     <title>Inertial Rendezvous | OTC OW</title>
     <meta name="description" content="Move sliders to set up a coplanar or co-orbital rendezvous, and watch the wait time, phasing orbit, burns, and equations update.">
@@ -715,12 +718,24 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
-    <script src="../assets/tool-kit.js"></script>
-    <script src="../assets/earth-land.js"></script>
-    <script src="../assets/earth-scene.js"></script>
-    <script src="../practice/practice-math.js"></script>
-    <script src="rendezvous-math.js"></script>
-    <script src="inertial-rendezvous-scene.js"></script>
-    <script src="inertial-rendezvous.js"></script>
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/tool-kit.js',
+                '../assets/earth-land.js',
+                '../assets/earth-scene.js',
+                '../practice/practice-math.js',
+                'rendezvous-math.js',
+                'inertial-rendezvous-scene.js',
+                'inertial-rendezvous.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
 </body>
 </html>

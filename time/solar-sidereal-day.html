@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Solar vs. Sidereal Day | OTC OW</title>
     <meta name="description" content="A view from above the North Pole showing why a solar day is about four minutes longer than a sidereal day.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -391,7 +394,19 @@
     </main>
 
 
-    <script src="../assets/earth-land.js"></script>
-    <script src="solar-sidereal-day.js"></script>
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/earth-land.js',
+                'solar-sidereal-day.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
 </body>
 </html>

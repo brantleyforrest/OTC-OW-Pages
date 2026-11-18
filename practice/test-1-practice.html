@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Test 1 Practice | OTC OW</title>
     <meta name="description" content="Practice problems for Test 1: R-V vectors to orbital elements, Hohmann transfers, simple plane changes, combined plane changes, coplanar and co-orbital rendezvous, time of flight with D = RT, and propulsion (the rocket equation, F = ma, and burn time), plus a card-matching drill for Kepler's three laws and Newton's four laws. Practice mode shows each problem in 3D and walks through the steps. Test mode accepts answers only, then shows the solution.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -746,28 +749,40 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
-    <script src="../assets/tool-kit.js"></script>
-    <script src="../assets/earth-land.js"></script>
-    <script src="../assets/earth-scene.js"></script>
-    <script src="answer-check.js"></script>
-    <script src="practice-math.js"></script>
-    <script src="satellite-motion.js"></script>
-    <script src="rv-coe-problems.js"></script>
-    <script src="rv-coe-scene.js"></script>
-    <script src="maneuvers-problems.js"></script>
-    <script src="test-1-maneuver-problems.js"></script>
-    <script src="test-1-maneuver-scene.js"></script>
-    <script src="../orbits/rendezvous-math.js"></script>
-    <script src="../orbits/inertial-rendezvous-scene.js"></script>
-    <script src="test-1-rendezvous-problems.js"></script>
-    <script src="test-1-rendezvous-scene.js"></script>
-    <script src="test-1-tof-problems.js"></script>
-    <script src="test-1-tof-scene.js"></script>
-    <script src="test-1-ground-track-problems.js"></script>
-    <script src="test-1-ground-track-scene.js"></script>
-    <script src="test-1-coe-box-problems.js"></script>
-    <script src="test-1-propulsion-problems.js"></script>
-    <script src="test-1-law-matching.js"></script>
-    <script src="test-1-practice.js"></script>
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/tool-kit.js',
+                '../assets/earth-land.js',
+                '../assets/earth-scene.js',
+                'answer-check.js',
+                'practice-math.js',
+                'satellite-motion.js',
+                'rv-coe-problems.js',
+                'rv-coe-scene.js',
+                'maneuvers-problems.js',
+                'test-1-maneuver-problems.js',
+                'test-1-maneuver-scene.js',
+                '../orbits/rendezvous-math.js',
+                '../orbits/inertial-rendezvous-scene.js',
+                'test-1-rendezvous-problems.js',
+                'test-1-rendezvous-scene.js',
+                'test-1-tof-problems.js',
+                'test-1-tof-scene.js',
+                'test-1-ground-track-problems.js',
+                'test-1-ground-track-scene.js',
+                'test-1-coe-box-problems.js',
+                'test-1-propulsion-problems.js',
+                'test-1-law-matching.js',
+                'test-1-practice.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -57,6 +57,7 @@ Upright phones match `(max-width: 640px) and (orientation: portrait)`. Rotated p
 
 ## Rules That Prevent Known Problems
 
+- **Load local scripts through the dynamic cache-busting loader.** Always keep the `<meta http-equiv="Cache-Control"...>` tags in `<head>` and load local scripts using the `s.src = src + '?t=' + t; s.async = false;` loader from `tool-template.html`. This ensures users and mobile devices always fetch the latest scripts on normal page refresh without having to hard-reload with Ctrl+Shift+R.
 - **Size canvases with `ToolKit.observeSize`.** It reports the area inside the border. Measuring the outer box stretches and blurs the drawing.
 - **Draw inside the resize callback.** Resizing clears a canvas, so waiting for the next frame shows a blank frame.
 - **Keep the top of the 3D scene in view.** Check that long axes and their arrows are not clipped. Move the camera target if needed.

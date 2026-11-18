@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="robots" content="noindex">
     <title>Orbital Maneuvers | OTC OW</title>
     <meta name="description" content="Interactive 3D visualizer and live equations for Hohmann Transfers, Simple Plane Changes (Inclination and Polar Orbit RAAN), and Combined Plane Changes.">
@@ -556,12 +559,24 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
-    <script src="../assets/tool-kit.js"></script>
-    <script src="../assets/earth-land.js"></script>
-    <script src="../assets/earth-scene.js"></script>
-    <script src="../practice/practice-math.js"></script>
-    <script src="../practice/maneuvers-problems.js"></script>
-    <script src="orbital-maneuvers-scene.js"></script>
-    <script src="orbital-maneuvers.js"></script>
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/tool-kit.js',
+                '../assets/earth-land.js',
+                '../assets/earth-scene.js',
+                '../practice/practice-math.js',
+                '../practice/maneuvers-problems.js',
+                'orbital-maneuvers-scene.js',
+                'orbital-maneuvers.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
 </body>
 </html>

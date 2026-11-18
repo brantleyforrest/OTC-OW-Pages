@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Test 2 Practice | OTC OW</title>
     <meta name="description" content="Practice problems for Test 2 on relative motion: the RIC axes, relative motion from orbital elements, and the ideas behind the CW equations. Practice mode shows each problem in the RIC frame and walks through the steps. Test mode accepts answers only, then shows the solution.">
     <meta name="robots" content="noindex">
@@ -652,25 +655,37 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
-    <script src="../assets/tool-kit.js"></script>
-    <script src="../assets/earth-land.js"></script>
-    <script src="../assets/earth-scene.js"></script>
-    <script src="../rpo/rpo-math.js"></script>
-    <script src="../rpo/rpo-views.js"></script>
-    <script src="answer-check.js"></script>
-    <script src="practice-math.js"></script>
-    <script src="test-2-common.js"></script>
-    <script src="test-2-matching.js"></script>
-    <script src="test-2-axes-problems.js"></script>
-    <script src="test-2-motion-problems.js"></script>
-    <script src="test-2-concepts-problems.js"></script>
-    <script src="test-2-coeric-problems.js"></script>
-    <script src="test-2-rmoe-problems.js"></script>
-    <script src="test-2-plots-problems.js"></script>
-    <script src="test-2-drift-problems.js"></script>
-    <script src="test-2-signs-problems.js"></script>
-    <script src="test-2-scene.js"></script>
-    <script src="test-2-release.js"></script>
-    <script src="test-2-practice.js"></script>
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/tool-kit.js',
+                '../assets/earth-land.js',
+                '../assets/earth-scene.js',
+                '../rpo/rpo-math.js',
+                '../rpo/rpo-views.js',
+                'answer-check.js',
+                'practice-math.js',
+                'test-2-common.js',
+                'test-2-matching.js',
+                'test-2-axes-problems.js',
+                'test-2-motion-problems.js',
+                'test-2-concepts-problems.js',
+                'test-2-coeric-problems.js',
+                'test-2-rmoe-problems.js',
+                'test-2-plots-problems.js',
+                'test-2-drift-problems.js',
+                'test-2-signs-problems.js',
+                'test-2-scene.js',
+                'test-2-release.js',
+                'test-2-practice.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Sun-Synchronous Orbit | OTC OW</title>
     <meta name="description" content="A 3D view of a sun-synchronous orbit turning with the Sun over a year, compared with a polar orbit that stays fixed in space.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -194,9 +197,21 @@
     </main>
 
 
-    <script src="../assets/tool-kit.js"></script>
-    <script src="../assets/earth-land.js"></script>
-    <script src="../assets/earth-scene.js"></script>
-    <script src="sun-synchronous.js"></script>
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/tool-kit.js',
+                '../assets/earth-land.js',
+                '../assets/earth-scene.js',
+                'sun-synchronous.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
 </body>
 </html>

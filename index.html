@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Interactive Tools | OTC OW</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1079,8 +1082,8 @@
                 document.documentElement.classList.add('dev-mode');
             }
         } catch (e) { /* storage is blocked: dev mode starts off */ }
+        document.write('<script src="practice/test-2-release.js?t=' + Date.now() + '"><\/script>');
     </script>
-    <script src="practice/test-2-release.js"></script>
 </head>
 <body>
 

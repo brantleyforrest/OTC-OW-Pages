@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <!-- Starter page. Replace this title and description, and remove the robots line below. -->
     <meta name="robots" content="noindex">
     <title>Tool Name | OTC OW</title>
@@ -140,13 +143,24 @@
     </main>
 
 
-    <script src="../assets/tool-kit.js"></script>
-    <!-- Keep one of these and delete the other, along with its file. A 3D tool also needs the two Earth scripts. -->
-    <script src="tool-template-2d.js"></script>
-    <!--
-    <script src="../assets/earth-land.js"></script>
-    <script src="../assets/earth-scene.js"></script>
-    <script src="tool-template-3d.js"></script>
-    -->
+    <!-- All local scripts load with ?t=Date.now() so that updates take effect immediately on normal refresh. -->
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/tool-kit.js',
+                'tool-template-2d.js'
+                // For a 3D tool, uncomment:
+                // '../assets/earth-land.js',
+                // '../assets/earth-scene.js',
+                // 'tool-template-3d.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
 </body>
 </html>
