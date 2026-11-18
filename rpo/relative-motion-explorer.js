@@ -233,7 +233,6 @@
         if (state.annot.center || hot === 'xc' || hot === 'yc0') {
             const c = hot === 'xc' || hot === 'yc0' ? COLORS.hot : COLORS.line;
             const q = P(center);
-            if (inPlane) label('center', q, c, 8, 12);
             if (hot === 'xc' && showsR) { const q0 = P([0, yc, 0]); line(q0, q, COLORS.hot, 2); label('x_C = ' + fmt(xc, 2) + ' km', q, COLORS.hot, 8, -14); }
             if (hot === 'yc0' && inPlane) { const q0 = P([xc, 0, 0]); line(q0, q, COLORS.hot, 2); label('y_C = ' + fmt(yc, 1) + ' km', q, COLORS.hot, 8, -14); }
         }
@@ -652,7 +651,7 @@
     });
 
     function updateLive(rNow) {
-        $('time-read').textContent = (state.t / sim.P).toFixed(2) + ' rev';
+        $('time-read').textContent = $('sp-time').textContent = (state.t / sim.P).toFixed(2) + ' rev';
         $('scrubber').max = String(Math.round(state.revs * 1000));
         $('scrubber').value = String(Math.round(state.t / sim.P * 1000));
         if (!rNow) return;
@@ -742,18 +741,25 @@
     });
 
     /* ---------- Time ---------- */
-    function setPlaying(on) { state.playing = on; $('play').textContent = on ? 'Pause' : 'Play'; }
+    // The full controls (Advanced) and the simple playback bar share one clock and one speed.
+    function setPlaying(on) { state.playing = on; $('play').textContent = $('sp-play').textContent = on ? 'Pause' : 'Play'; }
     $('play').addEventListener('click', () => setPlaying(!state.playing));
+    $('sp-play').addEventListener('click', () => setPlaying(!state.playing));
     $('scrubber').addEventListener('input', e => { state.t = Number(e.target.value) / 1000 * sim.P; setPlaying(false); dirty = true; });
-    Kit.bindSegmented($('speed'), v => { state.speed = Number(v); });
-    document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => {
-        state.t += Number(b.dataset.jump) * sim.P;
-        if (state.t > MAX_REVS * sim.P) state.t = MAX_REVS * sim.P;
+    const showSpeed = (group, v) => group.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value === v)));
+    Kit.bindSegmented($('speed'), v => { state.speed = Number(v); showSpeed($('sp-speed'), v); });
+    Kit.bindSegmented($('sp-speed'), v => { state.speed = Number(v); showSpeed($('speed'), v); });
+    // Move the clock by some revs; the drawn span grows to hold it (up to MAX_REVS).
+    function jump(revs) {
+        state.t = Math.min(MAX_REVS * sim.P, Math.max(0, state.t + revs * sim.P));
         const needed = Math.max(2, Math.ceil(state.t / sim.P - 1e-9));
-        if (needed !== state.revs) { const t = state.t; state.revs = needed; rebuild(); state.t = t; refit(true); }
+        if (needed > state.revs) { const t = state.t; state.revs = needed; rebuild(); state.t = t; refit(true); }
         setPlaying(false);
         dirty = true;
-    }));
+    }
+    document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => jump(Number(b.dataset.jump))));
+    $('sp-fwd').addEventListener('click', () => jump(1));
+    $('sp-back').addEventListener('click', () => jump(-1));
     $('epoch').addEventListener('click', () => {
         state.t = 0;
         if (state.revs !== 2) { state.revs = 2; rebuild(); refit(true); }

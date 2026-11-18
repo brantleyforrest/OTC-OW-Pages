@@ -120,6 +120,9 @@
         .set-mode-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 0.3rem 0.1rem; }
         .set-mode .segmented { display: grid; grid-template-columns: 0.8fr 0.8fr 1.4fr; width: 100%; }
         .set-mode .segmented button { padding: 0.6rem 0.4rem; font-size: 0.92rem; font-weight: 600; line-height: 1.2; }
+        body.advanced-on .simple-play { display: none !important; }
+        .simple-play .ctl-row { align-items: center; }
+        #sp-time { min-width: 4.2rem; }
         .model-line { font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); margin: 0.35rem 0.1rem 0; }
         .model-line b { color: var(--text-main); }
         /* Outside Set RMOEs the RMOE table is a read-only list of the epoch and current values. */
@@ -213,6 +216,23 @@
 
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view" aria-label="The inertial view, the 3D RIC box, and the RIC views from the left, from behind, and from above"></div>
+                </div>
+
+                <!-- The simple playback bar: only while Advanced is off, where the full controls are hidden. -->
+                <div class="panel controls simple-play">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="sp-play" type="button">Pause</button>
+                            <button class="btn" id="sp-back" type="button" title="Back one rev">−1 rev</button>
+                            <button class="btn" id="sp-fwd" type="button" title="Forward one rev">+1 rev</button>
+                        </div>
+                        <span class="scrub-read" id="sp-time">0.00 rev</span>
+                        <div class="segmented" id="sp-speed" role="group" aria-label="Speed">
+                            <button type="button" data-value="0.01" aria-pressed="false">Slow</button>
+                            <button type="button" data-value="0.02" aria-pressed="true">Normal</button>
+                            <button type="button" data-value="0.05" aria-pressed="false">Fast</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="panel controls" data-advanced>
