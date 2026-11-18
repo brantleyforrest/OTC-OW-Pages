@@ -577,6 +577,8 @@
     }
     // Advanced off: an eccentric target goes back to circular.
     new MutationObserver(() => {
+        // The Frame toggle shows only with Advanced on, so turning Advanced off goes back to ECI.
+        if (!isAdvanced() && state.frame !== 'ECI') { state.frame = 'ECI'; selectFrame('ECI'); }
         if (!isAdvanced() && state.target.e > 0) commit({ ...state.target, e: 0 }, { ...state.diff, de: Math.max(0, state.diff.de) }, null);
         else fillElTable();
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
@@ -707,7 +709,10 @@
     });
 
     function updateLive(rNow) {
-        $('time-read').textContent = $('sp-time').textContent = (state.t / sim.P).toFixed(2) + ' rev';
+        $('time-read').textContent = (state.t / sim.P).toFixed(2) + ' rev';
+        $('sp-span').textContent = state.revs + (state.revs === 1 ? ' rev' : ' revs');
+        $('sp-back').disabled = state.revs <= 1;
+        $('sp-fwd').disabled = state.revs >= MAX_REVS;
         $('scrubber').max = String(Math.round(state.revs * 1000));
         $('scrubber').value = String(Math.round(state.t / sim.P * 1000));
         if (!rNow) return;
@@ -870,8 +875,20 @@
         dirty = true;
     }
     document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => jump(Number(b.dataset.jump))));
-    $('sp-fwd').addEventListener('click', () => jump(1));
-    $('sp-back').addEventListener('click', () => jump(-1));
+    // The simple bar's buttons change how many revs of the path are drawn (1 to MAX_REVS), not the
+    // time; playback keeps running and starts over at the end of the new span.
+    function setSpan(revs) {
+        revs = Math.max(1, Math.min(MAX_REVS, revs));
+        if (revs === state.revs) return;
+        const t = state.t;
+        state.revs = revs;
+        rebuild();
+        state.t = Math.min(t, sim.spanT);
+        refit(true);
+        dirty = true;
+    }
+    $('sp-fwd').addEventListener('click', () => setSpan(state.revs + 1));
+    $('sp-back').addEventListener('click', () => setSpan(state.revs - 1));
     $('epoch').addEventListener('click', () => {
         state.t = 0;
         if (state.revs !== 2) { state.revs = 2; rebuild(); refit(true); }

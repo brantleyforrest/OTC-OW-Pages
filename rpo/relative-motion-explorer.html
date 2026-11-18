@@ -55,6 +55,7 @@
         .segmented button:disabled { opacity: 0.4; cursor: not-allowed; }
         .opt-label { min-width: 3.6rem; }
         .mag-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 0.45rem; }
+        .mag-row label { white-space: nowrap; }
         .mag-row input { flex: 1 1 auto; min-width: 0; }
         .mag-row .mono { min-width: 4.5rem; text-align: right; color: var(--text-main); }
 
@@ -133,7 +134,7 @@
         .a-field input.bad { border-color: #f87171; }
         body.advanced-on .simple-play { display: none !important; }
         .simple-play .ctl-row { align-items: center; }
-        #sp-time { min-width: 4.2rem; }
+        #sp-span { min-width: 3.4rem; text-align: center; align-self: center; }
         .model-line { font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); margin: 0.35rem 0.1rem 0; }
         .model-line b { color: var(--text-main); }
         /* Outside Set RMOEs the RMOE table is a read-only list of the epoch and current values. */
@@ -234,10 +235,10 @@
                     <div class="ctl-row">
                         <div class="buttons">
                             <button class="btn primary" id="sp-play" type="button">Pause</button>
-                            <button class="btn" id="sp-back" type="button" title="Back one rev">−1 rev</button>
-                            <button class="btn" id="sp-fwd" type="button" title="Forward one rev">+1 rev</button>
+                            <button class="btn" id="sp-back" type="button" title="Show one rev less of the path">−1 rev</button>
+                            <span class="scrub-read" id="sp-span" aria-live="polite">2 revs</span>
+                            <button class="btn" id="sp-fwd" type="button" title="Show one rev more of the path">+1 rev</button>
                         </div>
-                        <span class="scrub-read" id="sp-time">0.00 rev</span>
                         <div class="segmented" id="sp-speed" role="group" aria-label="Speed">
                             <button type="button" data-value="0.01" aria-pressed="false">Slow</button>
                             <button type="button" data-value="0.02" aria-pressed="true">Normal</button>
@@ -360,11 +361,11 @@
                     <div class="panel">
                         <div class="panel-title">View Options</div>
                         <div class="mag-row" id="mag-row">
-                            <label for="mag">Magnification</label>
+                            <label for="mag">Earth Frame Magnification</label>
                             <input type="range" id="mag" min="0" max="1000" step="1" value="500">
                             <span class="mono" id="mag-read"></span>
                         </div>
-                        <div class="opt-row">
+                        <div class="opt-row" data-advanced>
                             <span class="opt-label">Frame</span>
                             <div class="segmented" id="frame-pick" role="group" aria-label="Inertial frame">
                                 <button type="button" data-value="ECI" aria-pressed="true">ECI</button>
