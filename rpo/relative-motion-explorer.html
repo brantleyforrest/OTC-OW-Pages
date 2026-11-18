@@ -305,10 +305,11 @@
                             <span>Target</span>
                             <div class="segmented" id="target-pick" role="group" aria-label="Target orbit">
                                 <button type="button" data-value="geo" aria-pressed="true">GEO</button>
-                                <button type="button" data-value="gps" aria-pressed="false">MEO</button>
+                                <button type="button" data-value="gps" aria-pressed="false">GPS</button>
                                 <button type="button" data-value="leo" aria-pressed="false">LEO</button>
+                                <button type="button" data-value="custom" aria-pressed="false">Custom</button>
                             </div>
-                            <label class="a-field course-only" title="The target's semi-major axis (its orbit is circular here): type any value from 6500 to 50000 km">a <input type="number" step="any" min="6500" max="50000" id="target-a" aria-label="Target semi-major axis in km"> km</label>
+                            <label class="a-field course-only" title="The target's semi-major axis (its orbit is circular here). GEO, GPS, and LEO fill it in; type any value from 6500 to 50000 km for Custom">a <input type="number" step="any" min="6500" max="50000" id="target-a" aria-label="Target semi-major axis in km"> km</label>
                         </div>
                         <div class="coe-only" id="coe-block">
                             <div class="el-table" id="el-table"></div>

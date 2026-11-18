@@ -27,7 +27,7 @@
     const TARGETS = {
         geo: { a: 42164, e: 0, i: 0, raan: 0, argp: 0, nu: 0 },
         gps: { a: 26562, e: 0, i: 55, raan: 30, argp: 0, nu: 0 },
-        leo: { a: 7000, e: 0, i: 51.6, raan: 30, argp: 0, nu: 0 }
+        leo: { a: 8000, e: 0, i: 51.6, raan: 30, argp: 0, nu: 0 }
     };
     const SHORTCUTS = ['geo', 'gps', 'leo'];
     const RANGES = {
@@ -98,7 +98,7 @@
     const DEFAULT_PRESET = 'Drifting NMC';
     const ZERO = { xc: 0, yc0: 0, C: 0, M0: 0, zmax: 0, dM0: 0 };
     const ZERO_DIFF = { da: 0, de: 0, di: 0, draan: 0, dargp: 0, dnu: 0 };
-    // Preset distances are for GEO; at MEO they are halved and at LEO scaled to the LEO ranges.
+    // Preset distances are for GEO; at GPS they are halved and at LEO scaled to the LEO ranges.
     const SCALE = { geo: 1, gps: 0.5, leo: 0.3 };
     const POINTS_PER_REV = 240;
     const TINY = 1e-9;
@@ -113,6 +113,7 @@
         mode: 'rmoe',
         rmoe: { ...ZERO },            // undefined angles are kept as 0; mathRmoe() turns them into null
         modeNote: '',
+        customTarget: false,          // Custom picked (or a typed): the target's a is the typed one
         t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
         annot: { center: true, size: false, corners: false, cross: false },
         hot: null, lastRow: null,
@@ -391,10 +392,7 @@
         $('model-line').innerHTML = (sim.exact
             ? '<b>Exact model:</b> both spacecraft fly their own orbits.' + (hasRmoe ? '' : ' The target’s orbit is not circular, so there are no RMOEs.')
             : '<b>Course model:</b> the linear (CW) equations, for a circular target.') + (state.modeNote ? ' ' + state.modeNote : '');
-        $('target-pick').querySelectorAll('button').forEach(b => {
-            const s = TARGETS[b.dataset.value], t = state.target;
-            b.setAttribute('aria-pressed', String(Math.abs(t.a - s.a) < 1e-9 && Math.abs(t.i - s.i) < 1e-9 && Math.abs(t.raan - s.raan) < 1e-9 && t.e < 1e-12));
-        });
+        showTargetPick();
         $('frame-pick').querySelector('[data-value="ECEF"]').disabled = !isGeoTarget();
         if (document.activeElement !== $('target-a')) { $('target-a').value = fmtNum(state.target.a, 3); $('target-a').classList.remove('bad'); }
         if (hasRmoe) {
@@ -427,6 +425,14 @@
         $('notice').textContent = row ? row.notice : preset ? (state.mode === 'coe' ? preset.coeNotice : preset.notice) : '';
         updatePv();
         updateNotes();
+    }
+
+    // GEO, GPS, or LEO when the target is that orbit and Custom was not picked; otherwise Custom.
+    function showTargetPick() {
+        const t = state.target;
+        const match = SHORTCUTS.find(k => { const s = TARGETS[k]; return Math.abs(t.a - s.a) < 1e-9 && Math.abs(t.i - s.i) < 1e-9 && Math.abs(t.raan - s.raan) < 1e-9 && t.e < 1e-12; });
+        const pick = state.customTarget || !match ? 'custom' : match;
+        $('target-pick').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value === pick)));
     }
 
     /* ---------- Set COEs: the element table ---------- */
@@ -508,6 +514,7 @@
         const v = Number(el.value);
         if (el.value.trim() === '' || !isFinite(v)) return;
         if (el.dataset.col === 'target') {
+            if (row.key === 'a') { state.customTarget = true; showTargetPick(); }   // typing the target's a picks Custom
             const [lo, hi] = TARGET_LIMITS[row.key];
             if (v < lo || v > hi || (row.key === 'e' && !isAdvanced())) return;
             commit({ ...state.target, [row.key]: v }, { ...state.diff }, el, false, true);
@@ -716,7 +723,8 @@
         const s = SCALE[key];
         state.preset = index;
         $('preset').value = String(index);
-        state.target = { ...TARGETS[key] };
+        // Custom keeps the typed orbit (made circular); the presets scale by the nearest button.
+        state.target = state.customTarget ? { ...state.target, e: 0 } : { ...TARGETS[key] };
         state.rmoe = { ...ZERO };
         Object.entries(p.rmoe).forEach(([k, value]) => { state.rmoe[k] = k === 'M0' || k === 'dM0' ? value : value * s; });
         // Element differences: km scale like the RMOEs; e and angles also by a_GEO / a, so the
@@ -739,7 +747,19 @@
         fillElTable();
     }
     // A target button keeps the motion's shape, scaled to the new target, as presets are.
+    // Custom changes nothing by itself: it points to the a field, where typing sets the orbit.
     Kit.bindSegmented($('target-pick'), key => {
+        if (key === 'custom') {
+            state.customTarget = true;
+            showTargetPick();
+            const field = state.mode === 'coe' ? cells.a.target : $('target-a');
+            field.focus(); field.select();
+            return;
+        }
+        state.customTarget = false;
+        // A button always fills in a, even if the a field still has the cursor in it.
+        if (document.activeElement === $('target-a')) $('target-a').blur();
+        if (cells.a && document.activeElement === cells.a.target) cells.a.target.blur();
         const ratio = SCALE[key] / SCALE[nearestKey()];
         const circular = isCircular();
         const r = mathRmoe();
@@ -767,6 +787,7 @@
     // size changes: the plane stays and the RMOEs keep their km, so the motion keeps its shape while
     // n, the period, and the drift rate follow a. Live while typing; a value outside the limits
     // waits, and on Enter or leaving the field it is marked and put back.
+    const A_TITLE = $('target-a').title;
     function setTargetA(final) {
         const el = $('target-a'), [lo, hi] = TARGET_LIMITS.a;
         const v = Number(el.value);
@@ -776,7 +797,7 @@
             if (final) { el.title = 'Use a value from ' + lo + ' to ' + hi + ' km.'; el.value = fmtNum(state.target.a, 3); }
             return;
         }
-        el.title = '';
+        el.title = A_TITLE;
         if (Math.abs(v - state.target.a) < 1e-9 && !final) return;
         state.target = { ...state.target, a: v, e: 0 };
         state.modeNote = '';
@@ -788,7 +809,8 @@
         updateStatic();
         if (final) el.value = fmtNum(state.target.a, 3);
     }
-    $('target-a').addEventListener('input', () => setTargetA(false));
+    // Typing in a picks Custom.
+    $('target-a').addEventListener('input', () => { state.customTarget = true; showTargetPick(); setTargetA(false); });
     $('target-a').addEventListener('change', () => setTargetA(true));
 
     /* ---------- Time ---------- */
