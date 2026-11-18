@@ -855,7 +855,7 @@
         // backdrop frame, draw the backdrop with a camera aimed straight at Earth. The real
         // frame drawn right after clears and covers it, so it is never seen.
         let earthWarm = false;
-        const bgFwd = new THREE.Vector3(), bgLat = new THREE.Vector3();
+        const bgFwd = new THREE.Vector3(), bgLat = new THREE.Vector3(), bgToEci = new THREE.Matrix4();
         function warmUpEarth() {
             if (earthWarm || !bg) return;
             earthWarm = true;
@@ -912,13 +912,19 @@
                 // The box is flat (orthographic) and the backdrop is in perspective, so a point nearer
                 // or farther than the target lands a little apart in the two. Slide chase's ring
                 // sideways (by a fraction of chase's offset, a few km at most) so its point at chase
-                // lands exactly on the chase marker.
+                // lands exactly on the chase marker. The slide is worked out in the box axes, but the
+                // ring's position is in the world group's ECI axes, so it is turned into ECI first
+                // (the world matrix is a pure rotation, so its transpose undoes it). Without that the
+                // ring slid the wrong way, missing chase most when chase was far along the line of
+                // sight, such as at the front and back of an NMC.
                 bg.chaseOrbit.position.copy(bg.holder.position);
                 if (chase.visible) {
                     const f = bgFwd.copy(bg.camera.position).normalize().negate();
                     const v = bgLat.copy(chase.position).divideScalar(RE);
                     const along = v.dot(f);
-                    bg.chaseOrbit.position.addScaledVector(v.addScaledVector(f, -along), along / D);
+                    v.addScaledVector(f, -along).multiplyScalar(along / D);
+                    v.applyMatrix4(bgToEci.copy(bg.world.matrix).transpose());
+                    bg.chaseOrbit.position.add(v);
                 }
                 // A camera set back below Earth's surface (a big box seen from below at LEO) would be
                 // inside the globe: leave Earth out then rather than draw it inside out.
@@ -1033,7 +1039,9 @@
             chaseTraceToScreen() {
                 if (!bg) return null;
                 const RE = window.RpoMath.RE;
-                const v = chase.position.clone().divideScalar(RE).add(bg.chaseOrbit.position).sub(bg.holder.position).project(bg.camera);
+                // The slide is in the world group's ECI axes; the world matrix turns it into box axes.
+                const slide = bg.chaseOrbit.position.clone().sub(bg.holder.position).applyMatrix4(bg.world.matrix);
+                const v = chase.position.clone().divideScalar(RE).add(slide).project(bg.camera);
                 return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h];
             },
             backdropEarthShown: () => !!(bg && bg.holder.visible),
