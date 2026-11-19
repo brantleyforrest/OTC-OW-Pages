@@ -90,19 +90,6 @@
         return `${m} m ${String(s).padStart(2, '0')} s`;
     }
 
-    function formatGaugeTime(seconds) {
-        const total = Math.round(seconds);
-        const d = Math.floor(total / 86400);
-        const rem = total % 86400;
-        const h = Math.floor(rem / 3600);
-        const m = Math.floor((rem % 3600) / 60);
-        if (d > 0) {
-            return `${d}d ${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`;
-        }
-        const s = rem % 60;
-        return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
-    }
-
     /* ------------------------------------------------------------------ */
     /* Simulation                                                          */
     /* ------------------------------------------------------------------ */
@@ -514,49 +501,14 @@
     /* Interface                                                           */
     /* ------------------------------------------------------------------ */
 
-    const stepItems = [...$('steps').children];
-
-    function gaugePlacement() {
-        const siderealEnd = siderealTarget();
-        const end = solarRotation();
-        const span = end - siderealEnd;
-        const margin = Math.max(span * 0.42, 0.5);
-        const lo = siderealEnd - margin, hi = end + margin;
-        return { lo, hi, siderealEnd, end, toPercent: (v) => Math.min(100, Math.max(0, (v - lo) / (hi - lo) * 100)) };
-    }
-
     function updatePanels() {
         const end = solarRotation();
-        const siderealEnd = siderealTarget();
         const t = clockTime();
         $('clock').textContent = formatDuration(t);
         const currentRev = state.rotation / 360;
         $('rotation').textContent = `${state.rotation.toFixed(1)}° (${currentRev.toFixed(2)} rev)`;
         $('orbit-travel').textContent = `${orbitTravelToday().toFixed(3)}°`;
         $('needed').textContent = `${end.toFixed(3)}°`;
-
-        stepItems.forEach((item, i) => item.classList.toggle('current', i + 1 === state.step));
-
-        const g = gaugePlacement();
-        const place = (el, v) => { el.style.left = `${g.toPercent(v)}%`; };
-        place($('tick-sidereal'), siderealEnd);
-        place($('tick-solar'), end);
-        place($('gauge-pointer'), state.rotation);
-        const extraEl = $('gauge-extra');
-        extraEl.style.left = `${g.toPercent(siderealEnd)}%`;
-        extraEl.style.width = `${Math.max(0, g.toPercent(end) - g.toPercent(siderealEnd))}%`;
-        $('text-sidereal-deg').textContent = `${siderealEnd.toLocaleString()}°`;
-        $('text-solar-deg').textContent = `${end.toFixed(1)}°`;
-        $('text-sidereal-time').textContent = formatGaugeTime(state.rotations * SIDEREAL_DAY);
-        $('text-solar-time').textContent = formatGaugeTime(state.rotations * SOLAR_DAY);
-
-        const starsCount = (state.totalRotation + state.rotation) / 360;
-        const orbitTotal = state.totalOrbit + orbitTravelToday();
-        const sunCount = (state.totalRotation + state.rotation - orbitTotal) / 360;
-        $('count-stars').textContent = starsCount.toFixed(3);
-        $('count-sun').textContent = sunCount.toFixed(3);
-        $('count-diff').textContent = (starsCount - sunCount).toFixed(3);
-        $('count-orbits').textContent = (orbitTotal / 360).toFixed(3);
     }
 
     function updateComparison() {
@@ -580,23 +532,6 @@
 
         $('th-accumulated').textContent = n === 1 ? 'Total (1 Day)' : `Total (${n} Days)`;
         $('rotations-value').textContent = n === 1 ? '1 rotation (1 day)' : `${n} rotations (${n} days)`;
-        $('btn-toggle-rotations').textContent = n === 1 ? 'Default (10 Rotations)' : 'Single Rotation (1 Day)';
-
-        $('steps-title').textContent = n === 1 ? 'This Day, Step by Step' : `${n} Rotations, Step by Step`;
-        $('step-1-title').textContent = n === 1 ? 'Start of the day' : 'Start of day 1';
-        $('step-1-text').textContent = 'The marked point faces the Sun, and a distant star lies in the same direction.';
-
-        if (n === 1) {
-            $('step-2-title').textContent = 'One sidereal day: 360° of rotation';
-            $('step-2-text').textContent = 'The point faces the star again. Earth has moved about 1° along its orbit, so the point does not yet face the Sun.';
-            $('step-3-title').textContent = 'One solar day: about 361° of rotation';
-            $('step-3-text').textContent = 'After an extra 0.986° rotation (3 m 56 s), the point faces the Sun again. A new day begins.';
-        } else {
-            $('step-2-title').textContent = `${n} sidereal days: ${n} full rotations (${(n * 360).toLocaleString()}°)`;
-            $('step-2-text').textContent = `Earth completes ${n} full 360° spins facing the distant star. Along its orbit, Earth has traveled ${totalExtraDeg.toFixed(1)}°, falling behind the Sun.`;
-            $('step-3-title').textContent = `${n} solar days: ${n} full days (${Math.round(totalSolarSec / 3600)} h)`;
-            $('step-3-text').textContent = `After an accumulated ${totalExtraDeg.toFixed(1)}° extra rotation (${formatShortDuration(totalSolarSec - totalSiderealSec)}), the point faces the Sun again.`;
-        }
 
         $('scale-badge').innerHTML = n === 1
             ? '<strong>Real Earth values.</strong> 1 rotation (1 day). The extra rotation per day is 0.986°.'
@@ -654,9 +589,6 @@
         refresh();
     });
     $('rotations').addEventListener('input', (e) => setRotations(Number(e.target.value)));
-    $('btn-toggle-rotations').addEventListener('click', () => {
-        setRotations(state.rotations === 1 ? 10 : 1);
-    });
 
     new ResizeObserver(resize).observe(stage);
 

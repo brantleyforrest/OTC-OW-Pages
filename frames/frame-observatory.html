@@ -114,23 +114,6 @@
             margin-left: 0.3rem;
         }
 
-        .hud {
-            position: absolute;
-            top: 0.7rem;
-            left: 0.7rem;
-            max-width: min(26rem, calc(100% - 1.4rem));
-            padding: 0.5rem 0.7rem;
-            border-radius: 8px;
-            background: rgba(6, 11, 20, 0.78);
-            border: 1px solid var(--border-subtle);
-            font-size: 0.8rem;
-            line-height: 1.45;
-            pointer-events: none;
-        }
-
-        .hud strong { color: #ffffff; font-weight: 600; }
-        .hud .moving { color: var(--text-muted); }
-
         .view-hint {
             position: absolute;
             right: 0.7rem;
@@ -196,21 +179,6 @@
         }
 
         .toggles .check { font-size: 0.78rem; line-height: 1.35; white-space: nowrap; }
-
-        /* What to notice */
-        .notice-text {
-            font-size: 0.84rem;
-            line-height: 1.45;
-            color: var(--text-main);
-        }
-
-        .notice-question {
-            font-size: 0.84rem;
-            line-height: 1.35;
-            color: var(--accent-gold);
-            font-weight: 500;
-            margin-bottom: 0.25rem;
-        }
 
         /* Live coordinates */
         .coords-head {
@@ -283,39 +251,6 @@
             margin-top: 0.35rem;
         }
 
-        /* Frame components */
-        .anatomy-title {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-            margin-bottom: 0.55rem;
-        }
-
-        .anatomy-title .panel-title { margin-bottom: 0; }
-
-        .class-pill {
-            font-size: 0.66rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            padding: 0.16rem 0.55rem;
-            border-radius: 9999px;
-            white-space: nowrap;
-        }
-
-        .class-pill.inertial {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--badge-green);
-            border: 1px solid rgba(16, 185, 129, 0.35);
-        }
-
-        .class-pill.noninertial {
-            background: rgba(245, 158, 11, 0.15);
-            color: var(--badge-amber);
-            border: 1px solid rgba(245, 158, 11, 0.35);
-        }
-
         dl.anatomy {
             display: grid;
             grid-template-columns: 7.7rem minmax(0, 1fr);
@@ -329,14 +264,19 @@
         dl.anatomy dd { color: var(--text-muted); }
 
         .tool-side .panel { padding: 0.65rem 0.85rem; }
+        .tool-side > .col > .panel { flex-grow: 0; }
+
+        /* Tablets: the two panels sit side by side and use the full width. */
+        @media (min-width: 700px) and (max-width: 1080px) {
+            .tool-side { grid-template-columns: minmax(0, 1fr); }
+            .tool-side > .col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
 
         @media (max-width: 640px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
             .frame-picker { gap: 0.4rem; }
             .frame-btn { padding: 0.4rem 0.5rem; }
             .frame-btn .full-name { font-size: 0.68rem; flex-basis: 100%; }
             .view-hint { display: none; }
-            /* The status line moves below the view, so that it does not cover the scene. */
-            .hud { position: static; max-width: none; margin-top: 0.4rem; font-size: 0.74rem; }
             .scene-label .hint { display: none; }
             .toggles { grid-template-columns: repeat(2, auto); justify-content: start; }
             dl.anatomy { grid-template-columns: 7.2rem minmax(0, 1fr); }
@@ -396,8 +336,6 @@
     <main class="tool-main">
         <div class="tool-layout">
             <div class="col tool-stage-col">
-                <p class="tool-intro">One Earth and two spacecraft, seen from three reference frames. A frame changes only what is held still and how positions are written, never the motion itself.</p>
-
                 <div class="frame-picker" role="group" aria-label="Choose a reference frame">
                     <button class="frame-btn" data-frame="ECI" aria-pressed="true">
                         <span class="acronym">ECI</span>
@@ -414,15 +352,13 @@
                 </div>
 
                 <div class="tool-view">
-                <div class="tool-canvas-box viewport" id="viewport">
-                    <canvas id="scene" aria-label="Animated 3D view of Earth, two spacecraft, and the selected reference frame"></canvas>
-                    <div id="labels" aria-hidden="true"></div>
-                    <div class="inset-frame" id="inset-frame"><span>Zoomed-out view: Earth stays directly below the target</span></div>
-                    <div class="view-hint" id="view-hint">Drag to rotate the view. Scroll or pinch to zoom.</div>
-                    <div class="status-msg" id="status">Loading the 3D view.</div>
-                </div>
-
-                    <div class="hud" id="hud"></div>
+                    <div class="tool-canvas-box viewport" id="viewport">
+                        <canvas id="scene" aria-label="Animated 3D view of Earth, two spacecraft, and the selected reference frame"></canvas>
+                        <div id="labels" aria-hidden="true"></div>
+                        <div class="inset-frame" id="inset-frame"><span>Zoomed-out view: Earth stays directly below the target</span></div>
+                        <div class="view-hint" id="view-hint">Drag to rotate the view. Scroll or pinch to zoom.</div>
+                        <div class="status-msg" id="status">Loading the 3D view.</div>
+                    </div>
                 </div>
 
                 <div class="panel controls">
@@ -440,8 +376,7 @@
                             <input type="range" id="speed" min="0" max="5" step="1">
                         </div>
                         <div class="readout-time">
-                            Elapsed: <span class="mono" id="elapsed">0 d 00 h 00 m</span><br>
-                            Earth has turned: <span class="mono" id="turned">0&deg;</span>
+                            Elapsed: <span class="mono" id="elapsed">0 d 00 h 00 m</span>
                         </div>
                     </div>
                     <div class="ctl-row">
@@ -476,37 +411,28 @@
 
             <aside class="tool-side">
                 <div class="col">
-                <div class="panel accent">
-                    <div class="panel-title">What to Notice</div>
-                    <p class="notice-question" id="question"></p>
-                    <p class="notice-text" id="notice"></p>
-                </div>
-
-                <div class="panel">
-                    <div class="coords-head">
-                        <div class="panel-title">Live Coordinates (km)</div>
+                    <div class="panel">
+                        <div class="coords-head">
+                            <div class="panel-title">Live Coordinates (km)</div>
+                        </div>
+                        <div class="segmented object-picker" role="group" aria-label="Choose an object to measure">
+                            <button data-object="target" aria-pressed="true">Target</button>
+                            <button data-object="second" aria-pressed="false">Second Craft</button>
+                            <button data-object="site" aria-pressed="false">Ground Site</button>
+                        </div>
+                        <table class="coords">
+                            <thead>
+                                <tr><th>Frame</th><th colspan="3">Position along each axis</th><th>km/s</th></tr>
+                            </thead>
+                            <tbody id="coords-body"></tbody>
+                        </table>
+                        <p class="coords-note" id="coords-note"></p>
                     </div>
-                    <div class="segmented object-picker" role="group" aria-label="Choose an object to measure">
-                        <button data-object="target" aria-pressed="true">Target</button>
-                        <button data-object="second" aria-pressed="false">Second Craft</button>
-                        <button data-object="site" aria-pressed="false">Ground Site</button>
-                    </div>
-                    <table class="coords">
-                        <thead>
-                            <tr><th>Frame</th><th colspan="3">Position along each axis</th><th>km/s</th></tr>
-                        </thead>
-                        <tbody id="coords-body"></tbody>
-                    </table>
-                    <p class="coords-note" id="coords-note"></p>
-                </div>
 
-                <div class="panel">
-                    <div class="anatomy-title">
+                    <div class="panel">
                         <div class="panel-title" id="anatomy-name"></div>
-                        <span class="class-pill" id="class-pill"></span>
+                        <dl class="anatomy" id="anatomy"></dl>
                     </div>
-                    <dl class="anatomy" id="anatomy"></dl>
-                </div>
                 </div>
             </aside>
         </div>

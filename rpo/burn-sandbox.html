@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="robots" content="noindex">
+    <title>RIC Burn Sandbox | OTC OW</title>
+    <meta name="description" content="Fire radial, in-track, and cross-track burns at chase and watch what each one does to its motion relative to the target, in the RIC views and an inertial view, with the RMOEs before and after each burn.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <link rel="stylesheet" href="../assets/tool-theme.css">
+    <link rel="stylesheet" href="rpo-theme.css">
+    <style>
+        .tool-stage-col > .panel { flex-shrink: 0; }
+        .controls .segmented button { padding: 0.28rem 0.55rem; font-size: 0.76rem; }
+        .controls .btn { padding: 0.32rem 0.65rem; font-size: 0.8rem; }
+        .segmented button:disabled, .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .time-read { font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted); white-space: nowrap; }
+        .coast-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; }
+        .coast-row .lbl, .sub-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+        .coast-row .segmented button { padding: 0.26rem 0.5rem; }
+
+        .sub-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin: 0.35rem 0 0.55rem; font-size: 0.76rem; color: var(--text-muted); }
+        .sub-row .segmented button { padding: 0.24rem 0.5rem; font-size: 0.75rem; }
+        .sub-label { display: block; margin: 0.55rem 0 0.3rem; }
+        .sub-label:first-child { margin-top: 0; }
+
+        /* The six burn directions, two per axis. */
+        .dir-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.3rem; }
+        .dir-grid button {
+            padding: 0.45rem 0.4rem; font: inherit; font-size: 0.8rem; font-weight: 600; color: var(--text-main);
+            background: var(--surface-hover); border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer;
+        }
+        .dir-grid button small { font-weight: 400; color: var(--text-muted); }
+        .dir-grid button[aria-pressed="true"] { border-color: var(--accent-gold); background: rgba(224, 182, 79, 0.16); color: #ffffff; }
+        .burn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.55rem; }
+        .mag-field { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; color: var(--text-muted); }
+        .mag-field input {
+            width: 5.6rem; padding: 0.25rem 0.35rem; font-family: var(--font-mono); font-size: 0.82rem; text-align: right; color: #ffffff;
+            background: rgba(6, 11, 20, 0.6); border: 1px solid var(--border-subtle); border-radius: 4px;
+        }
+        .mag-field input:focus { outline: none; border-color: var(--accent-blue); }
+        .mag-field input.bad { border-color: #f87171; }
+        #burn-now { flex: 1 1 auto; }
+        .burn-msg { font-size: 0.74rem; color: #fbbf24; margin-top: 0.35rem; }
+        .burn-msg:empty { display: none; }
+        .burn-list { margin: 0.5rem 0 0; padding: 0; list-style: none; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-main); }
+        .burn-list li { padding: 0.12rem 0; border-top: 1px solid var(--border-subtle); }
+        .burn-list li:first-child { border-top: 0; }
+        .burn-list .muted { color: var(--text-muted); }
+        .burn-total { font-size: 0.76rem; color: var(--text-muted); margin-top: 0.3rem; }
+
+        .rule-box { margin-top: 0.55rem; display: flex; flex-direction: column; gap: 0.3rem; }
+        .rule-eq { padding: 0.3rem 0.45rem; border-radius: 6px; background: rgba(6, 11, 20, 0.45); overflow-x: auto; overflow-y: hidden; }
+        .rule-eq .katex { font-size: 0.86rem; color: var(--text-main); }
+        .rule-eq .tex-source { font-size: 0.72rem; white-space: pre-wrap; }
+        .rule-note { font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); }
+        .ba-empty { font-size: 0.78rem; color: var(--text-muted); }
+        .motion-name { font-size: 0.86rem; font-weight: 600; color: var(--accent-gold); margin-top: 0.4rem; }
+
+        /* Small plots: Compare and Natural vs. Forced Motion. */
+        .thumb-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem; }
+        .thumb { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+        .thumb canvas { width: 100%; height: 6.4rem; display: block; border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(3, 6, 12, 0.6); }
+        .thumb-cap { font-size: 0.72rem; color: var(--text-main); font-weight: 600; }
+        .thumb-cap span { font-weight: 400; color: var(--text-muted); }
+        .forced { display: flex; flex-direction: column; gap: 0.6rem; }
+        .forced-item { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 0.55rem; align-items: center; }
+        .forced-item .nf-box { height: 6.4rem; min-width: 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(3, 6, 12, 0.6); }
+        .forced-item canvas { display: block; }
+        .forced-item p { margin: 0; font-size: 0.74rem; line-height: 1.38; color: var(--text-main); }
+        .forced-item b { color: #ffffff; }
+        .forced-item .cost { font-family: var(--font-mono); color: var(--accent-gold); }
+        @media (max-width: 420px) { .forced-item { grid-template-columns: 1fr; } }
+
+        .opt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin-bottom: 0.45rem; font-size: 0.76rem; color: var(--text-muted); }
+        .opt-row .segmented button { padding: 0.22rem 0.5rem; font-size: 0.74rem; }
+        .opt-label { min-width: 4.6rem; }
+        .mag-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 0.45rem; }
+        .mag-row label { white-space: nowrap; }
+        .mag-row input { flex: 1 1 auto; min-width: 0; }
+        .mag-row .mono { min-width: 4.5rem; text-align: right; color: var(--text-main); }
+
+        .terms { margin: 0; padding: 0; list-style: none; }
+        .terms li { font-size: 0.78rem; line-height: 1.4; color: var(--text-main); margin-bottom: 0.25rem; }
+        .terms b { color: #ffffff; }
+        .ric-c { color: var(--frame-ric); font-weight: 600; }
+        .eci-c { color: var(--frame-eci); font-weight: 600; }
+        .table-wrap { overflow-x: auto; }
+        #start-pick { display: flex; flex-wrap: wrap; }
+        .sub-row[hidden] { display: none; }
+        #start-pick button { flex: 1 1 auto; }
+
+        @media (min-width: 1081px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 27rem; }
+        }
+        @media (min-width: 1081px) and (max-width: 1440px) and (min-height: 600px) {
+            .tool-layout { --aside-w: 23rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>RIC Burn Sandbox</h1>
+            </div>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../index.html#study" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <div class="col tool-stage-col">
+
+                <div class="tool-view">
+                    <div class="tool-canvas-box" id="view" aria-label="The RIC view from the left, a second RIC view, and the inertial view"></div>
+                </div>
+
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play" type="button">Pause</button>
+                        </div>
+                        <span class="time-read" id="time-read" aria-live="off">0.00 rev</span>
+                        <div class="segmented" id="speed" role="group" aria-label="Speed">
+                            <button type="button" data-value="0.01" aria-pressed="false">Slow</button>
+                            <button type="button" data-value="0.02" aria-pressed="true">Normal</button>
+                            <button type="button" data-value="0.05" aria-pressed="false">Fast</button>
+                        </div>
+                        <div class="buttons">
+                            <button class="btn" id="fit-views" type="button">Fit Views</button>
+                        </div>
+                    </div>
+                    <div class="coast-row">
+                        <span class="lbl">Coast to</span>
+                        <div class="segmented" id="coast" role="group" aria-label="Coast to the next point">
+                            <button type="button" data-value="0" aria-pressed="false">Bottom</button>
+                            <button type="button" data-value="90" aria-pressed="false">Front</button>
+                            <button type="button" data-value="180" aria-pressed="false">Top</button>
+                            <button type="button" data-value="270" aria-pressed="false">Back</button>
+                            <button type="button" data-value="pc" aria-pressed="false">Plane Crossing</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="tool-side">
+                <div class="col">
+                    <div class="panel accent">
+                        <div class="panel-title">Burn</div>
+                        <span class="sub-label">Chase starts</span>
+                        <div class="segmented" id="start-pick" role="group" aria-label="Where chase starts">
+                            <button type="button" data-value="rest" aria-pressed="true">At the Target</button>
+                            <button type="button" data-value="perch" aria-pressed="false">Perched 10 km Behind</button>
+                            <button type="button" data-value="nmc" aria-pressed="false">On an NMC</button>
+                        </div>
+                        <div class="sub-row" id="corner-row" hidden>
+                            <span>C = 5 km, chase at the</span>
+                            <div class="segmented" id="corner-pick" role="group" aria-label="Where chase starts on the NMC">
+                                <button type="button" data-value="0" aria-pressed="true">Bottom</button>
+                                <button type="button" data-value="90" aria-pressed="false">Front</button>
+                                <button type="button" data-value="180" aria-pressed="false">Top</button>
+                                <button type="button" data-value="270" aria-pressed="false">Back</button>
+                            </div>
+                        </div>
+                        <span class="sub-label">Direction</span>
+                        <div class="dir-grid" id="dir-pick" role="group" aria-label="Burn direction">
+                            <button type="button" data-value="+R" aria-pressed="true">+R <small>Up</small></button>
+                            <button type="button" data-value="-R" aria-pressed="false">−R <small>Down</small></button>
+                            <button type="button" data-value="+I" aria-pressed="false">+I <small>Forward</small></button>
+                            <button type="button" data-value="-I" aria-pressed="false">−I <small>Backward</small></button>
+                            <button type="button" data-value="+C" aria-pressed="false">+C <small>Left</small></button>
+                            <button type="button" data-value="-C" aria-pressed="false">−C <small>Right</small></button>
+                        </div>
+                        <div class="burn-row">
+                            <label class="mag-field">ΔV <input type="number" id="dv-mag" min="0" step="any" aria-label="Burn size in m/s"> m/s</label>
+                            <button class="btn primary" id="burn-now" type="button">Burn Now</button>
+                        </div>
+                        <div class="burn-row">
+                            <button class="btn" id="undo" type="button">Undo Last Burn</button>
+                            <button class="btn" id="restart" type="button">Restart</button>
+                        </div>
+                        <div class="burn-msg" id="burn-msg" role="status"></div>
+                        <ol class="burn-list" id="burn-list"></ol>
+                        <div class="burn-total" id="burn-total"></div>
+                        <div class="motion-name" id="motion"></div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Before and After</div>
+                        <div id="ba-body"><p class="ba-empty">Burn to see the RMOEs just before and just after it.</p></div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">What to Notice</div>
+                        <p class="panel-text" id="notice"></p>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">View Options</div>
+                        <div class="opt-row">
+                            <span class="opt-label">Target</span>
+                            <div class="segmented" id="target-pick" role="group" aria-label="Target orbit">
+                                <button type="button" data-value="geo" aria-pressed="true">GEO</button>
+                                <button type="button" data-value="gps" aria-pressed="false">MEO</button>
+                                <button type="button" data-value="leo" aria-pressed="false">LEO</button>
+                            </div>
+                        </div>
+                        <div class="opt-row">
+                            <span class="opt-label">Second view</span>
+                            <div class="segmented" id="second-pick" role="group" aria-label="Second RIC view">
+                                <button type="button" data-value="behind" aria-pressed="true">Behind</button>
+                                <button type="button" data-value="above" aria-pressed="false">Above</button>
+                                <button type="button" data-value="box" aria-pressed="false">3D</button>
+                            </div>
+                        </div>
+                        <div class="opt-row">
+                            <span class="opt-label">Frame</span>
+                            <div class="segmented" id="frame-pick" role="group" aria-label="Inertial frame">
+                                <button type="button" data-value="ECI" aria-pressed="true">ECI</button>
+                                <button type="button" data-value="ECEF" aria-pressed="false">ECEF</button>
+                            </div>
+                        </div>
+                        <div class="mag-row">
+                            <label for="mag">Magnification</label>
+                            <input type="range" id="mag" min="0" max="1000" step="1" value="500">
+                            <span class="mono" id="mag-read"></span>
+                        </div>
+                        <div class="ctl-checks">
+                            <label class="check"><input type="checkbox" id="opt-orbits" checked>Orbit Paths</label>
+                            <label class="check" title="The whole NMC chase is on right now, dotted"><input type="checkbox" id="opt-nmc" checked>NMC Trace</label>
+                            <label class="check" title="The path chase would have flown without the last burn"><input type="checkbox" id="opt-ghost" checked>Old Path</label>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Compare</div>
+                        <p class="panel-text muted">Each burn from rest at the target, at the ΔV above, over two revs, seen from the left. The two radial burns share one scale and the two in-track burns another, because they go farther. The ring is the start and the triangle the end.</p>
+                        <div class="thumb-grid" id="compare">
+                            <div class="thumb"><span class="thumb-cap">+R <span>up</span></span><canvas data-dir="+R"></canvas></div>
+                            <div class="thumb"><span class="thumb-cap">−R <span>down</span></span><canvas data-dir="-R"></canvas></div>
+                            <div class="thumb"><span class="thumb-cap">+I <span>forward</span></span><canvas data-dir="+I"></canvas></div>
+                            <div class="thumb"><span class="thumb-cap">−I <span>backward</span></span><canvas data-dir="-I"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Natural vs. Forced Motion</div>
+                        <p class="panel-text muted">Three ways to stay near the target at GEO, seen from the left. The costs are worked out with the CW equations; white arrows are burns.</p>
+                        <div class="forced">
+                            <div class="forced-item"><div class="nf-box"><canvas id="nf-nmc"></canvas></div><p id="nf-nmc-text"></p></div>
+                            <div class="forced-item"><div class="nf-box"><canvas id="nf-circle"></canvas></div><p id="nf-circle-text"></p></div>
+                            <div class="forced-item"><div class="nf-box"><canvas id="nf-tear"></canvas></div><p id="nf-tear-text"></p></div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Key Terms</div>
+                        <ul class="terms">
+                            <li><b>Target</b> (green square): the origin of the RIC frame. <b>Chase</b> (gold triangle): the other spacecraft.</li>
+                            <li><span class="ric-c">R</span> radial (up), <span class="ric-c">I</span> in-track (forward), <span class="ric-c">C</span> cross-track (left).</li>
+                            <li><b>Burn</b>: an instant change in chase's velocity. Its position does not change, only where it goes next.</li>
+                            <li><b>NMC</b>: natural motion circumnavigation, the 2-by-1 ellipse chase traces with no burns. Its center is at height x<sub>C</sub>; above the target it drifts backward, below it drifts forward.</li>
+                            <li><b>Natural motion</b>: coasting with no burns. <b>Forced motion</b>: burning again and again to fly a path that is not natural.</li>
+                            <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track.</li>
+                        </ul>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../assets/tool-kit.js',
+                '../assets/earth-land.js',
+                '../assets/earth-scene.js',
+                'rpo-math.js',
+                'rpo-views.js',
+                'burn-sandbox.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
+</body>
+</html>

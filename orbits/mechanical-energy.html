@@ -123,18 +123,6 @@
         .cmp tbody tr + tr { border-top: 1px solid rgba(28, 46, 74, 0.6); }
         .cmp-unit { color: var(--text-dim); font-size: 0.68rem; margin-left: 0.2rem; }
 
-        .notice-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 0.3rem;
-            font-size: 0.8rem;
-            line-height: 1.4;
-        }
-
-        .notice-list li { padding-left: 0.9rem; position: relative; }
-        .notice-list li::before { content: '•'; position: absolute; left: 0; color: var(--accent-gold); }
-
         /* Tablets: both columns fill the height of the row. */
         @media (min-width: 700px) and (max-width: 1080px) {
             .tool-side > .col > .panel { flex-grow: 1; }
@@ -198,8 +186,6 @@
     <main class="tool-main">
         <div class="tool-layout">
             <div class="col tool-stage-col">
-                <p class="tool-intro">A spacecraft trades potential energy for kinetic energy as it falls to perigee, and trades it back as it climbs to apogee. Their sum, the specific mechanical energy, never changes.</p>
-
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view">
                         <canvas id="scene" aria-label="An elliptical orbit around Earth with a moving spacecraft and its velocity arrow, beside a bar chart of specific kinetic, potential, and mechanical energy."></canvas>
@@ -342,15 +328,6 @@
                             </div>
                         </div>
                         <p class="eq-constants">μ is Earth's gravitational parameter, 398,600 km³/s². R is measured from Earth's center: R = 6,378 km + altitude.</p>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">What to Notice</div>
-                        <ul class="notice-list">
-                            <li>Toward apogee, R grows, so <span class="sym pe">sPE</span> rises toward zero and <span class="sym ke">sKE</span> falls. The spacecraft slows.</li>
-                            <li>Toward perigee, <span class="sym pe">sPE</span> drops and <span class="sym ke">sKE</span> gains the same amount. The spacecraft speeds up.</li>
-                            <li><span class="sym eps">ε</span> depends only on a. It is negative for every closed orbit.</li>
-                        </ul>
                     </div>
                 </div>
             </aside>

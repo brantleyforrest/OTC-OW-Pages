@@ -30,48 +30,6 @@
 
         .scale-badge strong { color: var(--text-main); font-weight: 600; }
 
-        .helper {
-            font-size: 0.76rem;
-            color: var(--text-dim);
-            line-height: 1.4;
-            margin-top: 0.3rem;
-        }
-
-        /* Steps */
-        .steps {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 0.3rem;
-        }
-
-        .steps li {
-            border: 1px solid var(--border-subtle);
-            border-left: 3px solid var(--border-subtle);
-            border-radius: 7px;
-            padding: 0.3rem 0.55rem;
-            font-size: 0.78rem;
-            line-height: 1.35;
-            color: var(--text-dim);
-            transition: background 0.2s, border-color 0.2s, color 0.2s;
-        }
-
-        .steps li strong {
-            display: block;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        .steps li.current {
-            color: var(--text-main);
-            background: var(--surface-hover);
-        }
-
-        .steps li.current strong { color: #ffffff; }
-        .steps li.current[data-step="1"] { border-left-color: var(--accent-gold); }
-        .steps li.current[data-step="2"] { border-left-color: var(--sidereal); }
-        .steps li.current[data-step="3"] { border-left-color: var(--solar); }
-
         /* Live values */
         .stats {
             display: grid;
@@ -93,65 +51,6 @@
             font-weight: 600;
             color: #ffffff;
             white-space: nowrap;
-        }
-
-        /* Magnified gauge */
-        .gauge {
-            position: relative;
-            height: 74px;
-            margin: 0.1rem 0.2rem 0;
-        }
-
-        .gauge-track {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 36px;
-            height: 4px;
-            border-radius: 2px;
-            background: var(--border-subtle);
-        }
-
-        .gauge-extra {
-            position: absolute;
-            top: 36px;
-            height: 4px;
-            background: var(--extra);
-        }
-
-        .gauge-tick {
-            position: absolute;
-            top: 24px;
-            width: 2px;
-            height: 28px;
-            margin-left: -1px;
-        }
-
-        .gauge-tick.sidereal { background: var(--sidereal); }
-        .gauge-tick.solar { background: var(--solar); }
-
-        .gauge-text {
-            position: absolute;
-            font-family: var(--font-mono);
-            font-size: 0.68rem;
-            line-height: 1.25;
-            white-space: nowrap;
-        }
-
-        .gauge-text.top { top: 0; }
-        .gauge-text.bottom { top: 54px; }
-        .gauge-text.sidereal { color: var(--sidereal); left: 0; }
-        .gauge-text.solar { color: var(--solar); right: 0; text-align: right; }
-
-        .gauge-pointer {
-            position: absolute;
-            top: 29px;
-            width: 12px;
-            height: 18px;
-            margin-left: -6px;
-            border-radius: 3px;
-            background: #ffffff;
-            box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
         }
 
         /* Comparison table */
@@ -190,36 +89,14 @@
             padding-left: 0;
         }
 
-        .count-row {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 0.2rem 1rem;
-            font-size: 0.78rem;
-            line-height: 1.35;
-            color: var(--text-muted);
-        }
-
-        .count-row .mono { color: #ffffff; text-align: right; }
-
-        .fact-list {
-            list-style: none;
-            font-size: 0.78rem;
-            line-height: 1.4;
-            color: var(--text-muted);
-            display: flex;
-            flex-direction: column;
-            gap: 0.3rem;
-        }
-
-        .fact-list strong { color: #ffffff; font-weight: 600; }
-
         .tool-side .panel { padding: 0.65rem 0.85rem; }
         .tool-side .panel-title { margin-bottom: 0.35rem; }
+        .tool-side > .col > .panel { flex-grow: 0; }
 
-        /* From this width, the panels fit in two columns beside the view. */
-        @media (min-width: 1300px) and (min-height: 600px) {
-            .tool-layout { --aside-w: 40rem; }
-            .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        /* Tablets: the two panels sit side by side and use the full width. */
+        @media (min-width: 700px) and (max-width: 1080px) {
+            .tool-side { grid-template-columns: minmax(0, 1fr); }
+            .tool-side > .col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         @media (max-width: 690px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
@@ -279,8 +156,6 @@
     <main class="tool-main">
         <div class="tool-layout">
             <div class="col tool-stage-col">
-                <p class="tool-intro">A view from above the North Pole. Earth spins while it moves along its orbit, so a marked point on Earth faces a distant star again before it faces the Sun again.</p>
-
                 <div class="tool-canvas-box" id="stage">
                     <canvas id="view" aria-label="Animated view of Earth rotating as it moves along its orbit around the Sun"></canvas>
                 </div>
@@ -310,44 +185,12 @@
                             </div>
                             <input type="range" id="rotations" min="1" max="30" step="1" value="10">
                         </div>
-                        <button class="btn" id="btn-toggle-rotations">Single Rotation (1 Day)</button>
                     </div>
                     <p class="ctl-caption scale-note"><span class="scale-badge" id="scale-badge"></span> <span id="rotations-help"></span></p>
                 </div>
             </div>
 
             <aside class="tool-side">
-                <div class="col">
-                    <div class="panel accent">
-                        <div class="panel-title" id="steps-title">10 Rotations, Step by Step</div>
-                        <ol class="steps" id="steps">
-                            <li data-step="1"><strong id="step-1-title">Start of day 1</strong><span id="step-1-text">The marked point faces the Sun, and a distant star lies in the same direction.</span></li>
-                            <li data-step="2"><strong id="step-2-title">10 sidereal days: 10 full rotations (3,600°)</strong><span id="step-2-text">Earth completes 10 full 360° spins facing the distant star. Along its orbit, Earth has traveled 9.9°, falling behind the Sun.</span></li>
-                            <li data-step="3"><strong id="step-3-title">10 solar days: 10 full days (240 h)</strong><span id="step-3-text">After an accumulated 9.9° extra rotation (39 m), the point faces the Sun again.</span></li>
-                        </ol>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">Rotations Counted Since Restart</div>
-                        <div class="count-row">
-                            <span>Against the distant stars (sidereal days)</span><span class="mono" id="count-stars">0.000</span>
-                            <span>Against the Sun (solar days)</span><span class="mono" id="count-sun">0.000</span>
-                            <span>Difference</span><span class="mono" id="count-diff">0.000</span>
-                            <span>Orbits of the Sun completed</span><span class="mono" id="count-orbits">0.000</span>
-                        </div>
-                        <p class="helper">The difference always equals the number of orbits completed. A real year has 366.24 sidereal days and 365.24 solar days. Over any period, the sidereal day count minus the solar day count exactly equals the fraction of the orbit completed.</p>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">Why the Difference Matters</div>
-                        <ul class="fact-list">
-                            <li><strong>Geostationary orbits</strong> must match the sidereal day, because that is Earth's true rotation period.</li>
-                            <li><strong>Stars</strong> rise about 4 minutes earlier each night, or about 2 hours earlier each month.</li>
-                            <li><strong>Civil clocks</strong> follow the solar day, because daily life follows the Sun.</li>
-                        </ul>
-                    </div>
-                </div>
-
                 <div class="col">
                     <div class="panel">
                         <div class="panel-title">Live Values</div>
@@ -357,22 +200,6 @@
                             <div class="stat"><span class="label">Earth's travel along its orbit</span><span class="value" id="orbit-travel">0.000°</span></div>
                             <div class="stat"><span class="label">Rotation needed to face the Sun</span><span class="value" id="needed">360.000°</span></div>
                         </div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">End of the Sequence, Magnified</div>
-                        <div class="gauge" id="gauge" aria-hidden="true">
-                            <div class="gauge-track"></div>
-                            <div class="gauge-extra" id="gauge-extra"></div>
-                            <div class="gauge-tick sidereal" id="tick-sidereal"></div>
-                            <div class="gauge-tick solar" id="tick-solar"></div>
-                            <div class="gauge-text top sidereal" id="text-sidereal-deg"></div>
-                            <div class="gauge-text bottom sidereal" id="text-sidereal-time"></div>
-                            <div class="gauge-text top solar" id="text-solar-deg"></div>
-                            <div class="gauge-text bottom solar" id="text-solar-time"></div>
-                            <div class="gauge-pointer" id="gauge-pointer"></div>
-                        </div>
-                        <p class="helper">The white marker shows Earth's rotation. The red segment is the extra rotation needed to realign with the Sun.</p>
                     </div>
 
                     <div class="panel">

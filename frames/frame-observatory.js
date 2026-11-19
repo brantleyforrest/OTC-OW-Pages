@@ -37,55 +37,34 @@
         ECI: {
             name: 'Earth-Centered Inertial',
             axes: ['Î', 'Ĵ', 'K̂'],
-            question: 'Where is the satellite in space, and where will it go next?',
-            held: 'the axes and the distant stars.',
-            moving: "Earth's surface and both spacecraft.",
-            classLabel: 'Treated as inertial',
-            classStyle: 'inertial',
             anatomy: [
                 ['Origin', "Earth's center of mass."],
                 ['Fundamental Plane', 'The equatorial plane.'],
                 ['Principal Axis', 'Î', 'In the equatorial plane, toward the vernal equinox.'],
                 ['Third Axis', 'K̂', "Along Earth's spin axis, through the North Pole."],
-                ['Remaining Axis', 'Ĵ', 'In the equatorial plane, 90° east of the vernal equinox.'],
-                ['Classification', 'Treated as inertial. Its axes do not rotate with Earth.'],
-                ['Purpose', 'Calculating orbits and predicting where a satellite will be.']
+                ['Remaining Axis', 'Ĵ', 'In the equatorial plane, 90° east of the vernal equinox.']
             ]
         },
         ECEF: {
             name: 'Earth-Centered Earth-Fixed',
             axes: ['X̂', 'Ŷ', 'Ẑ'],
-            question: "Where is this object relative to Earth's surface?",
-            held: "the axes and Earth's surface.",
-            moving: 'the stars, the Sun, and any spacecraft that is not geostationary.',
-            classLabel: 'Non-inertial',
-            classStyle: 'noninertial',
             anatomy: [
                 ['Origin', "Earth's center of mass, as in ECI."],
                 ['Fundamental Plane', 'The equatorial plane, as in ECI, but the axes rotate with Earth.'],
                 ['Principal Axis', 'X̂', 'Toward 0° latitude, 0° longitude, where the Prime Meridian crosses the equator.'],
                 ['Third Axis', 'Ẑ', "Along Earth's spin axis, through the North Pole."],
-                ['Remaining Axis', 'Ŷ', 'Toward 0° latitude, 90° east longitude.'],
-                ['Classification', 'Non-inertial, because it rotates with Earth.'],
-                ['Purpose', 'Sensor locations, GPS navigation, antenna pointing, and ground tracks.']
+                ['Remaining Axis', 'Ŷ', 'Toward 0° latitude, 90° east longitude.']
             ]
         },
         RIC: {
             name: 'Radial, In-Track, Cross-Track',
             axes: ['R̂', 'Î', 'Ĉ'],
-            question: 'Where is the other spacecraft relative to this one?',
-            held: "the axes, the target, and Earth's center.",
-            moving: "Earth's surface, the stars, the Sun, and the second spacecraft.",
-            classLabel: 'Non-inertial',
-            classStyle: 'noninertial',
             anatomy: [
                 ['Origin', 'The center of mass of the target spacecraft.'],
                 ['Fundamental Plane', "The target's orbital plane, containing its orbit and Earth's center."],
                 ['Principal Axis', 'R̂', "Radial. From Earth's center through the target, pointing away from Earth."],
                 ['Third Axis', 'Ĉ', "Cross-track. Perpendicular to the target's orbital plane."],
-                ['Remaining Axis', 'Î', 'In-track. In the orbital plane, perpendicular to R̂, on the side the target moves toward.'],
-                ['Classification', 'Non-inertial. It travels with the target and turns once per orbit.'],
-                ['Purpose', 'Orienting and maneuvering two separate objects in space.']
+                ['Remaining Axis', 'Î', 'In-track. In the orbital plane, perpendicular to R̂, on the side the target moves toward.']
             ]
         }
     };
@@ -130,28 +109,6 @@
         { rate: 7200, label: '1 second = 2 hours' }
     ];
 
-    function noticeText(frame, orbit, inclination) {
-        const tilted = inclination > 0;
-        if (frame === 'ECI') {
-            if (orbit === 'GEO') {
-                return 'Earth turns inside fixed axes while the target traces one full circle per rotation. Its speed reads the true orbital speed, about 3.07 km/s. The stars stay still here, unlike in ECEF.';
-            }
-            return 'The orbit stays one fixed loop in space while Earth turns beneath it. This steadiness is why orbits are calculated in this frame.';
-        }
-        if (frame === 'ECEF') {
-            if (orbit === 'GEO' && !tilted) {
-                return 'The axes turn with Earth, so the continents stop moving. The target\'s path collapses to a single point and its speed reads zero. The orbit did not change. Only the viewpoint did.';
-            }
-            if (orbit === 'GEO') {
-                return 'With a tilted orbit, the target swings north and south of the equator each day, tracing a repeating figure-eight. The ground site\'s coordinates still stay constant.';
-            }
-            return 'The continents stop moving. The target\'s path winds around the globe and shifts west each orbit, because Earth turns east beneath it. The path on the surface below is its ground track.';
-        }
-        const scale = orbit === 'GEO'
-            ? 'Earth is too far below to appear here, so the inset shows it.'
-            : 'Earth\'s surface moves beneath the view while its center stays directly below.';
-        return 'The target always sits at the origin, reading zero. The second spacecraft, on a slightly different orbit, traces a closed loop around it with small RIC numbers. ' + scale;
-    }
 
     const OBJECT_NOTES = {
         target: {
@@ -1057,15 +1014,6 @@
         return { x: offset, y: offset };
     }
 
-    // Areas of the view that labels must stay clear of.
-    let hudBox = null;
-    function measureObstacles() {
-        const hud = $('hud');
-        const view = viewport.getBoundingClientRect();
-        const box = hud.getBoundingClientRect();
-        const overlaid = getComputedStyle(hud).position === 'absolute';
-        hudBox = overlaid ? { x: box.left - view.left, y: box.top - view.top, w: box.width, h: box.height } : null;
-    }
 
     function resize() {
         viewW = Math.max(1, viewport.clientWidth);
@@ -1077,7 +1025,6 @@
         insetFrame.style.width = insetW + 'px';
         insetFrame.style.height = insetH + 'px';
         for (const item of labels) item.width = 0;
-        measureObstacles();
         dirty = true;
         // Resizing clears the canvas, so draw at once to avoid a blank frame.
         if (started) {
@@ -1132,13 +1079,9 @@
         const hours = Math.floor(elapsedMin / 60) % 24;
         const mins = elapsedMin % 60;
         $('elapsed').textContent = `${days} d ${String(hours).padStart(2, '0')} h ${String(mins).padStart(2, '0')} m`;
-        $('turned').textContent = `${numberFormat.format(Math.floor(FM.earthAngle(state.t) / D2R))}°`;
     }
 
-    function updateNotice() {
-        const def = FRAMES[state.frame];
-        $('question').textContent = def.question;
-        $('notice').textContent = noticeText(state.frame, state.orbit, state.inclination);
+    function updateCoordsNote() {
         $('coords-note').textContent = OBJECT_NOTES[state.object][state.frame];
     }
 
@@ -1150,21 +1093,7 @@
         for (const key of FRAME_KEYS) {
             coordCells[key].row.classList.toggle('active', key === state.frame);
         }
-        const hud = $('hud');
-        hud.textContent = '';
-        const heldLine = document.createElement('div');
-        heldLine.innerHTML = `<strong style="color:${CSS_COLORS[state.frame]}">${state.frame} view.</strong> <strong>Held still:</strong> `;
-        heldLine.append(def.held);
-        const movingLine = document.createElement('div');
-        movingLine.className = 'moving';
-        movingLine.textContent = `Appears to move: ${def.moving}`;
-        hud.append(heldLine, movingLine);
-        measureObstacles();
-
         $('anatomy-name').textContent = def.name;
-        const pill = $('class-pill');
-        pill.textContent = def.classLabel;
-        pill.className = `class-pill ${def.classStyle}`;
 
         const list = $('anatomy');
         list.textContent = '';
@@ -1182,7 +1111,7 @@
             dd.textContent = entry[entry.length - 1];
             list.append(dt, dd);
         }
-        updateNotice();
+        updateCoordsNote();
     }
 
     function setPlaying(value) {
@@ -1215,7 +1144,6 @@
         applyOrbitDefaults();
         rebuildScenario();
         updateOrbitRing();
-        updateNotice();
         dirty = true;
     }
 
@@ -1232,7 +1160,7 @@
                 other.setAttribute('aria-pressed', String(other === btn));
             });
             updateCoordinates();
-            updateNotice();
+            updateCoordsNote();
         });
     });
     $('play').addEventListener('click', () => setPlaying(!state.playing));
@@ -1256,7 +1184,6 @@
         $('tilt-value').textContent = `${state.inclination}°`;
         rebuildScenario();
         updateOrbitRing();
-        updateNotice();
         dirty = true;
     });
     for (const [id, key] of [['show-trails', 'trails'], ['show-plane', 'plane'], ['show-others', 'others'], ['show-labels', 'labels'], ['show-track', 'track']]) {
@@ -1335,7 +1262,6 @@
     if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(() => {
             for (const item of labels) item.width = 0;
-            measureObstacles();
             dirty = true;
         });
     }

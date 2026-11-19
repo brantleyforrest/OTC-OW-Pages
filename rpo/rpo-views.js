@@ -437,7 +437,9 @@
     // A small static plot of one path with a direction arrow, for answer choices.
     function drawThumbnail(canvas, spec) {
         const M = window.RpoMath;
-        const pane = createRicPlane(canvas, { plane: spec.plane || 'left' });
+        // spec.compact: a one-line axis key and no badge or scale bar; spec.fitPaths: fit to these
+        // paths instead of this one (several thumbnails at one scale).
+        const pane = createRicPlane(canvas, { plane: spec.plane || 'left', compact: !!spec.compact });
         pane.resize(canvas.clientWidth || 160, canvas.clientHeight || 110);
         // spec.path (a sampled path) draws a picture no set of RMOEs can make, such as a wrong answer.
         let path = spec.path;
@@ -446,7 +448,7 @@
             path = M.sampleTrajectory(spec.rmoe, spec.n, 0, tEnd, Math.max(60, Math.round(120 * (spec.revs || 1))));
         }
         const end = pathLength(path) - 1;
-        fitPanes([pane], [path], true);
+        fitPanes([pane], spec.fitPaths || [path], true);
         // A ring marks the start and the triangle the end, so the direction of travel can be read.
         pane.draw({ trail: path, marker: [path[0], path[1], path[2]], chase: [path[3 * end], path[3 * end + 1], path[3 * end + 2]] });
         return pane;
@@ -1248,6 +1250,7 @@
         const layer = options.labels && Kit ? new Kit.LabelLayer(options.labels) : null;
         const triadLabels = layer ? ['R', 'I', 'C'].map(n => layer.add('<b style="color:#f87171">' + n + '</b>', { rank: 1 })) : [];
         const eciLabels = layer ? ['Î', 'Ĵ', 'K̂'].map(n => layer.add('<b style="color:#60a5fa">' + n + '</b>', { rank: 2, optional: true })) : [];
+        const burnArrows = [];
 
         // ---------- frames and magnification ----------
         function isGeo() { return s.target && Math.abs(s.target.a - M.GEO_A) < 1 && s.target.i < 0.01 && s.target.e < 1e-6; }
@@ -1433,6 +1436,31 @@
                 arrow.position.copy(tPos);
                 arrow.setDirection(dir);
                 arrow.setLength(len, len * 0.22, len * 0.11);
+            });
+            // Burn arrows (Burn Sandbox): data.burns = [{ t, rho, dv, basis }], dv in RIC. Each arrow
+            // starts where chase is drawn at that burn and points along the burn in the inertial frame,
+            // with a fixed size on screen (it shows direction, not size).
+            const burns = now.burns || [];
+            while (burnArrows.length < burns.length) {
+                const a = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 1, 0xf0f4fa, 0.25, 0.12);
+                a.line.material.depthTest = false; a.cone.material.depthTest = false;
+                a.renderOrder = 16;
+                scene.add(a);
+                burnArrows.push(a);
+            }
+            burnArrows.forEach((arrow, j) => {
+                const bn = burns[j];
+                arrow.visible = !!bn;
+                if (!bn) return;
+                const B = bn.basis, r = bn.rho, d = bn.dv, thb = theta(bn.t);
+                const p = [0, 1, 2].map(a => B.r[a] + k * (r[0] * B.R[a] + r[1] * B.I[a] + r[2] * B.C[a]));
+                const q = [0, 1, 2].map(a => d[0] * B.R[a] + d[1] * B.I[a] + d[2] * B.C[a]);
+                put(tmpA, 0, p[0], p[1], p[2], thb);
+                arrow.position.set(tmpA[0], tmpA[1], tmpA[2]);
+                put(tmpA, 0, q[0], q[1], q[2], thb);
+                arrow.setDirection(tmp.set(tmpA[0], tmpA[1], tmpA[2]).normalize());
+                const bl = camera.position.distanceTo(arrow.position) * 0.07;
+                arrow.setLength(bl, bl * 0.3, bl * 0.16);
             });
             targetMark.scale.setScalar(markerScale(13));
             chaseMark.scale.setScalar(markerScale(15));
