@@ -9,6 +9,32 @@
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
     const RM = window.RendezvousMath;
+
+    /* ================================================================== */
+    /* RENDEZVOUS MATH                                                    */
+    /* The solvers live in rendezvous-math.js (pure functions, no DOM).   */
+    /* This block picks the constants and the solver for each mode.       */
+    /* ================================================================== */
+    const MU = (RM && RM.constants && RM.constants.MU) || 398600.4418;
+    const R_EARTH = (RM && RM.constants && RM.constants.R_EARTH) || 6378.137;
+    const MIN_ALT = (RM && RM.constants && RM.constants.MIN_ALT) || 100;
+    const R2D = 180 / Math.PI;
+
+    // The lesson's worked examples use these rounded constants
+    const LESSON_MU = 398600.44;
+    const LESSON_R_EARTH = 6378.0;
+
+    function solveRendezvous(mode, vals, useLessonConstants) {
+        const mu = useLessonConstants ? LESSON_MU : MU;
+        const rEarth = useLessonConstants ? LESSON_R_EARTH : R_EARTH;
+        if (mode === 'coplanar') return RM.solveCoplanar({ ...vals, mu, rEarth });
+        if (mode === 'coorbital') return RM.solveCoOrbital({ ...vals, mu, rEarth });
+        return null;
+    }
+
+    /* ================================================================== */
+    /* RENDERING AND CONTROLS                                             */
+    /* ================================================================== */
     const MathRenderer = window.PracticeMath || { math: (s) => s, column: (p) => p.join(', ') };
     const math = (tex) => MathRenderer.math(tex);
 
@@ -26,15 +52,6 @@
         showStatus('The 3D library could not be loaded. Sliders, values, and equations remain functional.');
     }
 
-    const MU = (RM && RM.constants && RM.constants.MU) || 398600.4418;
-    const R_EARTH = (RM && RM.constants && RM.constants.R_EARTH) || 6378.137;
-    const MIN_ALT = (RM && RM.constants && RM.constants.MIN_ALT) || 100;
-    const R2D = 180 / Math.PI;
-
-    // The lesson's worked examples use these rounded constants
-    const LESSON_MU = 398600.44;
-    const LESSON_R_EARTH = 6378.0;
-
     /* ------------------------------------------------------------------ */
     /* Formatting                                                         */
     /* ------------------------------------------------------------------ */
@@ -42,7 +59,6 @@
     const group = (v, d = 0) => Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
     const fmtKm = (v) => `${group(v)} km`;
     const fmtKms = (v) => `${Number(v).toFixed(3)} km/s`;
-    const fmtMs = (v) => `${group(Math.abs(v) * 1000)} m/s`;
     const fmtDeg = (v) => `${Number(v).toFixed(1)}°`;
     const signText = (v) => (v < 0 ? MINUS : '+');
 
@@ -65,9 +81,6 @@
         return RM.formatHms(seconds);
     }
     const hmsTex = (v) => `\\text{${formatHms(v)}}`;
-
-    const speedHtml = (kms) => `<b>${fmtKms(kms)}</b> <span class="unit-sub">(${fmtMs(kms)})</span>`;
-    const signedSpeedHtml = (kms) => `<b>${signText(kms)}${fmtKms(Math.abs(kms))}</b> <span class="unit-sub">(${signText(kms)}${fmtMs(kms)})</span>`;
 
     function phaseAngleHint(deg) {
         const d = ((deg % 360) + 360) % 360;
@@ -100,6 +113,8 @@
         speeds: [{ rate: 0.5, label: 'Slow' }, { rate: 1, label: 'Normal' }, { rate: 2, label: 'Fast' }],
         timeline: 0,
         activePhase: '',
+        // A clicked equation card stays open (worked numbers shown) until the next step change
+        openCard: '',
         shown: {
             vectors: true,
             angles: true,
@@ -150,12 +165,7 @@
         const mode = state.mode;
         const vals = state.values[mode] || state.values.coplanar;
         const isEx = state.lessonExample[mode];
-        const mu = isEx ? LESSON_MU : MU;
-        const rEarth = isEx ? LESSON_R_EARTH : R_EARTH;
-
-        let model = null;
-        if (mode === 'coplanar') model = RM.solveCoplanar({ ...vals, mu, rEarth });
-        if (mode === 'coorbital') model = RM.solveCoOrbital({ ...vals, mu, rEarth });
+        const model = solveRendezvous(mode, vals, Boolean(isEx));
         if (model) model.lessonExample = isEx ? LESSON_EXAMPLES[mode].name : '';
         return model;
     }
@@ -188,7 +198,6 @@
     const checkLabels = $('check-labels');
 
     const equationCardsEl = $('equation-cards');
-    const liveValuesGrid = $('live-values-grid');
     const constraintChipsEl = $('constraint-chips');
     const tradeContentEl = $('trade-content');
     const whatToNoticeText = $('what-to-notice-text');
@@ -358,7 +367,7 @@
     function card(model, key, title, lines, note = '') {
         const body = lines.map(([kind, tex]) => `<div class="eq-${kind}">${math(tex)}</div>`).join('');
         return `
-            <div class="equation-card ${state.activePhase === key ? 'active' : ''}" data-key="${key}" data-target-t="${timeForCard(model, key)}">
+            <div class="equation-card ${(state.openCard || state.activePhase) === key ? 'active' : ''}" data-key="${key}" data-target-t="${timeForCard(model, key)}">
                 <div class="eq-title">${title}</div>
                 ${body}
                 ${note ? `<div class="eq-note">${note}</div>` : ''}
@@ -536,43 +545,25 @@
             if (!cardEl) return;
             const t = Number(cardEl.dataset.targetT || 0);
             goToStep(stepForTime(t), { at: t });
+            state.openCard = cardEl.dataset.key;
+            highlightCards();
         });
     }
 
     /* ------------------------------------------------------------------ */
     /* Live Values & Constraint Chips                                     */
     /* ------------------------------------------------------------------ */
-    function renderLiveValues(model) {
-        if (!liveValuesGrid || !constraintChipsEl) return;
-
+    // Only the flags the numbers alone do not show: the lesson example's rounded
+    // constants, a same-orbit case, and the co-orbital perigee check. The values
+    // themselves are in the equation cards.
+    function renderChips(model) {
+        if (!constraintChipsEl) return;
         let chipsHtml = '';
-        let statsHtml = '';
-        const stat = (label, valHtml) => `
-            <div class="stat-item">
-                <div class="stat-label">${label}</div>
-                <div class="stat-val">${valHtml}</div>
-            </div>
-        `;
-
         if (model.lessonExample) {
             chipsHtml += `<span class="constraint-chip info">${model.lessonExample}: μ = 398,600.44, R⊕ = 6,378 km</span>`;
         }
-
-        if (model.mode === 'coplanar') {
-            if (isSameOrbit(model)) {
-                chipsHtml += '<span class="constraint-chip warn">Same orbit: use Co-orbital</span>';
-                statsHtml += stat('Initial phase angle (φ<sub>0</sub>)', `${fmtDeg(model.phi0)}`);
-                statsHtml += stat('Synodic period', 'none (no drift)');
-            } else {
-                statsHtml += stat('Initial phase angle (φ<sub>0</sub>)', `${fmtDeg(model.phi0)} <span class="unit-sub">(${phaseAngleHint(model.phi0)})</span>`);
-                statsHtml += stat('Desired phase angle (φ<sub>desired</sub>)', fmtDeg(model.phi_desired_deg));
-                statsHtml += stat('Target travel (ν<sub>travel</sub>)', fmtDeg(model.nu_travel_deg));
-                statsHtml += stat('Wait time (WT)', formatHms(model.WT));
-                statsHtml += stat('Time of flight (TOF)', formatHms(model.TOF));
-                statsHtml += stat('Total mission time', formatHms(model.TOF_total));
-                statsHtml += stat('Synodic period (T<sub>syn</sub>)', formatHms(model.T_syn));
-                statsHtml += stat('Total ΔV', speedHtml(model.dv_total));
-            }
+        if (isSameOrbit(model)) {
+            chipsHtml += '<span class="constraint-chip warn">Same orbit: use Co-orbital</span>';
         } else if (model.mode === 'coorbital') {
             const h = Math.round(model.h_p);
             if (model.phi0 === 0) {
@@ -582,22 +573,11 @@
             } else if (model.h_p <= MIN_ALT) {
                 chipsHtml += `<span class="constraint-chip warn">Perigee below 100 km (${group(h)} km)</span>`;
             } else {
-                chipsHtml += '<span class="constraint-chip ok">Perigee above 100 km</span>';
+                chipsHtml += `<span class="constraint-chip ok">Perigee ${group(h)} km: above 100 km</span>`;
             }
-
-            statsHtml += stat('Chase position', model.phi0 === 0 ? 'with the target' : model.isBehind ? 'behind the target' : 'ahead of the target');
-            statsHtml += stat('Target travel (ν<sub>travel</sub>)', `${fmtDeg(model.nu_travel_deg)} <span class="unit-sub">per orbit</span>`);
-            statsHtml += stat('Phasing period', formatHms(model.Period_phasing));
-            statsHtml += stat('Phasing a', fmtKm(model.a_phasing));
-            statsHtml += stat('Perigee altitude (h<sub>p</sub>)', `${group(h)} km`);
-            statsHtml += stat('Burn 1 (ΔV<sub>1</sub>)', signedSpeedHtml(model.dv1));
-            statsHtml += stat('Total ΔV', speedHtml(model.dv_total));
-            statsHtml += stat(`Time of flight (k = ${model.k})`, formatHms(model.TOF_rendezvous));
         }
-
         constraintChipsEl.innerHTML = chipsHtml;
         constraintChipsEl.hidden = !chipsHtml;
-        liveValuesGrid.innerHTML = statsHtml;
     }
 
     /* ------------------------------------------------------------------ */
@@ -748,18 +728,22 @@
         }
 
         // Highlight the card for the current part (none in the overview)
-        const activeKey = state.step === 0 ? '' : ((PART_CARD[m.mode] || {})[p.key] || '');
-        state.activePhase = activeKey;
-        if (equationCardsEl) {
-            equationCardsEl.querySelectorAll('.equation-card').forEach((c) => {
-                c.classList.toggle('active', c.dataset.key === activeKey);
-            });
-        }
+        state.activePhase = state.step === 0 ? '' : ((PART_CARD[m.mode] || {})[p.key] || '');
+        highlightCards();
 
         if (timelineValueEl) {
             const n = stepList().length;
             timelineValueEl.textContent = state.step === 0 ? 'Overview' : `Step ${state.step} of ${n}`;
         }
+    }
+
+    // The open card shows its worked numbers; the others show only formula and result
+    function highlightCards() {
+        if (!equationCardsEl) return;
+        const openKey = state.openCard || state.activePhase;
+        equationCardsEl.querySelectorAll('.equation-card').forEach((c) => {
+            c.classList.toggle('active', c.dataset.key === openKey);
+        });
     }
 
     // Delegated click on the HUD's "Switch to Co-orbital" button
@@ -783,7 +767,7 @@
         if (!currentSolved) return;
 
         renderEquations(currentSolved);
-        renderLiveValues(currentSolved);
+        renderChips(currentSolved);
         renderTrade(currentSolved);
         renderWhatToNotice(currentSolved);
 
@@ -844,6 +828,7 @@
         const list = stepList();
         step = Math.max(0, Math.min(list.length, step));
         const changed = step !== state.step;
+        state.openCard = '';
         state.step = step;
         state.anim = null;
 
@@ -977,11 +962,16 @@
         });
     }
 
+    // Keep the view to what the current step needs: nu_travel traces in with the target
+    // during the transfer, burn arrows appear when their burn happens, the sliders carry
+    // the radii, and the inertial axes stay in the background.
+    const SCENE_DECLUTTER = { traceNu: true, radiusLabels: false, faintTransfer: false, futureBurns: false, axisLevel: 0.25 };
+
     const updateShown = () => {
         state.shown.vectors = checkVectors ? checkVectors.checked : true;
         state.shown.angles = checkAngles ? checkAngles.checked : true;
         state.shown.labels = checkLabels ? checkLabels.checked : true;
-        if (sceneController) sceneController.setShown(state.shown);
+        if (sceneController) sceneController.setShown({ ...state.shown, ...SCENE_DECLUTTER });
     };
 
     if (checkVectors) checkVectors.addEventListener('change', updateShown);

@@ -50,6 +50,10 @@
     }
     const radiusAt = (a, e, nu) => a * (1 - e * e) / (1 + e * Math.cos(nu));
     const speedAt = (a, r) => Math.sqrt(MU * (2 / r - 1 / a));
+    const circularSpeed = (r) => Math.sqrt(MU / r);
+    const specificEnergy = (a) => -MU / (2 * a);
+    const radiusForMeanMotion = (n) => Math.cbrt(MU / (n * n));         // circular orbit, km
+    const planeChangeDv = (v, deg) => Math.abs(2 * v * Math.sin(deg * D2R / 2));   // same units as v
 
     function solveKepler(M, e) {
         let E = M + e * Math.sin(M);
@@ -306,7 +310,8 @@
         MU, RE, J2, J22, LON22, R_GEO, MU_MOON, D_MOON, MU_SUN, D_SUN, P_SUN, CD, CR, DAY_S, YEAR_DAYS,
         GEO_TILT_PERIOD, SUN_RATE, SSO_RATE, CRITICAL_INC, STABLE_LON, UNSTABLE_LON, CAP_YEARS,
         wrap180, wrap360, meanMotion, periodSeconds, elementsFromAltitudes, altitudesFromElements,
-        radiusAt, speedAt, solveKepler, trueFromEccentric,
+        radiusAt, speedAt, circularSpeed, specificEnergy, radiusForMeanMotion, planeChangeDv,
+        solveKepler, trueFromEccentric,
         DENSITY, density, SOLAR, AREA, ballisticCoefficient, dragAccel, dragRates, decayHistory, sampleHistory,
         dragRegime, dragPhase, dragHeat,
         j2Rates, nodeDirection, perigeeDirection, sunSyncInclination, apogeeLatitude,

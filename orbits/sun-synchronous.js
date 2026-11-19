@@ -3,6 +3,56 @@
 (async function () {
     'use strict';
 
+    /* ================================================================== */
+    /* ORBIT MATH                                                         */
+    /* J2 nodal regression of a circular orbit. km, s, rad unless noted.  */
+    /* ================================================================== */
+    const MU = 398600.4418;      // km^3/s^2
+    const RE = 6378.137;         // km
+    const J2 = 1.08262668e-3;
+    const YEAR_DAYS = 365.2422;
+    const DAY_S = 86400;
+    const SUN_RATE = 2 * Math.PI / (YEAR_DAYS * DAY_S); // rad/s, mean Sun's motion in right ascension
+    const D2R = Math.PI / 180;
+    const R2D = 180 / Math.PI;
+
+    const wrap180 = (deg) => ((deg % 360) + 540) % 360 - 180;
+    const wrap360 = (deg) => ((deg % 360) + 360) % 360;
+    const wrap12 = (hours) => ((hours % 24) + 36) % 24 - 12;
+
+    // RAAN rate: dOmega/dt = -(3/2) J2 n (RE/a)^2 cos i, for e = 0.
+    const meanMotion = (a) => Math.sqrt(MU / (a * a * a));
+    const j2Factor = (a) => 1.5 * J2 * meanMotion(a) * (RE / a) * (RE / a);
+    const nodalRate = (a, inc) => -j2Factor(a) * Math.cos(inc);
+
+    // Sun-synchronous: set dOmega/dt equal to the Sun's rate and solve for cos i.
+    const sunSyncCos = (a) => -SUN_RATE / j2Factor(a);
+    const sunSyncInclination = (a) => Math.acos(sunSyncCos(a));
+
+    // Angles after a number of days, in degrees.
+    const sunRightAscension = (days) => days * DAY_S * SUN_RATE * R2D;
+    const raanAfter = (raan0Deg, a, inc, days) => raan0Deg + nodalRate(a, inc) * days * DAY_S * R2D;
+
+    // Local time at the node: 12:00 when the node points at the Sun, 15 deg per hour.
+    const nodeLocalTime = (raanDeg, sunDeg) => 12 + wrap180(raanDeg - sunDeg) / 15;
+    const raanForNodeTime = (hours, sunDeg) => sunDeg + (hours - 12) * 15;
+
+    // Position on a circular orbit of the given radius at argument of latitude u (deg).
+    function circularOrbitPosition(radius, raanDeg, inc, uDeg) {
+        const raan = raanDeg * D2R, u = uDeg * D2R;
+        const ci = Math.cos(inc), si = Math.sin(inc);
+        const co = Math.cos(raan), so = Math.sin(raan);
+        const cu = Math.cos(u), su = Math.sin(u);
+        return {
+            x: radius * (co * cu - so * su * ci),
+            y: radius * (so * cu + co * su * ci),
+            z: radius * su * si
+        };
+    }
+
+    /* ================================================================== */
+    /* RENDERING AND CONTROLS                                             */
+    /* ================================================================== */
     const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
@@ -21,25 +71,6 @@
         showStatus('The 3D library could not be loaded. This tool needs an internet connection the first time it opens.');
         return;
     }
-
-    /* Physics, for a circular orbit */
-    const MU = 398600.4418;      // km^3/s^2
-    const RE = 6378.137;         // km
-    const J2 = 1.08262668e-3;
-    const YEAR_DAYS = 365.2422;
-    const DAY_S = 86400;
-    const SUN_RATE = 2 * Math.PI / (YEAR_DAYS * DAY_S); // rad/s
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-
-    const meanMotion = (a) => Math.sqrt(MU / (a * a * a));
-    const j2Factor = (a) => 1.5 * J2 * meanMotion(a) * (RE / a) * (RE / a);
-    const nodalRate = (a, inc) => -j2Factor(a) * Math.cos(inc);
-    const sunSyncCos = (a) => -SUN_RATE / j2Factor(a);
-
-    const wrap180 = (deg) => ((deg % 360) + 540) % 360 - 180;
-    const wrap360 = (deg) => ((deg % 360) + 360) % 360;
-    const wrap12 = (hours) => ((hours % 24) + 36) % 24 - 12;
 
     function formatTime(hours) {
         const total = Math.round(hours * 60);
@@ -236,35 +267,27 @@
     };
 
     function placeOrbit(orbit, radius, satelliteDeg) {
-        const raan = orbit.raanDeg * D2R;
-        const u = satelliteDeg * D2R;
-        const ci = Math.cos(orbit.inc), si = Math.sin(orbit.inc);
-        const co = Math.cos(raan), so = Math.sin(raan);
-        const cu = Math.cos(u), su = Math.sin(u);
-        orbit.group.rotation.set(orbit.inc, 0, raan);
+        orbit.group.rotation.set(orbit.inc, 0, orbit.raanDeg * D2R);
         orbit.group.scale.setScalar(radius);
-        orbit.satellite.position.set(
-            radius * (co * cu - so * su * ci),
-            radius * (so * cu + co * su * ci),
-            radius * su * si
-        );
-        orbit.node.position.set(radius * co, radius * so, 0);
+        const p = circularOrbitPosition(radius, orbit.raanDeg, orbit.inc, satelliteDeg);
+        orbit.satellite.position.set(p.x, p.y, p.z);
+        const node = circularOrbitPosition(radius, orbit.raanDeg, orbit.inc, 0);
+        orbit.node.position.set(node.x, node.y, node.z);
     }
 
-    const sunDeg = () => state.days * DAY_S * SUN_RATE * R2D;
+    const sunDeg = () => sunRightAscension(state.days);
 
     function updateScene() {
         const a = RE + state.altitude;
         const radius = drawRadius(state.altitude);
         const sun = sunDeg();
 
-        sso.inc = Math.acos(sunSyncCos(a));
-        const startRaan = (state.shownHours - 12) * 15;
-        sso.raanDeg = startRaan + nodalRate(a, sso.inc) * state.days * DAY_S * R2D;
-        polar.raanDeg = POLAR_RAAN + nodalRate(a, polar.inc) * state.days * DAY_S * R2D;
+        sso.inc = sunSyncInclination(a);
+        sso.raanDeg = raanAfter(raanForNodeTime(state.shownHours, 0), a, sso.inc, state.days);
+        polar.raanDeg = raanAfter(POLAR_RAAN, a, polar.inc, state.days);
 
         for (const orbit of [sso, polar]) {
-            orbit.nodeHours = 12 + wrap180(orbit.raanDeg - sun) / 15;
+            orbit.nodeHours = nodeLocalTime(orbit.raanDeg, sun);
             setText(orbit.timeEl, formatTime(orbit.nodeHours));
         }
 
@@ -309,11 +332,11 @@
     function updateEquations() {
         const a = RE + state.altitude;
         const cosI = sunSyncCos(a);
-        setText($('altitude-value'), `${state.altitude.toLocaleString('en-US')} km, i = ${(Math.acos(cosI) * R2D).toFixed(2)}°`);
+        setText($('altitude-value'), `${state.altitude.toLocaleString('en-US')} km, i = ${(sunSyncInclination(a) * R2D).toFixed(2)}°`);
         setText($('eq-rate'), `${(SUN_RATE * DAY_S * R2D).toFixed(4)}°/day`);
         setText($('eq-n'), `${(meanMotion(a) * 1000).toFixed(4)} mrad/s`);
         setText($('eq-a'), `a = ${Math.round(a).toLocaleString('en-US')} km`);
-        setText($('eq-i'), `${(Math.acos(cosI) * R2D).toFixed(2)}°`);
+        setText($('eq-i'), `${(sunSyncInclination(a) * R2D).toFixed(2)}°`);
         setText($('eq-cos'), `= ${cosI.toFixed(4).replace('-', '−')}`);
     }
 

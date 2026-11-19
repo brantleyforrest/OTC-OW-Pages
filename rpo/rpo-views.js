@@ -694,21 +694,10 @@
         const targetRing = new Float32Array(RING * 3), chaseRing = new Float32Array(RING * 3);
         function setRing(mesh, arr, rv, key) {
             ringReach[key] = 0;
-            const M = window.RpoMath, RE = M.RE, MU = M.MU;
-            const ok = rv && rv.r && rv.v;
-            const r = ok ? rv.r : null, v = ok ? rv.v : null;
-            const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-            const len = a => Math.hypot(a[0], a[1], a[2]);
-            const h = ok ? cross(r, v) : null;
-            const hn = ok ? len(h) : 0, rn = ok ? len(r) : 0;
-            const ev = ok ? cross(v, h).map((x, k) => x / MU - r[k] / rn) : null;
-            const e = ok ? len(ev) : 1;
-            if (!ok || hn === 0 || e >= 0.99) { mesh.visible = false; mesh.userData.ready = false; return; }
-            const hHat = h.map(x => x / hn);
-            const P = e > 1e-9 ? ev.map(x => x / e) : r.map(x => x / rn);
-            const Q = cross(hHat, P);
-            const p = hn * hn / MU;
-            const nu0 = Math.atan2(r[0] * Q[0] + r[1] * Q[1] + r[2] * Q[2], r[0] * P[0] + r[1] * P[1] + r[2] * P[2]);
+            const M = window.RpoMath, RE = M.RE;
+            const conic = rv && rv.r && rv.v ? M.conicFromRv(rv.r, rv.v) : null;
+            if (!conic || conic.e >= 0.99) { mesh.visible = false; mesh.userData.ready = false; return; }
+            const { p, e, P, Q, nu0 } = conic;
             for (let k = 0; k < RING; k++) {
                 const nu = nu0 + 2 * Math.PI * k / RING;
                 const rr = p / (1 + e * Math.cos(nu)) / RE, c = Math.cos(nu), sn = Math.sin(nu);

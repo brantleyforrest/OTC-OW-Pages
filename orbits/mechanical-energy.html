@@ -132,6 +132,44 @@
             .tool-layout { --aside-w: 46rem; }
             .tool-side { grid-template-columns: 20.5rem minmax(0, 1fr); }
         }
+
+        /* Split view: 3D orbit on the left (or top), energy chart on the right (or bottom) */
+        .tool-canvas-box { container-type: size; }
+
+        .split {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pane {
+            position: relative;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        #orbit-pane {
+            flex: 1 1 0;
+        }
+
+        #chart-pane {
+            flex: 0 0 clamp(160px, 35%, 230px);
+            border-top: 1px solid var(--border-subtle);
+            background: rgba(3, 6, 12, 0.5);
+        }
+
+        @container (min-aspect-ratio: 1.05) {
+            .split {
+                flex-direction: row;
+            }
+
+            #chart-pane {
+                flex: 0 0 clamp(210px, 30%, 310px);
+                border-top: 0;
+                border-left: 1px solid var(--border-subtle);
+            }
+        }
     </style>
 </head>
 <body>
@@ -188,8 +226,17 @@
             <div class="col tool-stage-col">
                 <div class="tool-view">
                     <div class="tool-canvas-box" id="view">
-                        <canvas id="scene" aria-label="An elliptical orbit around Earth with a moving spacecraft and its velocity arrow, beside a bar chart of specific kinetic, potential, and mechanical energy."></canvas>
-                        <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                        <div class="split">
+                            <div class="pane" id="orbit-pane">
+                                <canvas id="scene" aria-label="A 3D space-based view of Earth with an elliptical orbit, moving spacecraft, and velocity vector."></canvas>
+                                <div class="tool-labels" id="labels" aria-hidden="true"></div>
+                                <div class="tool-hint" id="view-hint">Drag to rotate the view. Scroll or pinch to zoom.</div>
+                            </div>
+                            <div class="pane" id="chart-pane">
+                                <canvas id="chart" aria-label="A bar chart of specific kinetic, potential, and mechanical energy."></canvas>
+                            </div>
+                        </div>
+                        <div class="tool-status" id="status" style="display: none;"></div>
                     </div>
                     <div class="tool-hud" id="hud" aria-live="polite"></div>
                 </div>
@@ -199,6 +246,7 @@
                         <div class="buttons">
                             <button class="btn primary" id="play">Pause</button>
                             <button class="btn" id="reset">Reset</button>
+                            <button class="btn" id="reset-view">Reset View</button>
                         </div>
                         <div class="ctl-grow">
                             <div class="control-label">
@@ -341,6 +389,8 @@
             const t = Date.now();
             [
                 '../assets/tool-kit.js',
+                '../assets/earth-land.js',
+                '../assets/earth-scene.js',
                 'mechanical-energy.js'
             ].forEach(function (src) {
                 const s = document.createElement('script');

@@ -2,6 +2,82 @@
 (async function () {
     'use strict';
 
+    /* ================================================================== */
+    /* ORBIT MATH                                                         */
+    /* Two-body motion about Earth. km, s, and degrees unless noted.      */
+    /* ================================================================== */
+    const MU = 398600.4418;    // km^3/s^2
+    const R_E = 6378.137;      // km
+    const D2R = Math.PI / 180;
+    const TWO_PI = 2 * Math.PI;
+
+    const wrap360 = (deg) => ((deg % 360) + 360) % 360;
+
+    // Orbit equation: r = a(1 - e^2) / (1 + e cos nu)
+    const semiLatus = (a, e) => a * (1 - e * e);
+    const radiusAt = (a, e, nu) => semiLatus(a, e) / (1 + e * Math.cos(nu * D2R));
+    const perigeeRadius = (a, e) => a * (1 - e);
+    const apogeeRadius = (a, e) => a * (1 + e);
+    const semiMinorAxis = (a, e) => a * Math.sqrt(1 - e * e);
+
+    // Vis-viva and circular speed, km/s
+    const orbitSpeed = (r, a) => Math.sqrt(MU * (2 / r - 1 / a));
+    const circularSpeed = (r) => Math.sqrt(MU / r);
+
+    // Position in the orbit plane: x toward perigee, y toward nu = 90 deg.
+    function positionAt(a, e, nu) {
+        const r = radiusAt(a, e, nu);
+        return { x: r * Math.cos(nu * D2R), y: r * Math.sin(nu * D2R) };
+    }
+
+    // The same ellipse from eccentric anomaly E (rad). Even steps in E give a smooth curve.
+    function positionAtEccentric(a, e, E) {
+        return { x: a * (Math.cos(E) - e), y: semiMinorAxis(a, e) * Math.sin(E) };
+    }
+
+    function orbitValues(a, e, nu) {
+        const r = radiusAt(a, e, nu);
+        return {
+            r,
+            rp: perigeeRadius(a, e),
+            ra: apogeeRadius(a, e),
+            v: orbitSpeed(r, a),
+            vc: circularSpeed(r)
+        };
+    }
+
+    // Kepler's equation, M = E - e sin E (M and E in rad).
+    function eccentricFromTrue(nu, e) {
+        const half = nu * D2R / 2;
+        return 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(half), Math.sqrt(1 + e) * Math.cos(half));
+    }
+
+    function trueFromEccentric(E, e) {
+        return wrap360(2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2)) / D2R);
+    }
+
+    // Newton's method, starting from M +/- e.
+    function solveKepler(M, e) {
+        let E = M + (Math.sin(M) >= 0 ? e : -e);
+        for (let i = 0; i < 16; i++) {
+            const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+            E -= step;
+            if (Math.abs(step) < 1e-10) break;
+        }
+        return E;
+    }
+
+    // Kepler's second law: M grows evenly with time, so step M and solve for the new nu.
+    function advanceTrueAnomaly(nu, deltaM, e) {
+        const E0 = eccentricFromTrue(nu, e);
+        let M = E0 - e * Math.sin(E0) + deltaM;
+        M = ((M + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
+        return trueFromEccentric(solveKepler(M, e), e);
+    }
+
+    /* ================================================================== */
+    /* RENDERING AND CONTROLS                                             */
+    /* ================================================================== */
     const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
@@ -20,12 +96,6 @@
         showStatus('The 3D library could not be loaded. This tool needs an internet connection the first time it opens.');
         return;
     }
-
-    /* Physical constants */
-    const R_E = 6378.137;      // km
-    const MU = 398600.4418;    // km^3/s^2
-    const D2R = Math.PI / 180;
-    const TWO_PI = 2 * Math.PI;
 
     /* Limits and animation ranges */
     const LIMITS = {
@@ -72,34 +142,6 @@
     let aInFocus = false;                  // Partial zoom and the note about the rings while a is being changed
     let aGoal = null;                      // The value the orbit is easing toward after a slider move
     let sliderOwner = null;                // The parameter last set by its slider, which keeps its position
-
-    /* The orbit equation and the values that follow from it */
-    const radiusAt = (nu) => state.a * (1 - state.e * state.e) / (1 + state.e * Math.cos(nu * D2R));
-
-    function orbitValues() {
-        const { a, e } = state;
-        return {
-            r: radiusAt(state.nu),
-            rp: a * (1 - e),
-            ra: a * (1 + e)
-        };
-    }
-
-    /* Kepler's second law: motion along the orbit, with equal areas in equal times */
-    function advanceAnomaly(nuDeg, deltaMean, e) {
-        const half = nuDeg * D2R / 2;
-        const E0 = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(half), Math.sqrt(1 + e) * Math.cos(half));
-        let M = E0 - e * Math.sin(E0) + deltaMean;
-        M = ((M + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
-        let E = M + (Math.sin(M) >= 0 ? e : -e);
-        for (let i = 0; i < 16; i++) {
-            const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= step;
-            if (Math.abs(step) < 1e-10) break;
-        }
-        const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
-        return ((nu / D2R) % 360 + 360) % 360;
-    }
 
     /* Renderer */
     const view = $('view');
@@ -317,18 +359,16 @@
         const lineWidth = px * 0.9;
         const a = state.a / R_E;
 
-        // Even steps in eccentric anomaly keep the curve smooth at high eccentricity.
-        const b = a * Math.sqrt(1 - e * e);
         for (let i = 0; i < ORBIT_POINTS; i++) {
-            const E = i / ORBIT_POINTS * TWO_PI;
-            orbitTube.xs[i] = a * (Math.cos(E) - e);
-            orbitTube.ys[i] = b * Math.sin(E);
+            const p = positionAtEccentric(a, e, i / ORBIT_POINTS * TWO_PI);
+            orbitTube.xs[i] = p.x;
+            orbitTube.ys[i] = p.y;
         }
         writeTube(orbitTube, lineWidth * 1.2);
 
-        const rNow = radiusAt(nu) / R_E;
-        const cx = rNow * Math.cos(nu * D2R), cy = rNow * Math.sin(nu * D2R);
-        const rp = a * (1 - e), ra = a * (1 + e);
+        const rNow = radiusAt(a, e, nu);
+        const { x: cx, y: cy } = positionAt(a, e, nu);
+        const rp = perigeeRadius(a, e), ra = apogeeRadius(a, e);
 
         setLine(rLine, 0, 0, cx, cy, lineWidth);
         // The semi-major axis runs from the center of the ellipse out to apogee.
@@ -349,12 +389,10 @@
         centerDot.visible = a * e > 1.05;
 
         // The true anomaly arc runs along the orbit itself, from perigee to the spacecraft.
-        const semiLatus = a * (1 - e * e);
         for (let i = 0; i < ARC_POINTS; i++) {
-            const angle = i / (ARC_POINTS - 1) * nu * D2R;
-            const dist = semiLatus / (1 + e * Math.cos(angle));
-            arcTube.xs[i] = dist * Math.cos(angle);
-            arcTube.ys[i] = dist * Math.sin(angle);
+            const p = positionAt(a, e, i / (ARC_POINTS - 1) * nu);
+            arcTube.xs[i] = p.x;
+            arcTube.ys[i] = p.y;
         }
         writeTube(arcTube, lineWidth * 1.3);
         arcTube.mesh.visible = nu > 0.5;
@@ -409,21 +447,20 @@
         if (state.showLabels) {
             const { e, nu } = state;
             const a = state.a / R_E;
-            const rNow = radiusAt(nu) / R_E;
-            const cx = rNow * Math.cos(nu * D2R), cy = rNow * Math.sin(nu * D2R);
+            const rNow = radiusAt(a, e, nu);
+            const { x: cx, y: cy } = positionAt(a, e, nu);
             if (rNow >= 1) {
                 showLabel(labels.craft, cx, cy, 0);
                 showLabel(labels.r, cx * 0.62, cy * 0.62, 0);
             }
             showLabel(labels.a, -a * e - a / 2, 0, 0);
             if (e > 0.001) {
-                showLabel(labels.perigee, a * (1 - e), 0, 0);
-                showLabel(labels.apogee, -a * (1 + e), 0, 0);
+                showLabel(labels.perigee, perigeeRadius(a, e), 0, 0);
+                showLabel(labels.apogee, -apogeeRadius(a, e), 0, 0);
             }
             if (nu > 8) {
-                const mid = nu / 2 * D2R;
-                const dist = a * (1 - e * e) / (1 + e * Math.cos(mid));
-                showLabel(labels.nu, dist * Math.cos(mid), dist * Math.sin(mid), 0);
+                const mid = positionAt(a, e, nu / 2);
+                showLabel(labels.nu, mid.x, mid.y, 0);
             }
             for (const axis of axes) showLabel(axis.label, axis.tip.x, axis.tip.y, axis.tip.z);
             for (const ring of rings) {
@@ -461,7 +498,7 @@
 
     function updatePanels() {
         const { a, e, nu } = state;
-        const values = orbitValues();
+        const values = orbitValues(a, e, nu);
         const nuShown = state.playing && state.sweep === 'nu' ? Math.round(nu) : Math.round(nu * 10) / 10;
 
         for (const key of Object.keys(inputs)) {
@@ -502,9 +539,9 @@
             'res-shape': e <= 0.001 ? '(Circle)' : '(Ellipse)',
             'v-r': plain(values.r),
             'v-a': plain(a),
-            'res-v': `${Math.sqrt(MU * (2 / values.r - 1 / a)).toFixed(2)} km/s`,
+            'res-v': `${values.v.toFixed(2)} km/s`,
             'vc-r': plain(values.r),
-            'res-vc': `${Math.sqrt(MU / values.r).toFixed(2)} km/s`
+            'res-vc': `${values.vc.toFixed(2)} km/s`
         });
 
         updateHud(values);
@@ -698,7 +735,7 @@
         state.spin = (state.spin + seconds * rate * EARTH_SPIN) % 360;
 
         if (state.sweep === 'nu') {
-            state.nu = advanceAnomaly(state.nu, seconds * rate * TWO_PI / ORBIT_SECONDS, state.e);
+            state.nu = advanceTrueAnomaly(state.nu, seconds * rate * TWO_PI / ORBIT_SECONDS, state.e);
             return;
         }
         const limit = LIMITS[state.sweep];

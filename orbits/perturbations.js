@@ -524,7 +524,7 @@
                 const first = s.history.samples[0];
                 const alt = M.altitudesFromElements(a, e);
                 const alt0 = M.altitudesFromElements(first.a, first.e);
-                const speed = Math.sqrt(M.MU / a), speed0 = Math.sqrt(M.MU / first.a);
+                const speed = M.circularSpeed(a), speed0 = M.circularSpeed(first.a);
                 const change = (x) => (Math.abs(x) < 0.5 ? '' : ` (${signed(x, 0)})`);
                 const left = s.history.days - s.t;
                 return [
@@ -549,7 +549,7 @@
                     rows: [
                         { name: 'Semi-major axis', result: `${comma(a)} km`, work: work('a = (R<sub>a</sub> + R<sub>p</sub>) / 2', `R<sub>a</sub> = ${comma(ra)}, R<sub>p</sub> = ${comma(rp)}`) },
                         { name: 'Eccentricity', result: e.toFixed(4), work: work('e = (R<sub>a</sub> − R<sub>p</sub>) / (R<sub>a</sub> + R<sub>p</sub>)', `start ${first.e.toFixed(4)}`) },
-                        { name: 'Specific mechanical energy', result: `${fixed(-M.MU / (2 * a), 2)} km²/s²`, work: work('ε = −μ / (2a)', `start ${fixed(-M.MU / (2 * first.a), 2)}`) },
+                        { name: 'Specific mechanical energy', result: `${fixed(M.specificEnergy(a), 2)} km²/s²`, work: work('ε = −μ / (2a)', `start ${fixed(M.specificEnergy(first.a), 2)}`) },
                         { name: 'Orbital period', result: `${period.toFixed(1)} min`, work: work('Period = 2π √(a³ / μ)', `start ${period0.toFixed(1)} min`) },
                         { name: 'Speed at apogee', result: `${va.toFixed(3)} km/s`, work: work('V = √(μ (2/R − 1/a))', `R = R<sub>a</sub>, start ${va0.toFixed(3)}`) }
                     ]
@@ -1163,7 +1163,7 @@
             equations() {
                 const off = s.hold ? 0 : M.semiMajorOffsetKm(s.sim.rate);
                 const N_GEO = 0.0000729212; // the equation sheet's constant
-                const r = Math.cbrt(M.MU / (N_GEO * N_GEO)) + off; // GEO radius that matches it exactly, plus the offset
+                const r = M.radiusForMeanMotion(N_GEO) + off; // GEO radius that matches it exactly, plus the offset
                 const n = M.meanMotion(r);
                 const side = Math.abs(off) < 0.05 ? 'equal: it stays put' : off > 0 ? 'smaller: it falls behind (west)' : 'larger: it pulls ahead (east)';
                 return {
@@ -1174,7 +1174,7 @@
                         { name: 'Mean motion', result: `${sci(n, 6)} rad/s`, work: work('n = √(μ / a³)') },
                         { name: 'GEO mean motion', result: `${sci(N_GEO, 6)} rad/s`, work: work('n<sub>geo</sub> (constant)', `n is ${side}`) },
                         { name: 'Orbital period', result: `${(M.periodSeconds(r) / 3600).toFixed(4)} h`, work: work('Period = 2π √(a³ / μ)', 'sidereal day 23.9345 h') },
-                        { name: 'Circular-orbit speed', result: `${Math.sqrt(M.MU / r).toFixed(4)} km/s`, work: work('V = √(μ / R)') }
+                        { name: 'Circular-orbit speed', result: `${M.circularSpeed(r).toFixed(4)} km/s`, work: work('V = √(μ / R)') }
                     ]
                 };
             },
@@ -1344,8 +1344,8 @@
             // Equation-sheet formulas only: the plane change that undoes the tilt.
             equations() {
                 const { incDeg } = tilt();
-                const v = Math.sqrt(M.MU / M.R_GEO); // km/s
-                const planeChange = (deg) => Math.abs(2 * v * Math.sin(deg * D2R / 2)) * 1000; // m/s
+                const v = M.circularSpeed(M.R_GEO); // km/s
+                const planeChange = (deg) => M.planeChangeDv(v, deg) * 1000; // m/s
                 const yearTilt = M.geoTilt(1).incDeg;
                 return {
                     title: 'Undoing the Tilt',

@@ -11,6 +11,69 @@
     const Motion = global.SatelliteMotion;
     const { math } = global.PracticeMath;
 
+    /* ================================================================== */
+    /* ORBIT GEOMETRY MATH                                                */
+    /* Positions on circular orbits and on the Hohmann transfer ellipse.  */
+    /* Distances in any length unit; angles in degrees. u is the argument */
+    /* of latitude, measured from the ascending node.                     */
+    /* ================================================================== */
+    const D2R = Math.PI / 180;
+    const R2D = 180 / Math.PI;
+
+    // Position on an orbit of radius r in the plane (inc, raan), at argument of latitude u.
+    function orbitPosition(r, inc, raan, u) {
+        const i = inc * D2R, o = raan * D2R, a = u * D2R;
+        return {
+            x: r * (Math.cos(o) * Math.cos(a) - Math.sin(o) * Math.sin(a) * Math.cos(i)),
+            y: r * (Math.sin(o) * Math.cos(a) + Math.cos(o) * Math.sin(a) * Math.cos(i)),
+            z: r * Math.sin(a) * Math.sin(i)
+        };
+    }
+
+    // Unit vector along the direction of motion there (d position / du).
+    function orbitDirection(inc, raan, u) {
+        const i = inc * D2R, o = raan * D2R, a = u * D2R;
+        return {
+            x: -Math.cos(o) * Math.sin(a) - Math.sin(o) * Math.cos(a) * Math.cos(i),
+            y: -Math.sin(o) * Math.sin(a) + Math.cos(o) * Math.cos(a) * Math.cos(i),
+            z: Math.cos(a) * Math.sin(i)
+        };
+    }
+
+    // Unit normal of the plane (direction of the angular momentum).
+    const orbitNormal = (inc, raan) => ({
+        x: Math.sin(raan * D2R) * Math.sin(inc * D2R),
+        y: -Math.cos(raan * D2R) * Math.sin(inc * D2R),
+        z: Math.cos(inc * D2R)
+    });
+
+    // Hohmann transfer between radii R1 and R2. eSigned < 0 when lowering, so that u = 0 is
+    // always the start at R1 and u = 180 the end at R2. Periods are in units of the transfer
+    // time (half the transfer orbit's period), from P proportional to a^(3/2).
+    function transferEllipse(R1, R2) {
+        const a = (R1 + R2) / 2;
+        const eSigned = (R2 - R1) / (R1 + R2);
+        const p = a * (1 - eSigned * eSigned);
+        return {
+            a, eSigned, p,
+            radiusAt: (u) => p / (1 + eSigned * Math.cos(u * D2R)),
+            T1: 2 * Math.pow(R1 / a, 1.5),
+            T2: 2 * Math.pow(R2 / a, 1.5)
+        };
+    }
+
+    // Angle u flown on the transfer after the share t (0 to 1) of its flight time (Kepler's
+    // equation, via SatelliteMotion). The spacecraft is fastest near perigee.
+    function transferU(t, eSigned) {
+        const e = Math.abs(eSigned), raise = eSigned > 0;
+        const M = Math.PI * (raise ? t : 1 + t);
+        return Motion.trueFromMean(M, e) * R2D - (raise ? 0 : 180);
+    }
+
+    /* ================================================================== */
+    /* STEPS, SCENE, AND CAMERA                                           */
+    /* ================================================================== */
+
     const CAMERA_SECONDS = 1.7;
     const RESET_SECONDS = 0.9;
     const BUILD_DELAY = 0.8;    // A new part starts this long after the camera starts moving
@@ -448,26 +511,9 @@
         /* Orbit geometry --------------------------------------------------- */
         // A circular orbit's point and direction of travel, from its inclination, RAAN, and the
         // argument of latitude u, all in degrees.
-        function orbitPoint(r, inc, raan, u, out = new THREE.Vector3()) {
-            const i = inc * D2R, o = raan * D2R, a = u * D2R;
-            return out.set(
-                r * (Math.cos(o) * Math.cos(a) - Math.sin(o) * Math.sin(a) * Math.cos(i)),
-                r * (Math.sin(o) * Math.cos(a) + Math.cos(o) * Math.sin(a) * Math.cos(i)),
-                r * Math.sin(a) * Math.sin(i)
-            );
-        }
-
-        function orbitTangent(inc, raan, u, out = new THREE.Vector3()) {
-            const i = inc * D2R, o = raan * D2R, a = u * D2R;
-            return out.set(
-                -Math.cos(o) * Math.sin(a) - Math.sin(o) * Math.cos(a) * Math.cos(i),
-                -Math.sin(o) * Math.sin(a) + Math.cos(o) * Math.cos(a) * Math.cos(i),
-                Math.cos(a) * Math.sin(i)
-            ).normalize();
-        }
-
-        const planeNormal = (inc, raan) => new THREE.Vector3(
-            Math.sin(raan * D2R) * Math.sin(inc * D2R), -Math.cos(raan * D2R) * Math.sin(inc * D2R), Math.cos(inc * D2R));
+        const orbitPoint = (r, inc, raan, u, out = new THREE.Vector3()) => out.copy(orbitPosition(r, inc, raan, u));
+        const orbitTangent = (inc, raan, u, out = new THREE.Vector3()) => out.copy(orbitDirection(inc, raan, u)).normalize();
+        const planeNormal = (inc, raan) => new THREE.Vector3().copy(orbitNormal(inc, raan));
         const ring = (r, inc, raan) => (t, out) => orbitPoint(r, inc, raan, t * 360, out);
         const ringSample = (r, inc, raan, from = 0, to = 360, count = 36) =>
             Array.from({ length: count + 1 }, (_, k) => orbitPoint(r, inc, raan, from + ((to - from) * k) / count));
@@ -546,21 +592,15 @@
             const i1 = combined ? source.i1 : 0, i2 = combined ? source.i2 : 0;
             const iTransfer = combined ? (source.isRaise ? source.i1 : source.i2) : 0;
             const highBurn = source.isRaise ? 'burn2' : 'burn1';
-            const a = (R1 + R2) / 2, eSigned = (R2 - R1) / (R1 + R2), p = a * (1 - eSigned * eSigned);
-            const transferAt = (u, out = new THREE.Vector3()) => orbitPoint(p / (1 + eSigned * Math.cos(u * D2R)), iTransfer, 0, u, out);
+            const tx = transferEllipse(R1, R2);
+            const { eSigned, T1, T2 } = tx;
+            const transferAt = (u, out = new THREE.Vector3()) => orbitPoint(tx.radiusAt(u), iTransfer, 0, u, out);
 
             // The satellite's path, timed in units of the transfer time. It goes once around the
             // first orbit to the first burn, flies the transfer, then stays on the second orbit.
-            // Periods scale with the 3/2 power of the size, and the transfer is half its own period.
-            const T1 = 2 * Math.pow(R1 / a, 1.5), T2 = 2 * Math.pow(R2 / a, 1.5);
-            const e = Math.abs(eSigned), raise = eSigned > 0;
-            const transferU = (t) => {
-                const M = Math.PI * (raise ? t : 1 + t);
-                return Motion.trueFromMean(M, e) * R2D - (raise ? 0 : 180);
-            };
             const satAt = (tau, out) => {
                 if (tau < T1) return orbitPoint(R1, i1, 0, (360 * tau) / T1 - 360, out);
-                if (tau <= T1 + 1) return transferAt(transferU(tau - T1), out);
+                if (tau <= T1 + 1) return transferAt(transferU(tau - T1, eSigned), out);
                 return orbitPoint(R2, i2, 0, 180 + (360 * (tau - T1 - 1)) / T2, out);
             };
 
@@ -584,7 +624,7 @@
                 ...frame(Math.max(R1, R2), 0.55),
                 ring1: ring(R1, i1, 0),
                 ring2: ring(R2, i2, 0),
-                T1, T2, transferU, satAt,
+                T1, T2, transferU: (t) => transferU(t, eSigned), satAt,
                 motionRate: TRANSFER_SECONDS,
                 transferHalf: (t, out) => transferAt(t * 180, out),
                 transferOther: (t, out) => transferAt(180 + t * 180, out),

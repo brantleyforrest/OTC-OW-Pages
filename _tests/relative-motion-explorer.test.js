@@ -374,7 +374,20 @@ async function runTests() {
         assert.strictEqual(timeRead, '0.75 rev', 'time-read matches preserved phase');
     });
 
+    check('COE mode is gated behind dev mode', () => {
+        globalThis.__DEV__ = false;
+        rme.selectMode('rmoe');
+        assert.strictEqual(rme.state.mode, 'rmoe');
+        rme.selectMode('coe');
+        assert.strictEqual(rme.state.mode, 'rmoe', 'COE mode must be blocked when dev mode is off');
+
+        globalThis.__DEV__ = true;
+        rme.selectMode('coe');
+        assert.strictEqual(rme.state.mode, 'coe', 'COE mode must be allowed when dev mode is on');
+    });
+
     check('COE mode: changing a updates chase orbit, n, P, and DOM a-field', () => {
+        globalThis.__DEV__ = true;
         rme.selectMode('coe');
         // Initial GEO
         rme.setOrbits({ a: 42164, e: 0, i: 0, raan: 0, argp: 0, nu: 0 }, { da: 5, de: 0.0002, di: 0.01, draan: 0, dargp: 0, dnu: 0 });

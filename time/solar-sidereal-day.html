@@ -21,13 +21,6 @@
 
         .scale-note { min-height: 2.7em; }
 
-        /* The canvas draws this key at larger sizes. */
-        .phone-key { display: none; color: var(--text-muted); }
-        .phone-key b { font-weight: 600; }
-        .key-white { color: #ffffff; }
-        .key-gold { color: var(--accent-gold); }
-        .key-red { color: var(--extra); }
-
         .scale-badge strong { color: var(--text-main); font-weight: 600; }
 
         /* Live values */
@@ -93,14 +86,11 @@
         .tool-side .panel-title { margin-bottom: 0.35rem; }
         .tool-side > .col > .panel { flex-grow: 0; }
 
-        /* Tablets: the two panels sit side by side and use the full width. */
+        /* Tablets: panels layout across the full width. */
         @media (min-width: 700px) and (max-width: 1080px) {
             .tool-side { grid-template-columns: minmax(0, 1fr); }
             .tool-side > .col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-
-        @media (max-width: 690px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-            .phone-key { display: block; }
+            .tool-side > .col > .eq-panel { grid-column: 1 / -1; }
         }
     </style>
 </head>
@@ -160,8 +150,6 @@
                     <canvas id="view" aria-label="Animated view of Earth rotating as it moves along its orbit around the Sun"></canvas>
                 </div>
 
-                <p class="ctl-caption phone-key"><b class="key-white">White arrow:</b> a point fixed to Earth. <b class="key-gold">Gold:</b> Earth's travel along its orbit. <b class="key-red">Red:</b> the extra rotation.</p>
-
                 <div class="panel controls">
                     <div class="ctl-row">
                         <div class="buttons">
@@ -213,6 +201,40 @@
                                 <tr><td>Extra rotation</td><td id="single-extra"></td><td id="total-extra"></td></tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="panel eq-panel">
+                        <div class="panel-title">Calculating the Daily Time Difference</div>
+                        <div class="eq-list">
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Daily orbital motion</b></span><span class="eq-result">≈ 0.986° / day</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span>Δθ =</span><span class="fraction"><span>360°</span><span>365.24 d</span></span></span>
+                                    <span class="eq-val">≈ 0.9856° ≈ 0.986°</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Rotation per solar day</b></span><span class="eq-result">360.986°</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">θ<sub>solar</sub> = 360° + Δθ</span>
+                                    <span class="eq-val">= 360° + 0.986° = 360.986°</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Daily time difference</b></span><span class="eq-result">236 s (3m 56s)</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span>Δt =</span><span class="fraction"><span>Δθ</span><span>θ<sub>solar</sub></span></span><span>× 86,400 s</span></span>
+                                    <span class="eq-val"><span>=</span><span class="fraction"><span>0.986°</span><span>360.986°</span></span><span>× 86,400 s ≈ 236 s</span></span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Sidereal day duration</b></span><span class="eq-result">23h 56m 04s</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">T<sub>sidereal</sub> = 86,400 s − Δt</span>
+                                    <span class="eq-val">= 86,400 s − 236 s = 86,164 s</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </aside>

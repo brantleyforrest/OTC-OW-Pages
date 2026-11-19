@@ -9,6 +9,84 @@
     const MP = window.ManeuversProblems;
     const MathRenderer = window.PracticeMath || { math: (s) => s };
 
+    /* ================================================================== */
+    /* MANEUVER MATH                                                      */
+    /* Impulsive burns between circular orbits. km, s, km/s, degrees.     */
+    /* The Hohmann, plane change, and combined solvers are shared with    */
+    /* the practice page in practice/maneuvers-problems.js; this block    */
+    /* adds the choice of where a combined maneuver turns the plane.      */
+    /* ================================================================== */
+    const MU = (MP && MP.constants && MP.constants.MU) || 398600.4418;
+    const R_EARTH = (MP && MP.constants && MP.constants.R_EARTH) || 6378.137;
+    const D2R = Math.PI / 180;
+
+    // Pure plane change at speed v through angle theta: dV = 2 v sin(theta/2).
+    const planeChangeDv = (v, thetaDeg) => 2 * v * Math.sin(thetaDeg * D2R / 2);
+
+    // Speed change and plane change in one burn (law of cosines).
+    const combinedBurnDv = (vBefore, vAfter, thetaDeg) =>
+        Math.sqrt(vBefore * vBefore + vAfter * vAfter - 2 * vBefore * vAfter * Math.cos(thetaDeg * D2R));
+
+    // A combined Hohmann transfer and plane change, with the plane turned at the higher orbit
+    // (the solver's default), at the lower orbit, or as a separate burn at the higher orbit.
+    function solveCombinedOptions(R1, R2, i1, i2, location) {
+        const base = MP.solveCombined(R1, R2, i1, i2);
+        const { isRaise, v1, v_tx1, v_tx2, v2, delta_theta } = base;
+
+        // Plane turned with the burn at the lower orbit.
+        const dv1_lower = isRaise ? combinedBurnDv(v1, v_tx1, delta_theta) : Math.abs(v_tx1 - v1);
+        const dv2_lower = isRaise ? Math.abs(v2 - v_tx2) : combinedBurnDv(v_tx2, v2, delta_theta);
+        const dv_total_lower = dv1_lower + dv2_lower;
+
+        // Hohmann plus a separate pure plane change at the higher orbit.
+        const dv_total_separate = base.dv_separate + (isRaise ? base.dv1 : base.dv2);
+
+        let dv1 = base.dv1, dv2 = base.dv2, dv_total = base.dv_total;
+        if (location === 'lower') {
+            dv1 = dv1_lower;
+            dv2 = dv2_lower;
+            dv_total = dv_total_lower;
+        } else if (location === 'separate') {
+            dv_total = dv_total_separate;
+        }
+
+        return {
+            ...base,
+            planeChangeLocation: location,
+            dv1,
+            dv2,
+            dv_total,
+            dv_higher_total: base.dv_total,
+            dv_lower_total: dv_total_lower,
+            dv_separate_total: dv_total_separate,
+            dv1_lower,
+            dv2_lower
+        };
+    }
+
+    // The solved maneuver for one maneuver type and its input values.
+    function solveManeuver(type, vals) {
+        if (type === 'hohmann') {
+            return { ...MP.solveHohmann(vals.R1, vals.R2), type };
+        }
+        if (type === 'inclination') {
+            const res = MP.solveInclinationChange(vals.r - R_EARTH, vals.i1, vals.i2, vals.raan, vals.u_sc);
+            return { ...res, type, r: vals.r };
+        }
+        if (type === 'polar_raan') {
+            const res = MP.solvePolarRaanChange(vals.r - R_EARTH, vals.raan1, vals.raan2, vals.u_sc);
+            return { ...res, type, r: vals.r, i: 90 };
+        }
+        if (type === 'combined') {
+            return { ...solveCombinedOptions(vals.R1, vals.R2, vals.i1, vals.i2, vals.location), type };
+        }
+        return null;
+    }
+
+    /* ================================================================== */
+    /* RENDERING AND CONTROLS                                             */
+    /* ================================================================== */
+
     const statusEl = $('status');
     function showStatus(text) {
         if (!statusEl) return;
@@ -22,10 +100,6 @@
     } catch (err) {
         showStatus('The 3D library could not be loaded. Sliders, values, and equations remain functional.');
     }
-
-    const MU = (MP && MP.constants && MP.constants.MU) || 398600.4418;
-    const R_EARTH = (MP && MP.constants && MP.constants.R_EARTH) || 6378.137;
-    const D2R = Math.PI / 180;
 
     // Formatting helpers
     const fmtKm = (v) => `${Math.round(v).toLocaleString('en-US')} km`;
@@ -77,83 +151,7 @@
     /* ------------------------------------------------------------------ */
     /* Physics Solvers Integration                                        */
     /* ------------------------------------------------------------------ */
-    function solveCurrent() {
-        const type = state.type;
-        const vals = state.values[type];
-
-        if (type === 'hohmann') {
-            const res = MP.solveHohmann(vals.R1, vals.R2);
-            return { ...res, type };
-        }
-
-        if (type === 'inclination') {
-            const alt = vals.r - R_EARTH;
-            const res = MP.solveInclinationChange(alt, vals.i1, vals.i2, vals.raan, vals.u_sc);
-            return { ...res, type, r: vals.r };
-        }
-
-        if (type === 'polar_raan') {
-            const alt = vals.r - R_EARTH;
-            const res = MP.solvePolarRaanChange(alt, vals.raan1, vals.raan2, vals.u_sc);
-            return { ...res, type, r: vals.r, i: 90 };
-        }
-
-        if (type === 'combined') {
-            const baseCombined = MP.solveCombined(vals.R1, vals.R2, vals.i1, vals.i2);
-            const { R1, R2, i1, i2, isRaise, v1, v_tx1, v_tx2, v2, delta_theta } = baseCombined;
-            const theta = delta_theta * D2R;
-
-            // Compute Lower orbit burn option
-            let dv1_lower, dv2_lower, dv_total_lower;
-            if (isRaise) {
-                // Lower orbit is R1: burn 1 carries plane change
-                dv1_lower = Math.sqrt(v1 * v1 + v_tx1 * v_tx1 - 2 * v1 * v_tx1 * Math.cos(theta));
-                dv2_lower = Math.abs(v2 - v_tx2);
-                dv_total_lower = dv1_lower + dv2_lower;
-            } else {
-                // Lower orbit is R2: burn 2 carries plane change
-                dv1_lower = Math.abs(v_tx1 - v1);
-                dv2_lower = Math.sqrt(v_tx2 * v_tx2 + v2 * v2 - 2 * v_tx2 * v2 * Math.cos(theta));
-                dv_total_lower = dv1_lower + dv2_lower;
-            }
-
-            // Separate burn option: Hohmann + separate pure plane change at higher orbit
-            const dv_higher_plain = isRaise ? Math.abs(v2 - v_tx2) : Math.abs(v1 - v_tx1);
-            const v_higher = isRaise ? v2 : v1;
-            const dv_plane_separate = 2 * v_higher * Math.sin(theta / 2);
-            const dv_total_separate = baseCombined.dv_separate + (isRaise ? baseCombined.dv1 : baseCombined.dv2);
-
-            // Active choice
-            let activeDv1 = baseCombined.dv1;
-            let activeDv2 = baseCombined.dv2;
-            let activeTotal = baseCombined.dv_total;
-
-            if (vals.location === 'lower') {
-                activeDv1 = dv1_lower;
-                activeDv2 = dv2_lower;
-                activeTotal = dv_total_lower;
-            } else if (vals.location === 'separate') {
-                activeDv1 = baseCombined.dv1;
-                activeDv2 = baseCombined.dv2;
-                activeTotal = dv_total_separate;
-            }
-
-            return {
-                ...baseCombined,
-                type,
-                planeChangeLocation: vals.location,
-                dv1: activeDv1,
-                dv2: activeDv2,
-                dv_total: activeTotal,
-                dv_higher_total: baseCombined.dv_total,
-                dv_lower_total: dv_total_lower,
-                dv_separate_total: dv_total_separate,
-                dv1_lower,
-                dv2_lower
-            };
-        }
-        return null;
-    }
+    const solveCurrent = () => solveManeuver(state.type, state.values[state.type]);
 
     /* ------------------------------------------------------------------ */
     /* Scene Setup                                                        */
@@ -594,7 +592,7 @@
             if (planeChangeLocation === 'separate') {
                 // A Hohmann transfer, then a simple plane change at the higher orbit
                 const vHigh = isRaise ? v2 : v1;
-                const dv3 = 2 * vHigh * Math.sin((delta_theta / 2) * D2R);
+                const dv3 = planeChangeDv(vHigh, delta_theta);
                 plainCard(1, dv1);
                 plainCard(2, dv2);
                 html += card(
@@ -822,7 +820,7 @@
         const plotH = h - padT - padB;
 
         // Max ΔV for 90 deg is 2 * V * sin(45) = 1.414 * V
-        const maxDv = 2 * v * Math.sin(45 * D2R);
+        const maxDv = planeChangeDv(v, 90);
 
         // Axes
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
@@ -850,7 +848,7 @@
         ctx.lineWidth = 2;
         ctx.beginPath();
         for (let th = 0; th <= 90; th += 1) {
-            const dv = 2 * v * Math.sin((th / 2) * D2R);
+            const dv = planeChangeDv(v, th);
             const x = padL + (th / 90) * plotW;
             const y = padT + plotH - (dv / maxDv) * plotH;
             if (th === 0) ctx.moveTo(x, y);

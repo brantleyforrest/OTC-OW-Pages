@@ -173,7 +173,26 @@
         .el-notes { margin: 0.3rem 0 0; padding: 0; list-style: none; }
         .el-notes li { font-size: 0.74rem; line-height: 1.35; color: #fbbf24; margin-top: 0.2rem; }
         .el-notes:empty { display: none; }
+
+        /* Dev mode: COE mode stays hidden unless it is on. */
+        html:not(.dev-mode) .dev-only {
+            display: none !important;
+        }
+        html.dev-mode .public-only {
+            display: none !important;
+        }
+        /* When COE mode is hidden, the mode switch has 2 buttons instead of 3. */
+        html:not(.dev-mode) .set-mode .segmented {
+            grid-template-columns: 0.8fr 1.4fr;
+        }
     </style>
+    <script>
+        try {
+            if (new URLSearchParams(location.search).has('dev') || localStorage.getItem('otc-dev-mode') === '1') {
+                document.documentElement.classList.add('dev-mode');
+            }
+        } catch (e) { /* storage is blocked: dev mode starts off */ }
+    </script>
 </head>
 <body>
 
@@ -294,7 +313,7 @@
                     <div class="set-mode">
                         <div class="set-mode-label">What you set</div>
                         <div class="segmented" id="mode-pick" role="group" aria-label="What to set">
-                            <button type="button" data-value="coe" aria-pressed="false">COEs</button>
+                            <button type="button" data-value="coe" class="dev-only" aria-pressed="false">COEs</button>
                             <button type="button" data-value="rmoe" aria-pressed="true">RMOEs</button>
                             <button type="button" data-value="pv" aria-pressed="false">Position and Velocity</button>
                         </div>
@@ -316,7 +335,7 @@
                             </div>
                             <label class="a-field course-only" title="The target's semi-major axis (its orbit is circular here). GEO, GPS, and LEO fill it in; type any value from 6500 to 50000 km for Custom">a <input type="number" step="any" min="6500" max="50000" id="target-a" aria-label="Target semi-major axis in km"> km</label>
                         </div>
-                        <div class="coe-only" id="coe-block">
+                        <div class="coe-only dev-only" id="coe-block">
                             <div class="el-table" id="el-table"></div>
                             <div class="sub-row" id="starts-row" data-advanced>
                                 <span>Chase starts at</span>
@@ -356,7 +375,7 @@
                         </div>
                         <div class="motion-name rmoe-view" id="motion" data-advanced></div>
                         <p class="panel-text muted rmoe-view" id="drift-read" data-advanced></p>
-                        <p class="panel-text muted coe-only rmoe-view" id="fit-read" data-advanced></p>
+                        <p class="panel-text muted coe-only rmoe-view dev-only" id="fit-read" data-advanced></p>
                     </div>
 
                     <div class="panel">
@@ -386,12 +405,6 @@
                             <label class="check" style="display: none;"><input type="checkbox" id="opt-labels" checked>Labels</label>
                         </div>
                     </div>
-                    </div>
-
-                    <div class="panel" data-advanced>
-                        <div class="panel-title">What to Notice</div>
-                        <p class="panel-text" id="notice"></p>
-                    </div>
 
                     <div class="panel rmoe-view" data-advanced>
                         <div class="panel-title">Boundary Tables</div>
@@ -420,8 +433,8 @@
                             <li><b>Drifting NMC</b>: both at once, NMC loops that walk along the track.</li>
                             <li><b>Cross-Track NMC</b>: an NMC that also swings left and right of the target’s plane, so the ellipse tilts but stays put.</li>
                             <li><b>Snake</b>: a drift that also swings left and right of the target’s plane; from above it winds like a snake.</li>
-                            <li><b>COEs</b>: the six classical orbital elements of an orbit, a, e, i, Ω, ω, and ν.</li>
-                            <li><b>Exact model</b> (Set COEs): each spacecraft flies its own orbit, and the picture shows where chase really is from the target. It works for any target orbit, even an eccentric one.</li>
+                            <li class="dev-only"><b>COEs</b>: the six classical orbital elements of an orbit, a, e, i, Ω, ω, and ν.</li>
+                            <li class="dev-only"><b>Exact model</b> (Set COEs): each spacecraft flies its own orbit, and the picture shows where chase really is from the target. It works for any target orbit, even an eccentric one.</li>
                             <li><b>Course model</b> (Set RMOEs, Set Position and Velocity): the linear (CW) equations. They are simple and match the exact model when the target’s orbit is circular and chase is close to it.</li>
                             <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track.</li>
                         </ul>

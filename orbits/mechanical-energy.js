@@ -1,62 +1,29 @@
-// Mechanical Energy: a spacecraft on an ellipse beside bars for its specific kinetic,
-// potential, and mechanical energy. Drawn on a 2D canvas. See _template/README.md.
-(function () {
+// Mechanical Energy: a spacecraft trading kinetic and potential energy in an elliptical orbit
+// around a 3D Earth, beside a live bar chart of specific kinetic, potential, and mechanical energy.
+(async function () {
     'use strict';
 
-    const $ = (id) => document.getElementById(id);
-    const Kit = window.ToolKit;
+    /* ================================================================== */
+    /* ORBIT MATH                                                         */
+    /* Specific energy of a two-body orbit. km, s, rad.                   */
+    /* ================================================================== */
+    const MU = 398600.4418;    // km^3/s^2
+    const RE = 6378.137;       // km
+    const D2R = Math.PI / 180;
+    const TWO_PI = 2 * Math.PI;
 
-    /* Constants and settings */
-    const MU = 398600.44;      // km^3/s^2, Earth's gravitational parameter
-    const RE = 6378;           // km, Earth's equatorial radius
-    const ALT_MIN = 100;       // km
-    const ALT_MAX = 100000;    // km
-    const COLORS = {
-        ke: '#34d399',
-        pe: '#60a5fa',
-        total: '#e0b64f',
-        orbit: '#3a5a8c',
-        dim: '#64748b',
-        text: '#f0f4fa',
-        muted: '#94a3b8'
-    };
-    // Seconds of animation for one orbit. The motion follows Kepler's second law, so the
-    // spacecraft still moves fastest at perigee.
-    const SPEEDS = [
-        { period: 24, label: 'Slow' },
-        { period: 12, label: 'Normal' },
-        { period: 6, label: 'Fast' }
-    ];
-    const PRESETS = {
-        gto: { hp: 300, ha: 35786 },      // Transfer orbit to geostationary altitude
-        molniya: { hp: 600, ha: 39700 },  // A 12-hour, highly elliptical orbit
-        lesson: { hp: 500, ha: 1500 },    // The worked example in the 2-Body Motion lesson
-        circular: { hp: 1000, ha: 1000 }
-    };
-    const DEFAULT_PRESET = 'gto';
+    const wrap = (angle) => ((angle % TWO_PI) + TWO_PI) % TWO_PI;
 
-    /* State */
-    const state = {
-        hp: PRESETS[DEFAULT_PRESET].hp,
-        ha: PRESETS[DEFAULT_PRESET].ha,
-        preset: DEFAULT_PRESET,
-        M: 0,               // Mean anomaly, rad
-        playing: !Kit.prefersReducedMotion(),
-        speed: 1,
-        showVelocity: true,
-        showLabels: true
-    };
-
-    /* Orbit math */
-    function orbit() {
-        const Rp = RE + state.hp;
-        const Ra = RE + state.ha;
+    // The orbit set by perigee and apogee altitudes (km).
+    function orbitFromAltitudes(hp, ha) {
+        const Rp = RE + hp;
+        const Ra = RE + ha;
         const a = (Ra + Rp) / 2;
         const e = (Ra - Rp) / (Ra + Rp);
-        const p = a * (1 - e * e);
-        const eps = -MU / (2 * a);
-        const period = 2 * Math.PI * Math.sqrt(a * a * a / MU);
-        const speedAt = (R) => Math.sqrt(2 * (MU / R + eps));
+        const p = a * (1 - e * e);                       // semi-latus rectum
+        const eps = -MU / (2 * a);                       // specific mechanical energy
+        const period = TWO_PI * Math.sqrt(a * a * a / MU);
+        const speedAt = (R) => Math.sqrt(Math.max(0, 2 * (MU / R + eps)));   // energy equation
         return { Rp, Ra, a, e, p, eps, period, Vp: speedAt(Rp), Va: speedAt(Ra), speedAt };
     }
 
@@ -73,24 +40,24 @@
 
     function trueFromMean(M, e) {
         const E = eccentricAnomaly(M, e);
-        const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
-        return wrap(nu);
+        return wrap(2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(Math.max(1e-12, 1 - e)) * Math.cos(E / 2)));
     }
 
     function meanFromTrue(nu, e) {
-        const E = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(nu / 2), Math.sqrt(1 + e) * Math.cos(nu / 2));
+        const E = 2 * Math.atan2(Math.sqrt(Math.max(1e-12, 1 - e)) * Math.sin(nu / 2), Math.sqrt(1 + e) * Math.cos(nu / 2));
         return wrap(E - e * Math.sin(E));
     }
 
-    function wrap(angle) {
-        const t = 2 * Math.PI;
-        return ((angle % t) + t) % t;
+    // Point on the ellipse from eccentric anomaly E, perigee along +x. Even steps in E draw a smooth curve.
+    function ellipsePoint(o, E) {
+        return { x: o.a * (Math.cos(E) - o.e), y: o.a * Math.sqrt(Math.max(0, 1 - o.e * o.e)) * Math.sin(E) };
     }
 
-    // The spacecraft's state at true anomaly nu, in the orbit plane with perigee along +x.
+    // State at true anomaly nu, in the orbit plane with perigee along +x.
+    // Velocity components: v = sqrt(mu/p) [-sin nu, e + cos nu].
     function pointAt(o, nu) {
         const R = o.p / (1 + o.e * Math.cos(nu));
-        const vScale = Math.sqrt(MU / o.p);
+        const vScale = Math.sqrt(MU / Math.max(1e-6, o.p));
         const V = o.speedAt(R);
         return {
             nu, R, V,
@@ -98,19 +65,218 @@
             y: R * Math.sin(nu),
             vx: -vScale * Math.sin(nu),
             vy: vScale * (o.e + Math.cos(nu)),
-            ke: V * V / 2,
-            pe: -MU / R
+            ke: V * V / 2,      // specific kinetic energy
+            pe: -MU / R         // specific potential energy
         };
     }
 
-    /* Number formatting. Negative numbers use a true minus sign. */
+    /* ================================================================== */
+    /* RENDERING AND CONTROLS                                             */
+    /* ================================================================== */
+    const ALT_MIN = 100;       // km, slider limits
+    const ALT_MAX = 100000;    // km
+
+    const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
+    const $ = (id) => document.getElementById(id);
+    const Kit = window.ToolKit;
+
+    const statusEl = $('status');
+    function showStatus(text) {
+        if (statusEl) {
+            statusEl.style.display = 'flex';
+            statusEl.textContent = text;
+        }
+    }
+
+    showStatus('Loading the 3D view.');
+    let THREE;
+    try {
+        THREE = await import(THREE_URL);
+    } catch (err) {
+        showStatus('The 3D library could not be loaded. This tool needs an internet connection the first time it opens.');
+        return;
+    }
+
+    const COLORS = {
+        ke: '#34d399',
+        pe: '#60a5fa',
+        total: '#e0b64f',
+        orbit: 0x4a88d9,
+        apsides: 0x94a3b8,
+        craft: 0xffffff,
+        dim: '#64748b',
+        text: '#f0f4fa',
+        muted: '#94a3b8'
+    };
+
+    // Seconds of animation for one orbit at each speed setting.
+    // The spacecraft follows Kepler's second law, moving fastest at perigee.
+    const SPEEDS = [
+        { period: 24, label: 'Slow' },
+        { period: 12, label: 'Normal' },
+        { period: 6, label: 'Fast' }
+    ];
+
+    const PRESETS = {
+        gto: { hp: 300, ha: 35786 },      // Transfer orbit to geostationary altitude
+        molniya: { hp: 600, ha: 39700 },  // A 12-hour, highly elliptical orbit
+        lesson: { hp: 500, ha: 1500 },    // The worked example in the 2-Body Motion lesson
+        circular: { hp: 1000, ha: 1000 }
+    };
+    const DEFAULT_PRESET = 'gto';
+
+    /* Camera settings: fixed space-based (inertial) oblique view */
+    const HOME_VIEW = { az: -68, el: 52, zoom: 1 };
+    const FOV = 38;
+    const EARTH_SPIN_RATE = 10; // Degrees per second of simulation when playing
+
+    /* State */
+    const state = {
+        hp: PRESETS[DEFAULT_PRESET].hp,
+        ha: PRESETS[DEFAULT_PRESET].ha,
+        preset: DEFAULT_PRESET,
+        M: 0,               // Mean anomaly, rad
+        playing: !Kit.prefersReducedMotion(),
+        speed: 1,
+        spin: 0,            // Earth rotation angle (rad)
+        showVelocity: true,
+        showLabels: true
+    };
+    const camView = { ...HOME_VIEW };
+    const camFit = { cx: 0, radius: 6 };
+    let dirty = true;
+    const orbit = () => orbitFromAltitudes(state.hp, state.ha);
+
+    /* Number formatting */
     const fixed = (value, digits) => (value < 0 ? '−' : '') + Math.abs(value).toFixed(digits);
     const comma = (value) => Math.round(value).toLocaleString('en-US');
 
-    /* View */
-    const view = $('view');
-    const canvas = $('scene');
-    const ctx = canvas.getContext('2d');
+    /* 3D Scene & Renderer */
+    const orbitPane = $('orbit-pane');
+    const sceneCanvas = $('scene');
+    let renderer;
+    try {
+        renderer = new THREE.WebGLRenderer({ canvas: sceneCanvas, antialias: true });
+    } catch (err) {
+        showStatus('This browser could not start the 3D view. WebGL must be enabled to use this tool.');
+        return;
+    }
+    renderer.setClearColor(0x03060c);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 500);
+    camera.up.set(0, 0, 1);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.6);
+    sun.position.set(4, -5, 4);
+    scene.add(sun);
+
+    // Shared Earth and star field (Earth has radius 1.0, centered at origin, Z points north)
+    const earth = window.EarthScene.addEarth(THREE, renderer, scene);
+    const stars = window.EarthScene.addStars(THREE, scene);
+    if (statusEl) statusEl.style.display = 'none';
+
+    /* 3D Orbit curve tube */
+    const TUBE_SIDES = 6;
+    function makeTube(count, closed, color, opacity = 1) {
+        const positions = new Float32Array(count * TUBE_SIDES * 3);
+        const index = [];
+        const segments = closed ? count : count - 1;
+        for (let i = 0; i < segments; i++) {
+            const next = (i + 1) % count;
+            for (let s = 0; s < TUBE_SIDES; s++) {
+                const t = (s + 1) % TUBE_SIDES;
+                const a = i * TUBE_SIDES + s, b = i * TUBE_SIDES + t;
+                const c = next * TUBE_SIDES + s, d = next * TUBE_SIDES + t;
+                index.push(a, c, b, b, c, d);
+            }
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setIndex(index);
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+            color, side: THREE.DoubleSide, transparent: opacity < 1, opacity
+        }));
+        mesh.frustumCulled = false;
+        scene.add(mesh);
+        return { mesh, count, closed, xs: new Float64Array(count), ys: new Float64Array(count) };
+    }
+
+    function writeTube(tube, width) {
+        const { count, closed, xs, ys } = tube;
+        const attr = tube.mesh.geometry.attributes.position;
+        const out = attr.array;
+        let o = 0;
+        for (let i = 0; i < count; i++) {
+            const prev = closed ? (i - 1 + count) % count : Math.max(0, i - 1);
+            const next = closed ? (i + 1) % count : Math.min(count - 1, i + 1);
+            let nx = -(ys[next] - ys[prev]), ny = xs[next] - xs[prev];
+            const len = Math.hypot(nx, ny) || 1;
+            nx /= len;
+            ny /= len;
+            for (let s = 0; s < TUBE_SIDES; s++) {
+                const a = s / TUBE_SIDES * TWO_PI;
+                const ca = Math.cos(a) * width, sa = Math.sin(a) * width;
+                out[o++] = xs[i] + nx * ca;
+                out[o++] = ys[i] + ny * ca;
+                out[o++] = sa;
+            }
+        }
+        attr.needsUpdate = true;
+    }
+
+    /* 3D Straight lines (thin cylinders) */
+    const Y_AXIS = new THREE.Vector3(0, 1, 0);
+    const NEG_Y_AXIS = new THREE.Vector3(0, -1, 0);
+    const lineGeometry = new THREE.CylinderGeometry(1, 1, 1, 8).translate(0, 0.5, 0);
+    function makeLine(color, opacity = 1) {
+        const mesh = new THREE.Mesh(lineGeometry, new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity }));
+        scene.add(mesh);
+        return mesh;
+    }
+
+    const direction = new THREE.Vector3();
+    function setLine(mesh, x0, y0, x1, y1, width) {
+        direction.set(x1 - x0, y1 - y0, 0);
+        const len = direction.length() || 1e-6;
+        mesh.position.set(x0, y0, 0);
+        mesh.quaternion.setFromUnitVectors(Y_AXIS, direction.divideScalar(len));
+        mesh.scale.set(width, len, width);
+    }
+
+    function makeDot(color) {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color }));
+        scene.add(mesh);
+        return mesh;
+    }
+
+    /* Orbit parts in scene coordinates (Earth radii) */
+    const ORBIT_POINTS = 360;
+    const orbitTube = makeTube(ORBIT_POINTS, true, COLORS.orbit, 0.95);
+    const apsisLine = makeLine(COLORS.apsides, 0.4);
+    const radiusLine = makeLine(0xcbd5e1, 0.5);
+    const craft = makeDot(COLORS.craft);
+    const perigeeDot = makeDot(0x34d399);
+    const apogeeDot = makeDot(0x60a5fa);
+
+    /* Velocity arrows */
+    const velArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, 0x34d399, 0.2, 0.12);
+    scene.add(velArrow);
+
+    function makeGhostArrow() {
+        const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, 0x34d399, 0.2, 0.12);
+        arrow.line.material.transparent = true;
+        arrow.line.material.opacity = 0.35;
+        arrow.cone.material.transparent = true;
+        arrow.cone.material.opacity = 0.35;
+        scene.add(arrow);
+        return arrow;
+    }
+    const periArrow = makeGhostArrow();
+    const apoArrow = makeGhostArrow();
+
+    /* Labels */
     const hud = $('hud');
     const layer = new Kit.LabelLayer($('labels'));
     const labels = {
@@ -119,308 +285,304 @@
         apogee: layer.add('<b>Apogee</b><span class="hint">slowest</span>', { rank: 1 }),
         earth: layer.add('<b>Earth</b>', { rank: 3, optional: true })
     };
-    let craftLabelText = '';
-    let W = 1, H = 1;
-    let dirty = true;
+    const earthLabelPos = new THREE.Vector3(0, 0, 1.08);
 
-    function setCraftLabel(text) {
-        if (text === craftLabelText) return;
-        craftLabelText = text;
-        labels.craft.el.innerHTML = text;
-        labels.craft.width = 0; // Measure again, because the text changed
+    const projected = new THREE.Vector3();
+    const toPoint = new THREE.Vector3();
+    const SPHERE_RADIUS = 1.0;
+
+    function isBlocked(point) {
+        toPoint.copy(point).sub(camera.position);
+        const distance = toPoint.length();
+        toPoint.divideScalar(distance);
+        const along = -camera.position.dot(toPoint);
+        const offCenter = camera.position.lengthSq() - along * along;
+        if (offCenter >= SPHERE_RADIUS * SPHERE_RADIUS) return false;
+        const entry = along - Math.sqrt(SPHERE_RADIUS * SPHERE_RADIUS - offCenter);
+        return entry > 0 && entry < distance;
     }
 
-    // Splits the view into the orbit area and the energy chart. Wide views put the chart on
-    // the right, and tall views put it below. The status box is kept clear of both.
-    function layout() {
-        const hudBox = Kit.overlayBox(hud, view);
-        const reserveTop = (x0, x1) => {
-            if (!hudBox) return 0;
-            const overlaps = hudBox.x < x1 && hudBox.x + hudBox.w > x0;
-            return overlaps ? hudBox.y + hudBox.h + 4 : 0;
-        };
-        if (W >= H * 1.05) {
-            const chartW = Math.min(320, Math.max(200, W * 0.32));
-            const orbitBox = { x: 0, y: 0, w: W - chartW, h: H };
-            const chartBox = { x: W - chartW, y: 0, w: chartW, h: H };
-            orbitBox.top = reserveTop(orbitBox.x, orbitBox.x + orbitBox.w);
-            chartBox.top = reserveTop(chartBox.x, chartBox.x + chartBox.w);
-            return { orbitBox, chartBox, wide: true };
+    function showLabel(label, point) {
+        if (isBlocked(point)) return;
+        projected.copy(point).project(camera);
+        if (projected.z < -1 || projected.z > 1) return;
+        layer.show(label, (projected.x + 1) * 0.5 * viewW, (1 - projected.y) * 0.5 * viewH);
+    }
+
+    /* Camera framing */
+    function fitFor(aKm, e) {
+        const a = aKm / RE;
+        const b = a * Math.sqrt(Math.max(0, 1 - e * e));
+        const ra = a * (1 + e);
+        const rp = a * (1 - e);
+        const xMin = -ra;
+        const xMax = Math.max(rp, 1.2);
+        const cx = (xMin + xMax) / 2;
+        const radius = Math.max((xMax - xMin) / 2, b, 1.8);
+        return { cx, radius };
+    }
+
+    const target = new THREE.Vector3();
+    let viewW = 1, viewH = 1, camDistance = 20;
+
+    function easeCamera(seconds) {
+        const o = orbit();
+        const goal = fitFor(o.a, o.e);
+        const k = seconds < 0 ? 1 : 1 - Math.exp(-seconds * 5);
+        camFit.cx += (goal.cx - camFit.cx) * k;
+        camFit.radius += (goal.radius - camFit.radius) * k;
+        return Math.abs(goal.cx - camFit.cx) > 1e-3 || Math.abs(goal.radius / camFit.radius - 1) > 1e-3;
+    }
+
+    function updateCamera() {
+        const vertical = Math.sin(FOV / 2 * D2R);
+        const horizontal = Math.sin(Math.atan(Math.tan(FOV / 2 * D2R) * viewW / viewH));
+        const fitRatio = Math.min(vertical, horizontal) || 1e-4;
+        camDistance = (camFit.radius * 1.15 / fitRatio) * camView.zoom;
+        target.set(camFit.cx, 0, 0);
+
+        const el = camView.el * D2R, az = camView.az * D2R;
+        camera.position.set(
+            target.x + camDistance * Math.cos(el) * Math.cos(az),
+            camDistance * Math.cos(el) * Math.sin(az),
+            camDistance * Math.sin(el)
+        );
+        const fromCenter = camera.position.length();
+        if (fromCenter < 1.4) camera.position.multiplyScalar(1.4 / fromCenter);
+
+        camera.lookAt(target);
+        camera.near = Math.max(0.02, camDistance * 0.005);
+        camera.far = camDistance * 8 + 30;
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld();
+    }
+
+    const perPixel = () => 2 * camera.position.distanceTo(target) * Math.tan(FOV / 2 * D2R) / viewH;
+    const vDir = new THREE.Vector3();
+
+    function updateScene(o, now) {
+        const px = perPixel();
+        const lineWidth = px * 1.4;
+
+        // Populate orbit tube
+        for (let i = 0; i < ORBIT_POINTS; i++) {
+            const p = ellipsePoint(o, i / ORBIT_POINTS * TWO_PI);
+            orbitTube.xs[i] = p.x / RE;
+            orbitTube.ys[i] = p.y / RE;
         }
-        const chartH = Math.min(260, Math.max(150, H * 0.4));
-        const orbitBox = { x: 0, y: 0, w: W, h: H - chartH };
-        const chartBox = { x: 0, y: H - chartH, w: W, h: chartH };
-        orbitBox.top = reserveTop(0, W);
-        chartBox.top = 0;
-        return { orbitBox, chartBox, wide: false };
-    }
+        writeTube(orbitTube, lineWidth * 1.3);
 
-    function arrow(x0, y0, x1, y1, color, width) {
-        const dx = x1 - x0, dy = y1 - y0;
-        const len = Math.hypot(dx, dy);
-        if (len < 1) return;
-        const ux = dx / len, uy = dy / len;
-        const head = Math.min(10, len * 0.45);
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
-        ctx.lineWidth = width;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.lineTo(x1 - ux * head * 0.8, y1 - uy * head * 0.8);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x1 - ux * head - uy * head * 0.5, y1 - uy * head + ux * head * 0.5);
-        ctx.lineTo(x1 - ux * head + uy * head * 0.5, y1 - uy * head - ux * head * 0.5);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    function drawOrbit(o, now, box) {
-        const margin = 34;
-        const top = box.y + Math.max(box.top, 0);
-        const h = box.h - (top - box.y);
-        const b = o.a * Math.sqrt(1 - o.e * o.e);
-        const s = Math.max(1e-6, Math.min((box.w - 2 * margin) / (2 * o.a), (h - 2 * margin) / (2 * b)));
-        const centerX = box.x + box.w / 2;
-        const centerY = top + h / 2;
-        // Earth sits at the focus, which is a*e from the ellipse's center toward perigee.
-        const fx = centerX + s * o.a * o.e;
-        const fy = centerY;
-        const toScreen = (x, y) => [fx + s * x, fy - s * y];
-
-        // Earth
-        const earthR = Math.max(3, s * RE);
-        const glow = ctx.createRadialGradient(fx - earthR * 0.3, fy - earthR * 0.3, earthR * 0.1, fx, fy, earthR);
-        glow.addColorStop(0, '#3b82f6');
-        glow.addColorStop(1, '#1e3a8a');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(fx, fy, earthR, 0, 2 * Math.PI);
-        ctx.fill();
+        const rp = o.Rp / RE;
+        const ra = o.Ra / RE;
+        const cx = now.x / RE;
+        const cy = now.y / RE;
 
         // Line of apsides
-        const [px, py] = toScreen(o.Rp, 0);
-        const [ax, ay] = toScreen(-o.Ra, 0);
-        ctx.setLineDash([4, 5]);
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(ax, ay);
-        ctx.lineTo(px, py);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        setLine(apsisLine, -ra, 0, rp, 0, lineWidth * 0.7);
+        apsisLine.visible = o.e > 0.0005;
 
-        // Orbit path
-        ctx.strokeStyle = COLORS.orbit;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.ellipse(centerX, centerY, s * o.a, s * b, 0, 0, 2 * Math.PI);
-        ctx.stroke();
+        // Radius line from Earth center to craft
+        setLine(radiusLine, 0, 0, cx, cy, lineWidth * 0.8);
 
-        // Velocity arrows. The perigee arrow sets the scale, so arrow lengths compare speeds.
-        const maxArrow = Math.max(24, Math.min(box.w, h) * 0.2);
-        const arrowFor = (pt) => {
-            const [sx, sy] = toScreen(pt.x, pt.y);
-            const len = maxArrow * pt.V / o.Vp;
-            const vlen = Math.hypot(pt.vx, pt.vy);
-            return [sx, sy, sx + len * pt.vx / vlen, sy - len * pt.vy / vlen];
-        };
-        if (state.showVelocity && o.e > 0.0005) {
-            for (const nu of [0, Math.PI]) {
-                const [x0, y0, x1, y1] = arrowFor(pointAt(o, nu));
-                arrow(x0, y0, x1, y1, 'rgba(52, 211, 153, 0.35)', 1.5);
-            }
-        }
+        // Craft
+        craft.position.set(cx, cy, 0);
+        craft.scale.setScalar(px * 5.5);
 
         // Apse markers
-        for (const [x, y, color] of [[px, py, COLORS.ke], [ax, ay, COLORS.pe]]) {
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, 2 * Math.PI);
-            ctx.fill();
-        }
+        perigeeDot.position.set(rp, 0, 0);
+        perigeeDot.scale.setScalar(px * 3.8);
+        perigeeDot.visible = o.e > 0.0005;
 
-        // Radius line and spacecraft
-        const [cx, cy] = toScreen(now.x, now.y);
-        ctx.strokeStyle = 'rgba(203, 213, 225, 0.55)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 4]);
-        ctx.beginPath();
-        ctx.moveTo(fx, fy);
-        ctx.lineTo(cx, cy);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        apogeeDot.position.set(-ra, 0, 0);
+        apogeeDot.scale.setScalar(px * 3.8);
+        apogeeDot.visible = o.e > 0.0005;
 
+        // Velocity arrow
         if (state.showVelocity) {
-            const [x0, y0, x1, y1] = arrowFor(now);
-            arrow(x0, y0, x1, y1, COLORS.ke, 2.5);
+            const vLen = Math.hypot(now.vx, now.vy) || 1e-6;
+            vDir.set(now.vx / vLen, now.vy / vLen, 0);
+            const maxArrow = px * 48;
+            const arrowLen = Math.max(px * 8, maxArrow * (now.V / o.Vp));
+            const headLen = Math.min(arrowLen * 0.42, px * 11);
+            velArrow.position.set(cx, cy, 0);
+            velArrow.setDirection(vDir);
+            velArrow.setLength(arrowLen, headLen, headLen * 0.65);
+            velArrow.visible = true;
+
+            if (o.e > 0.0005) {
+                const headP = Math.min(maxArrow * 0.42, px * 11);
+                periArrow.position.set(rp, 0, 0);
+                periArrow.setDirection(Y_AXIS);
+                periArrow.setLength(maxArrow, headP, headP * 0.65);
+                periArrow.visible = true;
+
+                const apoArrowLen = Math.max(px * 8, maxArrow * (o.Va / o.Vp));
+                const headA = Math.min(apoArrowLen * 0.42, px * 11);
+                apoArrow.position.set(-ra, 0, 0);
+                apoArrow.setDirection(NEG_Y_AXIS);
+                apoArrow.setLength(apoArrowLen, headA, headA * 0.65);
+                apoArrow.visible = true;
+            } else {
+                periArrow.visible = false;
+                apoArrow.visible = false;
+            }
+        } else {
+            velArrow.visible = false;
+            periArrow.visible = false;
+            apoArrow.visible = false;
         }
-
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(cx, cy, 6, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.strokeStyle = '#03060c';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        return {
-            craft: [cx, cy], perigee: [px, py], apogee: [ax, ay], earth: [fx, fy - earthR],
-            earthBox: { x: fx - earthR, y: fy - earthR, w: 2 * earthR, h: 2 * earthR }
-        };
     }
 
-    function drawChart(o, now, box) {
-        const pad = 14;
-        const top = box.y + Math.max(box.top, 0) + 12;
-        const titleH = 22;
-        const footH = 40;
-        const plotTop = top + titleH;
-        const plotBottom = box.y + box.h - footH;
-        const plotH = Math.max(20, plotBottom - plotTop);
-        const left = box.x + pad;
-        const right = box.x + box.w - pad;
+    function updateLabels(o, now) {
+        labels.craft.el.innerHTML = `<b>V</b> ${now.V.toFixed(2)} km/s`;
+        labels.craft.width = 0;
 
-        // Divider between the orbit and the chart
-        ctx.strokeStyle = 'rgba(28, 46, 74, 0.9)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        if (box.x > 0) {
-            ctx.moveTo(box.x + 0.5, box.y + 10);
-            ctx.lineTo(box.x + 0.5, box.y + box.h - 10);
-        } else {
-            ctx.moveTo(box.x + 10, box.y + 0.5);
-            ctx.lineTo(box.x + box.w - 10, box.y + 0.5);
+        layer.begin();
+        if (state.showLabels) {
+            showLabel(labels.craft, craft.position);
+            if (o.e > 0.0005) {
+                showLabel(labels.perigee, perigeeDot.position);
+                showLabel(labels.apogee, apogeeDot.position);
+            }
+            showLabel(labels.earth, earthLabelPos);
         }
-        ctx.stroke();
+        layer.place(viewW, viewH, []);
+    }
 
-        ctx.font = '600 12px Inter, sans-serif';
-        ctx.fillStyle = COLORS.muted;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText('Specific energy (km²/s²)', left, top + 12);
+    /* 2D Energy Chart */
+    const chartPane = $('chart-pane');
+    const chartCanvas = $('chart');
+    const chartCtx = chartCanvas.getContext('2d');
+    let chartW = 1, chartH = 1;
 
-        // The scale runs from the perigee kinetic energy down to the perigee potential energy,
-        // the largest values on this orbit.
-        const keMax = o.Vp * o.Vp / 2;
-        const peMin = -MU / o.Rp;
-        const yOf = (value) => plotTop + (keMax - value) / (keMax - peMin) * plotH;
+    function drawChart(o, now) {
+        if (!chartCtx || chartW <= 1 || chartH <= 1) return;
+        const g = chartCtx;
+        g.clearRect(0, 0, chartW, chartH);
+
+        const pad = 14;
+        const top = 10;
+        const titleH = 22;
+        const footH = 46;
+        const plotTop = top + titleH;
+        const plotBottom = chartH - footH;
+        const plotH = Math.max(20, plotBottom - plotTop);
+        const left = pad;
+        const right = chartW - pad;
+
+        g.font = '600 12px Inter, sans-serif';
+        g.fillStyle = COLORS.muted;
+        g.textAlign = 'left';
+        g.textBaseline = 'alphabetic';
+        g.fillText('Specific energy (km²/s²)', left, top + 14);
+
+        // Scale runs from perigee kinetic energy down to perigee potential energy
+        const peri = pointAt(o, 0), apo = pointAt(o, Math.PI);
+        const keMax = peri.ke;
+        const peMin = peri.pe;
+        const span = Math.max(1e-6, keMax - peMin);
+        const yOf = (value) => plotTop + (keMax - value) / span * plotH;
         const y0 = yOf(0);
 
         const columns = [
-            { key: 'ke', name: 'sKE', value: now.ke, color: COLORS.ke, perigee: o.Vp * o.Vp / 2, apogee: o.Va * o.Va / 2 },
-            { key: 'pe', name: 'sPE', value: now.pe, color: COLORS.pe, perigee: -MU / o.Rp, apogee: -MU / o.Ra },
+            { key: 'ke', name: 'sKE', value: now.ke, color: COLORS.ke, perigee: peri.ke, apogee: apo.ke },
+            { key: 'pe', name: 'sPE', value: now.pe, color: COLORS.pe, perigee: peri.pe, apogee: apo.pe },
             { key: 'total', name: 'ε', value: o.eps, color: COLORS.total }
         ];
         const slot = (right - left) / columns.length;
         const barW = Math.min(46, slot * 0.46);
 
         // Zero line
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(left, y0);
-        ctx.lineTo(right, y0);
-        ctx.stroke();
-        ctx.font = '11px "JetBrains Mono", monospace';
-        ctx.fillStyle = COLORS.dim;
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('0', right, y0 - 2);
+        g.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(left, y0);
+        g.lineTo(right, y0);
+        g.stroke();
+        g.font = '11px "JetBrains Mono", monospace';
+        g.fillStyle = COLORS.dim;
+        g.textAlign = 'right';
+        g.textBaseline = 'bottom';
+        g.fillText('0', right, y0 - 2);
 
         // The total stays fixed, so its level is drawn across the whole chart.
         const yEps = yOf(o.eps);
-        ctx.strokeStyle = 'rgba(224, 182, 79, 0.55)';
-        ctx.setLineDash([5, 4]);
-        ctx.beginPath();
-        ctx.moveTo(left, yEps);
-        ctx.lineTo(right, yEps);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        g.strokeStyle = 'rgba(224, 182, 79, 0.55)';
+        g.setLineDash([5, 4]);
+        g.beginPath();
+        g.moveTo(left, yEps);
+        g.lineTo(right, yEps);
+        g.stroke();
+        g.setLineDash([]);
 
         columns.forEach((col, i) => {
             const cx = left + slot * (i + 0.5);
             const x = cx - barW / 2;
 
-            // The range swept between perigee and apogee
-            if (col.perigee !== undefined) {
+            // Range swept between perigee and apogee
+            if (col.perigee !== undefined && o.e > 0.0005) {
                 const yA = yOf(col.apogee), yP = yOf(col.perigee);
-                ctx.fillStyle = 'rgba(148, 163, 184, 0.07)';
-                ctx.fillRect(x - 6, Math.min(yA, yP), barW + 12, Math.abs(yP - yA));
+                g.fillStyle = 'rgba(148, 163, 184, 0.08)';
+                g.fillRect(x - 6, Math.min(yA, yP), barW + 12, Math.abs(yP - yA));
             }
 
             const yV = yOf(col.value);
-            ctx.fillStyle = col.color;
-            ctx.globalAlpha = 0.85;
-            ctx.fillRect(x, Math.min(y0, yV), barW, Math.max(1, Math.abs(yV - y0)));
-            ctx.globalAlpha = 1;
+            g.fillStyle = col.color;
+            g.globalAlpha = 0.85;
+            g.fillRect(x, Math.min(y0, yV), barW, Math.max(1, Math.abs(yV - y0)));
+            g.globalAlpha = 1;
 
             // Perigee and apogee marks
             if (col.perigee !== undefined && o.e > 0.0005) {
-                ctx.font = '600 10px Inter, sans-serif';
-                ctx.textBaseline = 'middle';
+                g.font = '600 10px Inter, sans-serif';
+                g.textBaseline = 'middle';
                 for (const [value, tag] of [[col.perigee, 'P'], [col.apogee, 'A']]) {
                     const y = yOf(value);
-                    ctx.strokeStyle = '#cbd5e1';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(x - 6, y);
-                    ctx.lineTo(x + barW + 6, y);
-                    ctx.stroke();
-                    ctx.fillStyle = '#cbd5e1';
-                    ctx.textAlign = 'left';
-                    ctx.fillText(tag, x + barW + 9, y);
+                    g.strokeStyle = '#cbd5e1';
+                    g.lineWidth = 1;
+                    g.beginPath();
+                    g.moveTo(x - 6, y);
+                    g.lineTo(x + barW + 6, y);
+                    g.stroke();
+                    g.fillStyle = '#cbd5e1';
+                    g.textAlign = 'left';
+                    g.fillText(tag, x + barW + 9, y);
                 }
             }
 
             // Name and value beneath the plot
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'alphabetic';
-            ctx.font = '600 12px "JetBrains Mono", monospace';
-            ctx.fillStyle = col.color;
-            ctx.fillText(col.name, cx, plotBottom + 17);
-            ctx.font = '12px "JetBrains Mono", monospace';
-            ctx.fillStyle = COLORS.text;
-            ctx.fillText(fixed(col.value, 2), cx, plotBottom + 33);
+            g.textAlign = 'center';
+            g.textBaseline = 'alphabetic';
+            g.font = '600 12px "JetBrains Mono", monospace';
+            g.fillStyle = col.color;
+            g.fillText(col.name, cx, plotBottom + 17);
+            g.font = '12px "JetBrains Mono", monospace';
+            g.fillStyle = COLORS.text;
+            g.fillText(fixed(col.value, 2), cx, plotBottom + 33);
         });
 
         // Plus and equals signs between the columns, read as sKE + sPE = ε
-        ctx.font = '600 13px Inter, sans-serif';
-        ctx.fillStyle = COLORS.muted;
-        ctx.textAlign = 'center';
-        ctx.fillText('+', left + slot, plotBottom + 17);
-        ctx.fillText('=', left + slot * 2, plotBottom + 17);
+        g.font = '600 13px Inter, sans-serif';
+        g.fillStyle = COLORS.muted;
+        g.textAlign = 'center';
+        g.fillText('+', left + slot, plotBottom + 17);
+        g.fillText('=', left + slot * 2, plotBottom + 17);
     }
 
-    function draw() {
+    function renderFrame() {
         const o = orbit();
         const now = pointAt(o, trueFromMean(state.M, o.e));
 
-        ctx.fillStyle = '#03060c';
-        ctx.fillRect(0, 0, W, H);
-
-        const { orbitBox, chartBox } = layout();
-        const spots = drawOrbit(o, now, orbitBox);
-        drawChart(o, now, chartBox);
-
-        setCraftLabel(`<b>V</b> ${now.V.toFixed(2)} km/s`);
-        layer.begin();
-        if (state.showLabels) {
-            layer.show(labels.craft, ...spots.craft);
-            if (o.e > 0.0005) {
-                layer.show(labels.perigee, ...spots.perigee);
-                layer.show(labels.apogee, ...spots.apogee);
-            }
-            layer.show(labels.earth, ...spots.earth);
-        }
-        // Labels keep off the chart, and off Earth, which nearly touches perigee on low orbits.
-        layer.place(W, H, [Kit.overlayBox(hud, view), spots.earthBox, chartBox]);
-
+        updateScene(o, now);
+        updateCamera();
+        stars.follow(camera);
+        renderer.render(scene, camera);
+        updateLabels(o, now);
+        drawChart(o, now);
         updatePanels(o, now);
     }
 
-    /* Panels */
+    /* Panels & HUD */
     function updatePanels(o, now) {
         const peri = pointAt(o, 0);
         const apo = pointAt(o, Math.PI);
@@ -481,7 +643,6 @@
     }
 
     /* Controls */
-    // The altitude sliders use a logarithmic scale, so low orbits get as much travel as high ones.
     const altFromSlider = (value) => ALT_MIN * Math.pow(ALT_MAX / ALT_MIN, value / 1000);
     const sliderFromAlt = (alt) => Math.round(1000 * Math.log(alt / ALT_MIN) / Math.log(ALT_MAX / ALT_MIN));
     const roundAlt = (alt) => alt < 2000 ? Math.round(alt / 10) * 10 : Math.round(alt / 100) * 100;
@@ -500,7 +661,6 @@
         }
     }
 
-    // Changing the orbit keeps the spacecraft at the same true anomaly.
     function setAltitude(key, value) {
         const nu = trueFromMean(state.M, orbit().e);
         state[key] = value;
@@ -574,7 +734,13 @@
     $('reset').addEventListener('click', () => {
         state.M = 0;
         applyPreset(DEFAULT_PRESET);
+        Object.assign(camView, HOME_VIEW);
         setPlaying(!Kit.prefersReducedMotion());
+        dirty = true;
+    });
+    $('reset-view').addEventListener('click', () => {
+        Object.assign(camView, HOME_VIEW);
+        dirty = true;
     });
     $('speed').addEventListener('input', (event) => {
         state.speed = Number(event.target.value);
@@ -589,26 +755,89 @@
         dirty = true;
     });
 
+    /* Rotating and zooming the view */
+    const hint = $('view-hint');
+    const pointers = new Map();
+    let pinchStart = 0, pinchZoom = 1;
+    const clampZoom = (z) => Math.min(3.5, Math.max(0.3, z));
+
+    sceneCanvas.style.touchAction = 'none';
+    sceneCanvas.style.cursor = 'grab';
+
+    sceneCanvas.addEventListener('pointerdown', (e) => {
+        sceneCanvas.setPointerCapture(e.pointerId);
+        sceneCanvas.style.cursor = 'grabbing';
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size === 2) {
+            const [p1, p2] = [...pointers.values()];
+            pinchStart = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+            pinchZoom = camView.zoom;
+        }
+        if (hint) hint.style.display = 'none';
+    });
+
+    sceneCanvas.addEventListener('pointermove', (e) => {
+        const last = pointers.get(e.pointerId);
+        if (!last) return;
+        if (pointers.size === 1) {
+            camView.az -= (e.clientX - last.x) * 0.35;
+            camView.el = Math.min(86, Math.max(-86, camView.el + (e.clientY - last.y) * 0.3));
+        }
+        last.x = e.clientX;
+        last.y = e.clientY;
+        if (pointers.size === 2 && pinchStart > 0) {
+            const [p1, p2] = [...pointers.values()];
+            camView.zoom = clampZoom((pinchZoom * pinchStart) / Math.hypot(p1.x - p2.x, p1.y - p2.y));
+        }
+        dirty = true;
+    });
+
+    const removePointer = (e) => {
+        pointers.delete(e.pointerId);
+        if (pointers.size === 0) sceneCanvas.style.cursor = 'grab';
+    };
+    sceneCanvas.addEventListener('pointerup', removePointer);
+    sceneCanvas.addEventListener('pointercancel', removePointer);
+
+    sceneCanvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        camView.zoom = clampZoom(camView.zoom * Math.exp(e.deltaY * 0.0012));
+        dirty = true;
+    }, { passive: false });
+
     /* Start */
     $('speed-value').textContent = SPEEDS[state.speed].label;
     showAltitudes();
     setPlaying(state.playing);
+    Object.assign(camFit, fitFor(orbit().a, orbit().e));
 
-    Kit.observeSize(view, (width, height) => {
-        W = width;
-        H = height;
-        Kit.fitCanvas2D(canvas, ctx, W, H);
+    Kit.observeSize(orbitPane, (w, h) => {
+        viewW = w;
+        viewH = h;
+        renderer.setSize(w, h, false);
         layer.remeasure();
-        draw(); // Resizing clears the canvas, so draw at once to avoid a blank frame.
+        dirty = true;
+        renderFrame();
+    });
+
+    Kit.observeSize(chartPane, (w, h) => {
+        chartW = w;
+        chartH = h;
+        Kit.fitCanvas2D(chartCanvas, chartCtx, w, h);
+        drawChart(orbit(), pointAt(orbit(), trueFromMean(state.M, orbit().e)));
     });
 
     Kit.startLoop((seconds) => {
         if (state.playing) {
             state.M = wrap(state.M + 2 * Math.PI * seconds / SPEEDS[state.speed].period);
+            state.spin = (state.spin + seconds * (EARTH_SPIN_RATE * D2R)) % TWO_PI;
+            earth.pivot.rotation.z = state.spin;
             dirty = true;
         }
+        if (easeCamera(seconds)) dirty = true;
+
         if (!dirty) return;
         dirty = false;
-        draw();
+        renderFrame();
     });
 })();

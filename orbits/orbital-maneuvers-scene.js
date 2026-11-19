@@ -8,8 +8,75 @@
     'use strict';
 
     const Kit = global.ToolKit;
+
+    /* ================================================================== */
+    /* ORBIT GEOMETRY MATH                                                */
+    /* Positions on circular orbits and on the Hohmann transfer ellipse.  */
+    /* Distances in any length unit; angles in degrees. u is the argument */
+    /* of latitude, measured from the ascending node.                     */
+    /* ================================================================== */
     const D2R = Math.PI / 180;
     const R2D = 180 / Math.PI;
+
+    // Position on an orbit of radius r in the plane (inc, raan), at argument of latitude u.
+    function orbitPosition(r, inc, raan, u) {
+        const i = inc * D2R, o = raan * D2R, a = u * D2R;
+        return {
+            x: r * (Math.cos(o) * Math.cos(a) - Math.sin(o) * Math.sin(a) * Math.cos(i)),
+            y: r * (Math.sin(o) * Math.cos(a) + Math.cos(o) * Math.sin(a) * Math.cos(i)),
+            z: r * Math.sin(a) * Math.sin(i)
+        };
+    }
+
+    // Unit vector along the direction of motion there (d position / du).
+    function orbitDirection(inc, raan, u) {
+        const i = inc * D2R, o = raan * D2R, a = u * D2R;
+        return {
+            x: -Math.cos(o) * Math.sin(a) - Math.sin(o) * Math.cos(a) * Math.cos(i),
+            y: -Math.sin(o) * Math.sin(a) + Math.cos(o) * Math.cos(a) * Math.cos(i),
+            z: Math.cos(a) * Math.sin(i)
+        };
+    }
+
+    // Unit normal of the plane (direction of the angular momentum).
+    const orbitNormal = (inc, raan) => ({
+        x: Math.sin(raan * D2R) * Math.sin(inc * D2R),
+        y: -Math.cos(raan * D2R) * Math.sin(inc * D2R),
+        z: Math.cos(inc * D2R)
+    });
+
+    // Hohmann transfer between radii R1 and R2. eSigned < 0 when lowering, so that u = 0 is
+    // always the start at R1 and u = 180 the end at R2.
+    function transferEllipse(R1, R2) {
+        const a = (R1 + R2) / 2;
+        const eSigned = (R2 - R1) / (R1 + R2);
+        const p = a * (1 - eSigned * eSigned);
+        return { a, eSigned, p, radiusAt: (u) => p / (1 + eSigned * Math.cos(u * D2R)) };
+    }
+
+    // Angle u flown on the transfer after the share t (0 to 1) of its flight time,
+    // from Kepler's equation M = E - e sin E. The spacecraft is fastest near perigee.
+    function transferU(t, eSigned) {
+        if (t <= 0) return 0;
+        if (t >= 1) return 180;
+        const e = Math.abs(eSigned), raise = eSigned >= 0;
+        const M = Math.PI * (raise ? t : 1 + t);
+        let E = M;
+        for (let k = 0; k < 12; k++) {
+            const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+            E -= step;
+            if (Math.abs(step) < 1e-10) break;
+        }
+        const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+        return ((nu * R2D + 360) % 360) - (raise ? 0 : 180);
+    }
+
+    // Pure plane change at speed v through angle theta: dV = 2 v sin(theta/2).
+    const planeChangeDv = (v, thetaDeg) => 2 * v * Math.sin(thetaDeg * D2R / 2);
+
+    /* ================================================================== */
+    /* TIMELINE, SCENE, AND CAMERA                                        */
+    /* ================================================================== */
 
     /* Timeline --------------------------------------------------------- */
     // The parts of the timeline for a maneuver, each with its start and end, from 0 to 1. Both
@@ -432,26 +499,9 @@
         const degText = (x) => `${x.toFixed(1)}°`;
 
         /* Orbit geometry --------------------------------------------------- */
-        function orbitPoint(r, inc, raan, u, out = new THREE.Vector3()) {
-            const i = inc * D2R, o = raan * D2R, a = u * D2R;
-            return out.set(
-                r * (Math.cos(o) * Math.cos(a) - Math.sin(o) * Math.sin(a) * Math.cos(i)),
-                r * (Math.sin(o) * Math.cos(a) + Math.cos(o) * Math.sin(a) * Math.cos(i)),
-                r * Math.sin(a) * Math.sin(i)
-            );
-        }
-
-        function orbitTangent(inc, raan, u, out = new THREE.Vector3()) {
-            const i = inc * D2R, o = raan * D2R, a = u * D2R;
-            return out.set(
-                -Math.cos(o) * Math.sin(a) - Math.sin(o) * Math.cos(a) * Math.cos(i),
-                -Math.sin(o) * Math.sin(a) + Math.cos(o) * Math.cos(a) * Math.cos(i),
-                Math.cos(a) * Math.sin(i)
-            ).normalize();
-        }
-
-        const planeNormal = (inc, raan) => new THREE.Vector3(
-            Math.sin(raan * D2R) * Math.sin(inc * D2R), -Math.cos(raan * D2R) * Math.sin(inc * D2R), Math.cos(inc * D2R));
+        const orbitPoint = (r, inc, raan, u, out = new THREE.Vector3()) => out.copy(orbitPosition(r, inc, raan, u));
+        const orbitTangent = (inc, raan, u, out = new THREE.Vector3()) => out.copy(orbitDirection(inc, raan, u)).normalize();
+        const planeNormal = (inc, raan) => new THREE.Vector3().copy(orbitNormal(inc, raan));
         const ring = (r, inc, raan) => (t, out) => orbitPoint(r, inc, raan, t * 360, out);
         const ringSample = (r, inc, raan, from = 0, to = 360, count = 36) =>
             Array.from({ length: count + 1 }, (_, k) => orbitPoint(r, inc, raan, from + ((to - from) * k) / count));
@@ -542,23 +592,6 @@
             return [orbitTangent(incBefore, 0, u).multiplyScalar(vBefore * scale), orbitTangent(incAfter, 0, u).multiplyScalar(vAfter * scale)];
         }
 
-        // True anomaly on the transfer, from the share of the transfer time flown. The spacecraft
-        // is fastest near perigee.
-        function transferU(t, eSigned) {
-            if (t <= 0) return 0;
-            if (t >= 1) return 180;
-            const e = Math.abs(eSigned), raise = eSigned >= 0;
-            const M = Math.PI * (raise ? t : 1 + t);
-            let E = M;
-            for (let k = 0; k < 12; k++) {
-                const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-                E -= step;
-                if (Math.abs(step) < 1e-10) break;
-            }
-            const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
-            return ((nu * R2D + 360) % 360) - (raise ? 0 : 180);
-        }
-
         // Share of a path's length covered by its parameter x, for drawing a tube up to a point.
         function lengthTable(pointAt) {
             const N = 180, lengths = [0];
@@ -592,8 +625,8 @@
             const incEnd = separate && raise ? i1 : i2;          // Just after burn 2
             const noTransfer = Math.abs(R1 - R2) < 1e-6;
 
-            const a = (R1 + R2) / 2, eSigned = (R2 - R1) / (R1 + R2), p = a * (1 - eSigned * eSigned);
-            const transferAt = (u, out = new THREE.Vector3()) => orbitPoint(p / (1 + eSigned * Math.cos(u * D2R)), iTransfer, 0, u, out);
+            const { eSigned, radiusAt } = transferEllipse(R1, R2);
+            const transferAt = (u, out = new THREE.Vector3()) => orbitPoint(radiusAt(u), iTransfer, 0, u, out);
             const transferHalf = (t, out) => transferAt(t * 180, out);
 
             const P1 = orbitPoint(R1, i1, 0, 0), P2 = orbitPoint(R2, i2, 0, 180);
@@ -1074,7 +1107,7 @@
             burnLabels('burn1', d.burns.burn1, { dv: m.dv1 });
             burnLabels('burn2', d.burns.burn2, { dv: m.dv2 });
             if (d.burns.burn3) {
-                const burn3Dv = 2 * (m.isRaise ? m.v2 : m.v1) * Math.sin((m.delta_theta / 2) * D2R);
+                const burn3Dv = planeChangeDv(m.isRaise ? m.v2 : m.v1, m.delta_theta);
                 burnLabels('burn3', d.burns.burn3, { dv: burn3Dv });
             }
 

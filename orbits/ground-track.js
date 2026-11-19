@@ -6,6 +6,182 @@
 (async function () {
     'use strict';
 
+    /* ================================================================== */
+    /* ORBIT MATH                                                         */
+    /* Two-body orbit over a spherical Earth turning at OMEGA_E.          */
+    /* km and s. Elements in degrees; E and M in radians.                 */
+    /* An element set `el` is any object with a, e, i, raan, argp, nu.    */
+    /* ================================================================== */
+    const R_E = 6378.137;         // km
+    const MU = 398600.4418;       // km^3/s^2
+    const OMEGA_E = 7.292115e-5;  // rad/s
+    const D2R = Math.PI / 180;
+    const R2D = 180 / Math.PI;
+    const TWO_PI = 2 * Math.PI;
+    const EARTH_DEG_PER_HOUR = OMEGA_E * R2D * 3600;
+    const CIRCULAR_E = 0.02;      // Below this, an orbit counts as circular: no perigee or apogee
+
+    const POINTS_PER_ORBIT = 240; // Track samples per orbit
+    const MAX_PAST_ORBITS = 16;   // About one day of a low orbit
+    const TRACK_POINTS = (MAX_PAST_ORBITS + 1) * POINTS_PER_ORBIT + 1;
+    const MARKER_MAX = MAX_PAST_ORBITS + 2; // Perigee (or apogee, or node) passes in one track
+
+    const meanMotion = (a) => Math.sqrt(MU / (a * a * a));
+    const periodOf = (a) => TWO_PI / meanMotion(a);
+    const isCircular = (el) => el.e < CIRCULAR_E;
+    const isEquatorial = (el) => el.i < 0.05 || el.i > 179.95;
+
+    // Perifocal unit vectors in ECI: P toward perigee, Q 90 deg ahead of P in the orbit plane.
+    function orbitBasis(el) {
+        const O = el.raan * D2R, inc = el.i * D2R, w = el.argp * D2R;
+        const cosO = Math.cos(O), sinO = Math.sin(O);
+        const cosi = Math.cos(inc), sini = Math.sin(inc);
+        const cosw = Math.cos(w), sinw = Math.sin(w);
+        return {
+            P: { x: cosO * cosw - sinO * sinw * cosi, y: sinO * cosw + cosO * sinw * cosi, z: sinw * sini },
+            Q: { x: -cosO * sinw - sinO * cosw * cosi, y: -sinO * sinw + cosO * cosw * cosi, z: cosw * sini }
+        };
+    }
+
+    // r = p / (1 + e cos nu), km
+    const radiusAt = (el, nuDeg) => el.a * (1 - el.e * el.e) / (1 + el.e * Math.cos(nuDeg * D2R));
+
+    // ECI position (km) at true anomaly nu (deg).
+    function positionAt(el, basis, nuDeg) {
+        const r = radiusAt(el, nuDeg), nu = nuDeg * D2R;
+        const px = r * Math.cos(nu), py = r * Math.sin(nu);
+        const { P, Q } = basis;
+        return { x: P.x * px + Q.x * py, y: P.y * px + Q.y * py, z: P.z * px + Q.z * py };
+    }
+
+    // The ascending node is at nu = -argp, the descending node at nu = 180 - argp.
+    const nodeRadii = (el) => ({ ascending: radiusAt(el, -el.argp), descending: radiusAt(el, 180 - el.argp) });
+
+    function eccentricAnomaly(nuDeg, e) {
+        const nu = nuDeg * D2R;
+        return Math.atan2(Math.sqrt(1 - e * e) * Math.sin(nu), e + Math.cos(nu));
+    }
+
+    function meanAnomaly(nuDeg, e) {
+        const E = eccentricAnomaly(nuDeg, e);
+        return E - e * Math.sin(E);
+    }
+
+    // Kepler's equation, M = E - e sin E, solved for E by Newton's method.
+    function solveKepler(M, e) {
+        let E = e < 0.8 ? M : Math.PI;
+        for (let iter = 0; iter < 12; iter++) {
+            const delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+            E -= delta;
+            if (Math.abs(delta) < 1e-9) break;
+        }
+        return E;
+    }
+
+    // Moves nu forward by a fraction of one orbit in time, so the satellite is fastest at perigee.
+    function advanceTrueAnomaly(nuDeg, e, orbitFraction) {
+        const M = ((meanAnomaly(nuDeg, e) + orbitFraction * TWO_PI) % TWO_PI + TWO_PI) % TWO_PI;
+        const E = solveKepler(M, e);
+        const next = Math.atan2(Math.sqrt(1 - e * e) * Math.sin(E), Math.cos(E) - e) * R2D;
+        return (next + 360) % 360;
+    }
+
+    // Time (s) to move from nu0 to nu1 the shorter way around; negative when nu1 is behind.
+    function shortestTimeBetween(el, nu0Deg, nu1Deg) {
+        let dM = (meanAnomaly(nu1Deg, el.e) - meanAnomaly(nu0Deg, el.e)) % TWO_PI;
+        if (dM > Math.PI) dM -= TWO_PI;
+        if (dM < -Math.PI) dM += TWO_PI;
+        return dM / meanMotion(el.a);
+    }
+
+    // Earth's rotation (rad) during a time span (s).
+    const earthTurn = (seconds) => OMEGA_E * seconds;
+
+    // The most recent ascending node at or before the satellite: its eccentric anomaly, and the
+    // time (s) since the satellite passed it.
+    function lastAscendingNode(el) {
+        const { e } = el;
+        const E0 = eccentricAnomaly(el.nu, e);
+        const behind = (((E0 - eccentricAnomaly(-el.argp, e)) % TWO_PI) + TWO_PI) % TWO_PI;
+        const start = E0 - behind;
+        const elapsed = (behind + e * (Math.sin(start) - Math.sin(E0))) / meanMotion(el.a);
+        return { start, elapsed };
+    }
+
+    // Unit vector, in Earth-fixed axes, toward the point below the satellite at eccentric anomaly E.
+    // theta is Earth's rotation angle when the satellite is at mean anomaly M0. Written into out[3k..3k+2].
+    function subSatellitePoint(el, basis, M0, theta, E, out, k) {
+        const { a, e } = el;
+        const { P, Q } = basis;
+        const elapsed = (E - e * Math.sin(E) - M0) / meanMotion(a);
+        const turned = theta + earthTurn(elapsed);
+        const cosT = Math.cos(turned), sinT = Math.sin(turned);
+        const r = a * (1 - e * Math.cos(E));
+        const px = a * (Math.cos(E) - e), py = a * Math.sqrt(1 - e * e) * Math.sin(E);
+        const x = P.x * px + Q.x * py, y = P.y * px + Q.y * py, z = P.z * px + Q.z * py;
+        out[3 * k] = (cosT * x + sinT * y) / r;
+        out[3 * k + 1] = (-sinT * x + cosT * y) / r;
+        out[3 * k + 2] = z / r;
+    }
+
+    // The ground track from `pastOrbits` orbits back to one orbit ahead, or, in onePeriod mode,
+    // from the last ascending node to the next. Samples are even in E, so they bunch near perigee
+    // without a Kepler solve per sample. Fills out.track and the pass lists in `out`
+    // (perigees, apogees, ascents, descents). Returns the sample index of the satellite, the last
+    // sample index, and the time since the last ascending node (onePeriod mode only, else null).
+    function computeGroundTrack(el, theta, pastOrbits, onePeriod, out) {
+        const { e } = el;
+        const basis = orbitBasis(el);
+        const E0 = eccentricAnomaly(el.nu, e);
+        const M0 = E0 - e * Math.sin(E0);
+
+        let start = E0 - pastOrbits * TWO_PI;
+        let end = E0 + TWO_PI;
+        let periodElapsed = null;
+        if (onePeriod) {
+            const node = lastAscendingNode(el);
+            start = node.start;
+            end = start + TWO_PI;
+            periodElapsed = node.elapsed;
+        }
+
+        // The satellite is always a sample, and the two ends land exactly on the window's ends.
+        const step = TWO_PI / POINTS_PER_ORBIT;
+        const now = Math.ceil((E0 - start) / step - 1e-9);
+        const last = now + Math.ceil((end - E0) / step - 1e-9);
+        for (let k = 0; k <= last; k++) {
+            const E = k === 0 ? start : k === last ? end : E0 + (k - now) * step;
+            subSatellitePoint(el, basis, M0, theta, E, out.track, k);
+        }
+
+        // Every pass of a fixed point on the orbit (fixed E) inside the window. The first
+        // `past` of them are behind the satellite.
+        const collect = (set, phase, includeEnd = false) => {
+            const stop = includeEnd ? end + 1e-9 : end - 1e-9;
+            set.count = set.past = 0;
+            for (let m = Math.ceil((start - phase) / TWO_PI - 1e-9); phase + m * TWO_PI < stop; m++) {
+                const E = phase + m * TWO_PI;
+                subSatellitePoint(el, basis, M0, theta, E, set.points, set.count);
+                set.count++;
+                if (E <= E0) set.past = set.count;
+            }
+        };
+        collect(out.perigees, 0);
+        collect(out.apogees, Math.PI);
+        collect(out.ascents, eccentricAnomaly(-el.argp, e), onePeriod);
+        collect(out.descents, eccentricAnomaly(180 - el.argp, e));
+
+        return { trackNow: now, trackEnd: last, periodElapsed };
+    }
+
+    // Longitude and latitude (deg) of sample k of a list of Earth-fixed unit vectors.
+    const longitudeOf = (points, k) => Math.atan2(points[3 * k + 1], points[3 * k]) * R2D;
+    const latitudeOf = (points, k) => Math.asin(Math.max(-1, Math.min(1, points[3 * k + 2]))) * R2D;
+    const wrapLongitude = (lon) => (((lon + 180) % 360) + 360) % 360 - 180;
+
+    /* ================================================================== */
+    /* RENDERING AND CONTROLS                                             */
+    /* ================================================================== */
     const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
@@ -28,13 +204,6 @@
     /* ------------------------------------------------------------------ */
     /* Constants                                                          */
     /* ------------------------------------------------------------------ */
-    const R_E = 6378.137;         // Earth equatorial radius (km). One scene unit is one Earth radius.
-    const MU = 398600.4418;       // Earth gravitational parameter (km^3/s^2)
-    const OMEGA_E = 7.292115e-5;  // Earth rotation rate (rad/s)
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-    const TWO_PI = 2 * Math.PI;
-
     // Every orbit plays in the same time, so that a low orbit is not a blur.
     const ORBIT_PLAY_SECONDS = 12;
     const SPEEDS = [
@@ -57,14 +226,7 @@
     };
     const AHEAD_OPACITY = 0.45;
     const E_MAX = 0.85;           // Largest eccentricity offered
-    const CIRCULAR_E = 0.02;      // Below this, an orbit counts as circular: no perigee or apogee
-    const EARTH_DEG_PER_HOUR = OMEGA_E * R2D * 3600;
-
-    const POINTS_PER_ORBIT = 240; // Enough that the track looks smooth at the largest eccentricity
-    const MAX_PAST_ORBITS = 16;   // About one day of a low orbit
-    const TRACK_POINTS = (MAX_PAST_ORBITS + 1) * POINTS_PER_ORBIT + 1;
     const TRACK_RADIUS = 1.004;   // The track on the globe lies just above the surface
-    const MARKER_MAX = MAX_PAST_ORBITS + 2; // Perigee or apogee passes that can be in view at once
 
     // A slice of the globe is built fine enough that its flat facets stay above the surface.
     const SLICE_ROWS = 48;
@@ -298,144 +460,24 @@
     const nodeLine = ghosted(pointGeometry(2), COLORS.node, { ghost: 0.3, line: true });
     const periodObjects = [wholeSlice, turnedSlice, nodeLine];
 
-    /* ------------------------------------------------------------------ */
-    /* Orbital Mechanics                                                  */
-    /* ------------------------------------------------------------------ */
-
-    // Unit vectors in ECI: P toward perigee, Q in the plane 90 degrees ahead of P.
-    function orbitBasis() {
-        const O = state.raan * D2R, inc = state.i * D2R, w = state.argp * D2R;
-        const cosO = Math.cos(O), sinO = Math.sin(O);
-        const cosi = Math.cos(inc), sini = Math.sin(inc);
-        const cosw = Math.cos(w), sinw = Math.sin(w);
-        return {
-            P: new THREE.Vector3(cosO * cosw - sinO * sinw * cosi, sinO * cosw + cosO * sinw * cosi, sinw * sini),
-            Q: new THREE.Vector3(-cosO * sinw - sinO * cosw * cosi, -sinO * sinw + cosO * cosw * cosi, cosw * sini)
-        };
-    }
-
-    const meanMotion = (a) => Math.sqrt(MU / (a * a * a));
-
-    function eccentricAnomaly(nuDeg, e) {
-        const nu = nuDeg * D2R;
-        return Math.atan2(Math.sqrt(1 - e * e) * Math.sin(nu), e + Math.cos(nu));
-    }
-
-    function meanAnomaly(nuDeg, e) {
-        const E = eccentricAnomaly(nuDeg, e);
-        return E - e * Math.sin(E);
-    }
-
-    // Solves Kepler's equation, M = E - e sin E, for the eccentric anomaly E.
-    function solveKepler(M, e) {
-        let E = e < 0.8 ? M : Math.PI;
-        for (let iter = 0; iter < 12; iter++) {
-            const delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= delta;
-            if (Math.abs(delta) < 1e-9) break;
-        }
-        return E;
-    }
-
-    // Moves the true anomaly forward by a fraction of one orbit, equal in time. The satellite
-    // therefore moves faster near perigee and slower near apogee.
-    function advanceTrueAnomaly(nuDeg, e, orbitFraction) {
-        const M = ((meanAnomaly(nuDeg, e) + orbitFraction * TWO_PI) % TWO_PI + TWO_PI) % TWO_PI;
-        const E = solveKepler(M, e);
-        const next = Math.atan2(Math.sqrt(1 - e * e) * Math.sin(E), Math.cos(E) - e) * R2D;
-        return (next + 360) % 360;
-    }
-
-    const isCircular = () => state.e < CIRCULAR_E;
-    const isEquatorial = () => state.i < 0.05 || state.i > 179.95;
-    const periodSeconds = () => TWO_PI / meanMotion(state.a);
-
-    // The most recent ascending node at or before the satellite: its eccentric anomaly, and the
-    // time since the satellite passed it.
-    function lastNode() {
-        const { e } = state;
-        const E0 = eccentricAnomaly(state.nu, e);
-        const behind = (((E0 - eccentricAnomaly(-state.argp, e)) % TWO_PI) + TWO_PI) % TWO_PI;
-        const start = E0 - behind;
-        const elapsed = (behind + e * (Math.sin(start) - Math.sin(E0))) / meanMotion(state.a);
-        return { start, elapsed };
-    }
-
-    // Each sample is the unit vector, in Earth-fixed axes, toward the point below the satellite.
-    // Samples are evenly spaced in eccentric anomaly, which keeps them close together near perigee
-    // without a Kepler solve for each one. The current position is the sample at index trackNow.
+    // The track, its current and last sample, and every pass of each marked point.
     const track = new Float32Array(TRACK_POINTS * 3);
     let trackNow = 0, trackEnd = 0;
     let periodElapsed = 0;     // Time since the first equator crossing of the period shown (s)
-
-    // Every pass in view of each marked point. The first "past" of them are behind the satellite.
     const passes = () => ({ points: new Float32Array(MARKER_MAX * 3), count: 0, past: 0 });
     const perigees = passes(), apogees = passes(), ascents = passes(), descents = passes();
+    const trackOut = { track, perigees, apogees, ascents, descents };
 
     function computeTrack() {
-        const { a, e } = state;
-        const { P, Q } = orbitBasis();
-        const root = Math.sqrt(1 - e * e);
-        const n = meanMotion(a);
-        const E0 = eccentricAnomaly(state.nu, e);
-        const M0 = E0 - e * Math.sin(E0);
-
-        // One period runs from one ascending node to the next. When the satellite reaches the
-        // next node, the view moves on to the pass that starts there, and Earth keeps turning.
-        let start = E0 - state.pastOrbits * TWO_PI;
-        let end = E0 + TWO_PI;
-        if (state.onePeriod) {
-            const node = lastNode();
-            start = node.start;
-            end = start + TWO_PI;
-            periodElapsed = node.elapsed;
-        }
-
-        const groundPoint = (E, target, index) => {
-            const elapsed = (E - e * Math.sin(E) - M0) / n;
-            const turned = state.theta + OMEGA_E * elapsed;
-            const cosT = Math.cos(turned), sinT = Math.sin(turned);
-            const r = a * (1 - e * Math.cos(E));
-            const px = a * (Math.cos(E) - e), py = a * root * Math.sin(E);
-            const x = P.x * px + Q.x * py, y = P.y * px + Q.y * py, z = P.z * px + Q.z * py;
-            target[3 * index] = (cosT * x + sinT * y) / r;
-            target[3 * index + 1] = (-sinT * x + cosT * y) / r;
-            target[3 * index + 2] = z / r;
-        };
-
-        // The satellite is always a sample, and the two ends land exactly on the window's ends.
-        const step = TWO_PI / POINTS_PER_ORBIT;
-        trackNow = Math.ceil((E0 - start) / step - 1e-9);
-        trackEnd = trackNow + Math.ceil((end - E0) / step - 1e-9);
-        for (let k = 0; k <= trackEnd; k++) {
-            const E = k === 0 ? start : k === trackEnd ? end : E0 + (k - trackNow) * step;
-            groundPoint(E, track, k);
-        }
-
-        // Perigee is at E = 0 and apogee at E = 180 degrees, once per orbit. The nodes are at true
-        // anomalies of -w and 180 - w. One period runs from one ascending node to the next, so
-        // both of its ends are marked.
-        const collect = (set, phase, includeEnd = false) => {
-            const last = includeEnd ? end + 1e-9 : end - 1e-9;
-            set.count = set.past = 0;
-            for (let m = Math.ceil((start - phase) / TWO_PI - 1e-9); phase + m * TWO_PI < last; m++) {
-                const E = phase + m * TWO_PI;
-                groundPoint(E, set.points, set.count);
-                set.count++;
-                if (E <= E0) set.past = set.count;
-            }
-        };
-        collect(perigees, 0);
-        collect(apogees, Math.PI);
-        collect(ascents, eccentricAnomaly(-state.argp, e), state.onePeriod);
-        collect(descents, eccentricAnomaly(180 - state.argp, e));
+        const result = computeGroundTrack(state, state.theta, state.pastOrbits, state.onePeriod, trackOut);
+        trackNow = result.trackNow;
+        trackEnd = result.trackEnd;
+        if (result.periodElapsed !== null) periodElapsed = result.periodElapsed;
     }
 
-    const longitudeOf = (points, k) => Math.atan2(points[3 * k + 1], points[3 * k]) * R2D;
-    const latitudeOf = (points, k) => Math.asin(Math.max(-1, Math.min(1, points[3 * k + 2]))) * R2D;
+    const periodSeconds = () => periodOf(state.a);
     const longitudeAt = (k) => longitudeOf(track, k);
     const latitudeAt = (k) => latitudeOf(track, k);
-    const wrapLongitude = (lon) => (((lon + 180) % 360) + 360) % 360 - 180;
 
     /* ------------------------------------------------------------------ */
     /* 3D Scene Update                                                    */
@@ -511,11 +553,10 @@
 
     function update3DScene() {
         const { a, e, nu } = state;
-        const { P, Q } = orbitBasis();
+        const basis = orbitBasis(state);
+        const { P, Q } = basis;
         const aScene = a / R_E;
         const p = aScene * (1 - e * e);
-        const nuRad = nu * D2R;
-        const r = p / (1 + e * Math.cos(nuRad));
 
         earth.pivot.rotation.z = state.theta;
 
@@ -538,9 +579,7 @@
             rebuildOrbitTube(tubeRadius);
         }
 
-        satPos.set(0, 0, 0)
-            .addScaledVector(P, r * Math.cos(nuRad))
-            .addScaledVector(Q, r * Math.sin(nuRad));
+        satPos.copy(positionAt(state, basis, nu)).divideScalar(R_E);
         groundPos.copy(satPos).normalize();
         satMarker.position.copy(satPos);
         satMarker.scale.setScalar(5 * px);
@@ -554,7 +593,7 @@
         writeRibbon(nextRibbon, trackNow, trackEnd, halfWidth);
 
         // Perigee and apogee, on the orbit and on the track. A circle has neither.
-        const hasApsides = !isCircular();
+        const hasApsides = !isCircular(state);
         perigeeMarker.visible = apogeeMarker.visible = hasApsides;
         perigeeMarker.position.copy(P).multiplyScalar(aScene * (1 - e));
         apogeeMarker.position.copy(P).multiplyScalar(-aScene * (1 + e));
@@ -566,15 +605,15 @@
         // The nodes, on the orbit and on the track. An orbit in the equator's plane has none, but
         // one period is still measured between the points where it would ascend.
         const raan = state.raan * D2R;
-        const cosArgp = Math.cos(state.argp * D2R);
-        const showAscending = state.onePeriod || !isEquatorial();
-        const showDescending = !isEquatorial();
+        const nodeR = nodeRadii(state);
+        const showAscending = state.onePeriod || !isEquatorial(state);
+        const showDescending = !isEquatorial(state);
         nodeGround.set(Math.cos(raan), Math.sin(raan), 0);
-        nodePos.copy(nodeGround).multiplyScalar(p / (1 + e * cosArgp));
+        nodePos.copy(nodeGround).multiplyScalar(nodeR.ascending / R_E);
         ascendingMarker.visible = showAscending;
         descendingMarker.visible = showDescending;
         ascendingMarker.position.copy(nodePos);
-        descendingMarker.position.copy(nodeGround).multiplyScalar(-p / (1 - e * cosArgp));
+        descendingMarker.position.copy(nodeGround).multiplyScalar(-nodeR.descending / R_E);
         ascendingMarker.scale.setScalar(4 * px);
         descendingMarker.scale.setScalar(4 * px);
         writeDots(ascendingDots, ascents.points, showAscending ? ascents.count : 0, 3.5 * px);
@@ -585,8 +624,8 @@
         periodObjects.forEach((object) => { object.visible = state.onePeriod; });
         if (state.onePeriod) {
             const first = longitudeAt(0);
-            writeSlice(wholeSlice, first, OMEGA_E * periodSeconds() * R2D);
-            writeSlice(turnedSlice, first, OMEGA_E * periodElapsed * R2D);
+            writeSlice(wholeSlice, first, earthTurn(periodSeconds()) * R2D);
+            writeSlice(turnedSlice, first, earthTurn(periodElapsed) * R2D);
             setLine(nodeLine, nodeGround, nodePos);
         }
     }
@@ -691,7 +730,7 @@
         const first = longitudeAt(0);
         const hours = periodSeconds() / 3600;
         const span = EARTH_DEG_PER_HOUR * hours;
-        const turned = OMEGA_E * periodElapsed * R2D;
+        const turned = earthTurn(periodElapsed) * R2D;
         const y = mapY(0) - RULER_HEIGHT / 2;
 
         g.fillStyle = COLORS.phase;
@@ -815,14 +854,14 @@
                 firstLabelWest = west;
                 labelFirst.spot = west ? 3 : 0;
             }
-        } else if (!isEquatorial()) {
+        } else if (!isEquatorial(state)) {
             labelPass(labelAscending, ascents);
         }
-        if (!isCircular()) {
+        if (!isCircular(state)) {
             labelPass(labelPerigee, perigees);
             labelPass(labelApogee, apogees);
         }
-        if (!isEquatorial()) labelPass(labelDescending, descents);
+        if (!isEquatorial(state)) labelPass(labelDescending, descents);
         mapLayer.place(mapW, mapH, [Kit.overlayBox($('map-title'), mapPane)]);
     }
 
@@ -846,9 +885,9 @@
         g.lineWidth = 2;
         strokeTrack(g, 0, trackNow);
 
-        if (state.onePeriod || !isEquatorial()) drawPassMarks(g, ascents, ascendingMark, COLORS.node);
-        if (!isEquatorial()) drawPassMarks(g, descents, descendingMark, COLORS.descending);
-        if (!isCircular()) {
+        if (state.onePeriod || !isEquatorial(state)) drawPassMarks(g, ascents, ascendingMark, COLORS.node);
+        if (!isEquatorial(state)) drawPassMarks(g, descents, descendingMark, COLORS.descending);
+        if (!isCircular(state)) {
             drawPassMarks(g, perigees, circleMark, COLORS.perigee);
             drawPassMarks(g, apogees, diamondMark, COLORS.apogee);
         }
@@ -886,7 +925,7 @@
         const { a, e, nu, i } = state;
         const r = (a * (1 - e * e)) / (1 + e * Math.cos(nu * D2R));
         const period = periodSeconds();
-        const shift = OMEGA_E * period * R2D;
+        const shift = earthTurn(period) * R2D;
         const lat = formatAngle(latitudeAt(trackNow), 'N', 'S');
         const lon = formatAngle(longitudeAt(trackNow), 'E', 'W');
 
@@ -911,7 +950,7 @@
             $('val-alt').textContent = `${formatNumber(r - R_E, 0)} km`;
         }
 
-        $('map-title').classList.toggle('circular', isCircular());
+        $('map-title').classList.toggle('circular', isCircular(state));
         updateCaption(a * (1 - e) - R_E);
     }
 
@@ -931,7 +970,7 @@
 
         const notes = [];
         if (hp < 0) notes.push('This orbit passes through Earth: its perigee is below the surface.');
-        if (isEquatorial()) {
+        if (isEquatorial(state)) {
             notes.push(state.onePeriod
                 ? 'At this inclination the orbit does not cross the equator, so λ₁ and λ₂ are where it would.'
                 : 'At this inclination the orbit does not cross the equator, so it has no nodes to mark.');
@@ -1009,19 +1048,16 @@
         if (name === 'nu') {
             // Moving the satellite takes time, so Earth turns by the same amount of time. The
             // satellite takes the shorter way around, and the track stays where it is.
-            let dM = (meanAnomaly(value, state.e) - meanAnomaly(state.nu, state.e)) % TWO_PI;
-            if (dM > Math.PI) dM -= TWO_PI;
-            if (dM < -Math.PI) dM += TWO_PI;
-            state.theta += (OMEGA_E * dM) / meanMotion(state.a);
+            state.theta += earthTurn(shortestTimeBetween(state, state.nu, value));
             setPlaying(false);
         } else {
             state.activePreset = null;
             $('preset').value = '';
             // In one period, the first crossing stays put while the orbit changes shape.
             if (state.onePeriod) {
-                const thetaAtNode = state.theta - OMEGA_E * lastNode().elapsed;
+                const thetaAtNode = state.theta - earthTurn(lastAscendingNode(state).elapsed);
                 state[name] = value;
-                state.theta = thetaAtNode + OMEGA_E * lastNode().elapsed;
+                state.theta = thetaAtNode + earthTurn(lastAscendingNode(state).elapsed);
             }
         }
         state[name] = value;
@@ -1244,7 +1280,7 @@
             if (document.activeElement !== $('nu-number')) $('nu-number').value = state.nu.toFixed(1);
 
             // Earth turns by the true amount for the time the orbit represents.
-            state.theta = (state.theta + (OMEGA_E * TWO_PI * orbitFraction) / meanMotion(state.a)) % TWO_PI;
+            state.theta = (state.theta + earthTurn(orbitFraction * periodOf(state.a))) % TWO_PI;
             dirty = true;
         }
 

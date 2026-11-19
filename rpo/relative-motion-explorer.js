@@ -137,6 +137,16 @@
     });
 
     /* ---------- Derived values ---------- */
+    const isDev = () => {
+        try {
+            if (typeof window !== 'undefined' && window.__DEV__ !== undefined) return Boolean(window.__DEV__);
+            if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('dev')) return true;
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('otc-dev-mode') === '1') return true;
+            if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('dev-mode')) return true;
+            if (typeof location === 'undefined') return true;
+        } catch (e) {}
+        return false;
+    };
     const isCircular = () => state.target.e < 1e-6;
     const isAdvanced = () => document.body.classList.contains('advanced-on');
     const chaseCoe = () => M.coeFromDifference(state.target, state.diff);
@@ -297,11 +307,7 @@
             now = M.stateFromRmoe(sim.rmoe, sim.n, t);
             rDraw = rTable = M.rmoeAt(sim.rmoe, sim.n, t);
             basis = M.ricBasis(sim.coe, t);
-            // Chase's ECI state from the course model: r = rT + rho, v = vT + omega x rho + rho dot.
-            const w = basis.omega;
-            const rho = M.ricToEci(now, basis);
-            const dv = M.ricToEci([now[3] - w * now[1], now[4] + w * now[0], now[5]], basis);
-            chaseRv = { r: basis.r.map((x, k) => x + rho[k]), v: basis.v.map((x, k) => x + dv[k]) };
+            chaseRv = M.chaseRvFromRic(now, basis);   // the course model's chase, in ECI
         }
         const k = sampleIndex(t);
         const trail = sim.path.subarray(0, 3 * (k + 1));
@@ -429,8 +435,11 @@
         $('co-p').textContent = P > 7200 ? (P / 3600).toFixed(3) + ' h' : (P / 60).toFixed(2) + ' min';
         const row = state.mode === 'rmoe' ? ROWS.find(x => x.key === state.lastRow) : null;
         const preset = state.presetCustom ? null : PRESETS[state.preset];
-        $('notice').textContent = row ? row.notice : preset ? (state.mode === 'coe' ? preset.coeNotice : preset.notice)
-            : state.presetCustom ? 'These are your own numbers, not a preset’s. Reset Preset puts back ' + PRESETS[state.preset].name + '.' : '';
+        const noticeEl = $('notice');
+        if (noticeEl) {
+            noticeEl.textContent = row ? row.notice : preset ? (state.mode === 'coe' ? preset.coeNotice : preset.notice)
+                : state.presetCustom ? 'These are your own numbers, not a preset’s. Reset Preset puts back ' + PRESETS[state.preset].name + '.' : '';
+        }
         updatePv();
         updateNotes();
     }
@@ -698,6 +707,7 @@
     // Switching keeps the motion. To COEs: chase's elements from the RMOEs (coesFromRmoe). From
     // COEs: the RMOEs the elements give (rmoeFromCoes); an eccentric target is made circular first.
     function applyMode(mode) {
+        if (mode === 'coe' && !isDev()) return;
         const from = state.mode;
         state.modeNote = '';
         if (mode === 'coe' && from !== 'coe') {
@@ -724,6 +734,7 @@
         drawAll();
     }
     const selectMode = Kit.bindSegmented($('mode-pick'), mode => {
+        if (mode === 'coe' && !isDev()) return;
         if (mode !== state.mode) applyMode(mode === 'coe' || mode === 'pv' ? mode : 'rmoe');
     });
 
@@ -970,6 +981,7 @@
     buildElTable();
     buildPv();
     fillPresets();
+    if (state.mode === 'coe' && !isDev()) state.mode = 'rmoe';
     document.body.classList.add('mode-' + state.mode);
     loadPreset(state.preset);
     applyViewOptions();
@@ -990,6 +1002,7 @@
     window.relativeMotionExplorer = {
         state, sim: () => sim, stage, presets: PRESETS, loadPreset, drawNow: drawAll,
         selectMode,
+        isDev,
         setTargetA: v => { $('target-a').value = String(v); setTargetA(true); },
         set(values) {
             Object.assign(state.rmoe, values);

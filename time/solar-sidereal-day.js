@@ -2,15 +2,31 @@
 (function () {
     'use strict';
 
-    const $ = (id) => document.getElementById(id);
+    /* ================================================================== */
+    /* EARTH ROTATION MATH                                                */
+    /* Seconds and degrees.                                               */
+    /* ================================================================== */
     const D2R = Math.PI / 180;
 
-    /* Physical values */
     const SOLAR_DAY = 86400;                     // average solar day, s
     const TROPICAL_YEAR = 365.2422 * SOLAR_DAY;  // s
-    const REAL_ORBIT_RATE = 360 / TROPICAL_YEAR; // degrees per second
+    const REAL_ORBIT_RATE = 360 / TROPICAL_YEAR; // degrees per second, Earth around the Sun
+
+    // In one solar day Earth spins 360 deg plus the angle it moved along its orbit.
     const SIDEREAL_DAY = 360 / (360 / SOLAR_DAY + REAL_ORBIT_RATE); // s
     const SPIN_RATE = 360 / SIDEREAL_DAY;        // degrees per second
+
+    // Spin needed for the Sun to return to the same place in the sky.
+    const SOLAR_DAY_ROTATION = 360 * SPIN_RATE / (SPIN_RATE - REAL_ORBIT_RATE); // deg
+    const EXTRA_ROTATION_PER_DAY = SOLAR_DAY_ROTATION - 360;                     // deg
+
+    const timeForRotation = (deg) => deg / SPIN_RATE;                  // s
+    const orbitTravelDuring = (seconds) => REAL_ORBIT_RATE * seconds;  // deg
+
+    /* ================================================================== */
+    /* ANIMATION, DRAWING, AND CONTROLS                                   */
+    /* ================================================================== */
+    const $ = (id) => document.getElementById(id);
 
     const COLORS = {
         sidereal: '#60a5fa',
@@ -49,17 +65,15 @@
     }
 
     function solarRotation() {
-        // Rotation for the marked point to face the Sun again across state.rotations solar days.
-        const oneSolar = 360 * SPIN_RATE / (SPIN_RATE - REAL_ORBIT_RATE);
-        return state.rotations * oneSolar;
+        return state.rotations * SOLAR_DAY_ROTATION;
     }
 
     function clockTime() {
-        return state.rotation / SPIN_RATE;
+        return timeForRotation(state.rotation);
     }
 
     function orbitTravelToday() {
-        return REAL_ORBIT_RATE * clockTime();
+        return orbitTravelDuring(clockTime());
     }
 
     function formatDuration(seconds) {
@@ -97,9 +111,9 @@
     function beginNextCycle() {
         const finished = solarRotation();
         state.totalRotation += finished;
-        state.totalOrbit += REAL_ORBIT_RATE * (finished / SPIN_RATE);
+        state.totalOrbit += orbitTravelDuring(timeForRotation(finished));
         state.dayStartSpin += finished;
-        state.dayStartOrbit += REAL_ORBIT_RATE * (finished / SPIN_RATE);
+        state.dayStartOrbit += orbitTravelDuring(timeForRotation(finished));
         state.rotation -= finished;
         if (state.rotation < 0) state.rotation = 0;
         state.step = 1;
@@ -486,15 +500,6 @@
         const ahead = orbitNow + Math.max(16, 280 / orbitR * 10);
         const a0 = ahead + 6, a1 = a0 + 10;
         arrow(cx + orbitR * dirX(a0), cy + orbitR * dirY(a0), cx + orbitR * dirX(a1), cy + orbitR * dirY(a1), COLORS.dim, 1.6, 8);
-
-        /* Key */
-        const keyY = H - 16;
-        const small = W < 640;
-        if (!small) {
-            label('White arrow: a point fixed to Earth', 14, keyY - 38, COLORS.text);
-            label('Gold: Earth\'s travel along its orbit', 14, keyY - 19, COLORS.gold);
-            label('Red: the extra rotation', 14, keyY, COLORS.extra);
-        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -513,9 +518,8 @@
 
     function updateComparison() {
         const n = state.rotations;
-        const oneSolarRot = 360 * SPIN_RATE / (SPIN_RATE - REAL_ORBIT_RATE);
-        const oneSolarSec = oneSolarRot / SPIN_RATE;
-        const oneExtraDeg = oneSolarRot - 360;
+        const oneSolarSec = timeForRotation(SOLAR_DAY_ROTATION);
+        const oneExtraDeg = EXTRA_ROTATION_PER_DAY;
 
         const totalSiderealSec = n * SIDEREAL_DAY;
         const totalSolarSec = n * oneSolarSec;

@@ -7,6 +7,104 @@
 (async function () {
     'use strict';
 
+    /* ================================================================== */
+    /* ORBIT MATH                                                         */
+    /* Classical orbital elements to position and velocity in ECI.        */
+    /* km and s. Elements in degrees; E and M in radians.                 */
+    /* An element set `el` is any object with a, e, i, raan, argp, nu.    */
+    /* ================================================================== */
+    const R_E = 6378.137;         // km
+    const MU = 398600.4418;       // km^3/s^2
+    const OMEGA_E = 7.292115e-5;  // rad/s, Earth's rotation
+    const D2R = Math.PI / 180;
+    const R2D = 180 / Math.PI;
+    const TWO_PI = 2 * Math.PI;
+
+    const periodOf = (a) => TWO_PI * Math.sqrt(a * a * a / MU);
+    const isEquatorial = (el) => el.i < 0.05 || el.i > 179.95;
+    const isCircular = (el) => el.e < 1e-4;
+
+    // Unit vectors in ECI: P toward perigee, Q in the plane 90 deg ahead of P,
+    // W along the angular momentum, and n toward the ascending node.
+    function orbitBasis(el) {
+        const O = el.raan * D2R, inc = el.i * D2R, w = el.argp * D2R;
+        const cosO = Math.cos(O), sinO = Math.sin(O);
+        const cosi = Math.cos(inc), sini = Math.sin(inc);
+        const cosw = Math.cos(w), sinw = Math.sin(w);
+        return {
+            P: { x: cosO * cosw - sinO * sinw * cosi, y: sinO * cosw + cosO * sinw * cosi, z: sinw * sini },
+            Q: { x: -cosO * sinw - sinO * cosw * cosi, y: -sinO * sinw + cosO * cosw * cosi, z: cosw * sini },
+            W: { x: sinO * sini, y: -cosO * sini, z: cosi },
+            n: { x: cosO, y: sinO, z: 0 }
+        };
+    }
+
+    // r = p / (1 + e cos nu), km
+    const radiusAt = (el, nuDeg) => el.a * (1 - el.e * el.e) / (1 + el.e * Math.cos(nuDeg * D2R));
+
+    // u P + v Q
+    const inPlane = (basis, u, v) => ({
+        x: basis.P.x * u + basis.Q.x * v,
+        y: basis.P.y * u + basis.Q.y * v,
+        z: basis.P.z * u + basis.Q.z * v
+    });
+
+    // ECI position (km) at true anomaly nu (deg).
+    function positionAt(el, basis, nuDeg) {
+        const r = radiusAt(el, nuDeg), nu = nuDeg * D2R;
+        return inPlane(basis, r * Math.cos(nu), r * Math.sin(nu));
+    }
+
+    // ECI velocity (km/s): v = sqrt(mu/p) [-sin nu P + (e + cos nu) Q].
+    function velocityAt(el, basis, nuDeg) {
+        const p = el.a * (1 - el.e * el.e), nu = nuDeg * D2R;
+        const k = Math.sqrt(MU / p);
+        return inPlane(basis, -k * Math.sin(nu), k * (el.e + Math.cos(nu)));
+    }
+
+    // Everything the readouts show for one element set.
+    function orbitState(el) {
+        const { a, e, nu } = el;
+        const basis = orbitBasis(el);
+        const r = radiusAt(el, nu);
+        return {
+            r,
+            hp: a * (1 - e) - R_E,
+            ha: a * (1 + e) - R_E,
+            speed: Math.sqrt(MU * (2 / r - 1 / a)),   // vis-viva
+            period: periodOf(a),
+            rVec: positionAt(el, basis, nu),
+            vVec: velocityAt(el, basis, nu),
+            // The north component of h classifies the motion.
+            direction: basis.W.z > 1e-6 ? 'Prograde' : basis.W.z < -1e-6 ? 'Retrograde' : 'Polar'
+        };
+    }
+
+    // Kepler's equation, M = E - e sin E, solved for E by Newton's method.
+    function solveKepler(M, e) {
+        let E = e < 0.8 ? M : Math.PI;
+        for (let iter = 0; iter < 12; iter++) {
+            const delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+            E -= delta;
+            if (Math.abs(delta) < 1e-9) break;
+        }
+        return E;
+    }
+
+    // Moves nu forward by a fraction of one orbit in time, so the satellite is fastest at perigee.
+    function advanceTrueAnomaly(nuDeg, e, orbitFraction) {
+        const nu = nuDeg * D2R;
+        const root = Math.sqrt(Math.max(0, 1 - e * e));
+        const E0 = Math.atan2(root * Math.sin(nu), e + Math.cos(nu));
+        const M = (((E0 - e * Math.sin(E0)) + orbitFraction * TWO_PI) % TWO_PI + TWO_PI) % TWO_PI;
+        const E = solveKepler(M, e);
+        const next = Math.atan2(root * Math.sin(E), Math.cos(E) - e) * R2D;
+        return (next + 360) % 360;
+    }
+
+    /* ================================================================== */
+    /* RENDERING AND CONTROLS                                             */
+    /* ================================================================== */
     const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
@@ -29,13 +127,6 @@
     /* ------------------------------------------------------------------ */
     /* Constants                                                          */
     /* ------------------------------------------------------------------ */
-    const R_E = 6378.137;         // Earth equatorial radius (km). One scene unit is one Earth radius.
-    const MU = 398600.4418;       // Earth gravitational parameter (km^3/s^2)
-    const OMEGA_E = 7.292115e-5;  // Earth rotation rate (rad/s)
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-    const TWO_PI = 2 * Math.PI;
-
     // Every orbit plays in the same time, so that a low orbit is not a blur.
     const ORBIT_PLAY_SECONDS = 20;
     const SPEEDS = [
@@ -485,51 +576,6 @@
     };
 
     /* ------------------------------------------------------------------ */
-    /* Orbital Mechanics                                                  */
-    /* ------------------------------------------------------------------ */
-
-    // Unit vectors in ECI: P toward perigee, Q in the plane 90 degrees ahead of P,
-    // W along the angular momentum, and n toward the ascending node.
-    function orbitBasis() {
-        const O = state.raan * D2R, inc = state.i * D2R, w = state.argp * D2R;
-        const cosO = Math.cos(O), sinO = Math.sin(O);
-        const cosi = Math.cos(inc), sini = Math.sin(inc);
-        const cosw = Math.cos(w), sinw = Math.sin(w);
-        return {
-            P: new THREE.Vector3(cosO * cosw - sinO * sinw * cosi, sinO * cosw + cosO * sinw * cosi, sinw * sini),
-            Q: new THREE.Vector3(-cosO * sinw - sinO * cosw * cosi, -sinO * sinw + cosO * cosw * cosi, cosw * sini),
-            W: new THREE.Vector3(sinO * sini, -cosO * sini, cosi),
-            n: new THREE.Vector3(cosO, sinO, 0)
-        };
-    }
-
-    // Solves Kepler's equation, M = E - e sin E, for the eccentric anomaly E.
-    function solveKepler(M, e) {
-        let E = e < 0.8 ? M : Math.PI;
-        for (let iter = 0; iter < 12; iter++) {
-            const delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= delta;
-            if (Math.abs(delta) < 1e-9) break;
-        }
-        return E;
-    }
-
-    // Moves the true anomaly forward by a fraction of one orbit, equal in time. The satellite
-    // therefore moves faster near perigee and slower near apogee.
-    function advanceTrueAnomaly(nuDeg, e, orbitFraction) {
-        const nu = nuDeg * D2R;
-        const root = Math.sqrt(Math.max(0, 1 - e * e));
-        const E0 = Math.atan2(root * Math.sin(nu), e + Math.cos(nu));
-        const M = (((E0 - e * Math.sin(E0)) + orbitFraction * TWO_PI) % TWO_PI + TWO_PI) % TWO_PI;
-        const E = solveKepler(M, e);
-        const next = Math.atan2(root * Math.sin(E), Math.cos(E) - e) * R2D;
-        return (next + 360) % 360;
-    }
-
-    function isEquatorial() { return state.i < 0.05 || state.i > 179.95; }
-    function isCircular() { return state.e < 1e-4; }
-
-    /* ------------------------------------------------------------------ */
     /* Scene Update                                                       */
     /* ------------------------------------------------------------------ */
     let geometryKey = '';
@@ -647,13 +693,13 @@
 
     function update3DScene() {
         const { a, e, nu, selected } = state;
-        const { P, Q, W, n } = orbitBasis();
+        const basis = orbitBasis(state);
+        const [P, Q, W, n] = [basis.P, basis.Q, basis.W, basis.n].map((v) => new THREE.Vector3(v.x, v.y, v.z));
         const aScene = a / R_E;
         const p = aScene * (1 - e * e);
-        const rp = aScene * (1 - e);
-        const ra = aScene * (1 + e);
+        const rp = radiusAt(state, 0) / R_E;
+        const ra = radiusAt(state, 180) / R_E;
         const nuRad = nu * D2R;
-        const r = p / (1 + e * Math.cos(nuRad));
         const shown = shownElements();
         const show = visibility(shown);
         const has = (name) => shown.has(name);
@@ -705,7 +751,7 @@
         anchors.H.copy(W).multiplyScalar(kLen);
 
         // The ascending node lies where the orbit itself crosses the equator heading north.
-        const rNode = p / (1 + e * Math.cos(state.argp * D2R));
+        const rNode = radiusAt(state, -state.argp) / R_E;
         anchors.node.copy(n).multiplyScalar(rNode);
         nodeMarker.visible = show.node;
         nodeMarker.position.copy(anchors.node);
@@ -743,9 +789,7 @@
         anchors.e.copy(anchors.orbitCenter).multiplyScalar(0.5);
 
         // Satellite, with the position vector as one side of the true anomaly
-        anchors.sat.set(0, 0, 0)
-            .addScaledVector(P, r * Math.cos(nuRad))
-            .addScaledVector(Q, r * Math.sin(nuRad));
+        anchors.sat.copy(positionAt(state, basis, nu)).divideScalar(R_E);
         satMarker.position.copy(anchors.sat);
         satMarker.scale.setScalar(0.55 * sz);
         rLine.visible = show.rLine && state.showFill;
@@ -762,10 +806,7 @@
         // Each arc runs along the path it measures along, and ends on the point it measures to:
         // RAAN along the equator to the node, the argument of perigee along the orbit from the
         // node to perigee, and the true anomaly along the orbit from perigee to the satellite.
-        const orbitPoint = (theta, out) => {
-            const dist = p / (1 + e * Math.cos(theta));
-            return out.copy(P).multiplyScalar(dist * Math.cos(theta)).addScaledVector(Q, dist * Math.sin(theta));
-        };
+        const orbitPoint = (theta, out) => out.copy(positionAt(state, basis, theta * R2D)).divideScalar(R_E);
         const raanRad = state.raan * D2R, argpRad = state.argp * D2R;
         drawArc(arcRAAN, anchors.raan, (t, out) => out.set(Math.cos(raanRad * t) * rNode, Math.sin(raanRad * t) * rNode, 0),
             Z_AXIS, raanRad, sz, has('raan'), bold('raan'));
@@ -808,28 +849,7 @@
     }
 
     function updatePanels() {
-        const { a, e, nu } = state;
-        const p = a * (1 - e * e);
-        const hp = a * (1 - e) - R_E;
-        const ha = a * (1 + e) - R_E;
-        const nuRad = nu * D2R;
-        const r = p / (1 + e * Math.cos(nuRad));
-        const speed = Math.sqrt(MU * (2 / r - 1 / a));
-        const period = TWO_PI * Math.sqrt(Math.pow(a, 3) / MU);
-
-        const { P, Q, W } = orbitBasis();
-        const rVec = new THREE.Vector3()
-            .addScaledVector(P, r * Math.cos(nuRad))
-            .addScaledVector(Q, r * Math.sin(nuRad));
-        const vScale = Math.sqrt(MU / p);
-        const vVec = new THREE.Vector3()
-            .addScaledVector(P, -vScale * Math.sin(nuRad))
-            .addScaledVector(Q, vScale * (e + Math.cos(nuRad)));
-
-        // The north-south part of the angular momentum direction classifies the motion.
-        let direction = 'Polar';
-        if (W.z > 1e-6) direction = 'Prograde';
-        else if (W.z < -1e-6) direction = 'Retrograde';
+        const { r, hp, ha, speed, period, rVec, vVec, direction } = orbitState(state);
 
         $('val-direction').textContent = direction;
         $('val-period').textContent = formatPeriod(period);
@@ -861,10 +881,10 @@
         const notes = [];
         if (hp < 0) notes.push('This orbit passes through Earth: its perigee is below the surface.');
         const shown = shownElements();
-        if (isEquatorial() && (shown.has('i') || shown.has('raan') || shown.has('argp'))) {
+        if (isEquatorial(state) && (shown.has('i') || shown.has('raan') || shown.has('argp'))) {
             notes.push('At this inclination the orbit does not cross the equator, so the node shown is where it would lie.');
         }
-        if (isCircular() && (shown.has('e') || shown.has('argp') || shown.has('nu'))) {
+        if (isCircular(state) && (shown.has('e') || shown.has('argp') || shown.has('nu'))) {
             notes.push('A circle has no closest point, so the perigee shown is where it would lie.');
         }
 
@@ -1307,8 +1327,7 @@
             if (document.activeElement !== $('nu-number')) $('nu-number').value = state.nu.toFixed(1);
 
             // Earth turns by the true amount for the time the orbit represents.
-            const period = TWO_PI * Math.sqrt(Math.pow(state.a, 3) / MU);
-            earth.pivot.rotation.z += OMEGA_E * period * orbitFraction;
+            earth.pivot.rotation.z += OMEGA_E * periodOf(state.a) * orbitFraction;
             dirty = true;
         }
 

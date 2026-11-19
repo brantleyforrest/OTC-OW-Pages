@@ -262,6 +262,20 @@
         };
     }
 
+    // The conic through an ECI state: semi-latus rectum p, eccentricity e, perifocal unit
+    // vectors P (toward perigee, or along r for a circle) and Q, and the true anomaly nu0 (rad)
+    // of r. null when the state does not define an orbit.
+    function conicFromRv(r, v) {
+        const h = cross(r, v);
+        const hn = norm(h), rn = norm(r);
+        if (hn === 0 || rn === 0) return null;
+        const ev = cross(v, h).map((x, k) => x / MU - r[k] / rn);   // eccentricity vector
+        const e = norm(ev);
+        const P = e > 1e-9 ? ev.map((x) => x / e) : r.map((x) => x / rn);
+        const Q = cross(h.map((x) => x / hn), P);
+        return { p: hn * hn / MU, e, P, Q, nu0: Math.atan2(dot(r, Q), dot(r, P)) };
+    }
+
     // The RIC axes at time t, as ECI unit vectors, with the target's state and the frame's turn rate.
     function ricBasis(targetCoe, t) {
         const rv = coesToRv(t ? coeAt(targetCoe, t) : targetCoe);
@@ -279,6 +293,15 @@
             rho[0] * basis.R[1] + rho[1] * basis.I[1] + rho[2] * basis.C[1],
             rho[0] * basis.R[2] + rho[1] * basis.I[2] + rho[2] * basis.C[2]
         ];
+    }
+
+    // Chase's ECI state from its RIC state: r = rT + rho, v = vT + omega x rho + rho dot,
+    // with the frame turning at basis.omega about C.
+    function chaseRvFromRic(state, basis) {
+        const w = basis.omega;
+        const rho = ricToEci(state, basis);
+        const rel = ricToEci([state[3] - w * state[1], state[4] + w * state[0], state[5]], basis);
+        return { r: basis.r.map((x, k) => x + rho[k]), v: basis.v.map((x, k) => x + rel[k]) };
     }
 
     // Linear mapping from element differences to RMOEs (the method the course teaches).
@@ -510,7 +533,7 @@
         meanMotion, period, wrap360, wrap180,
         rmoeFromState, stateFromRmoe, rmoeAt, nmcLoop, driftRate, planeCrossingM, boundaryTable, timeToAngle,
         cwPropagate, stm, transferVelocity, applyBurn, rule,
-        keplerE, meanFromTrue, trueFromMean, coeAt, orbitProblem, coesToRv, ricBasis, ricToEci,
+        keplerE, meanFromTrue, trueFromMean, coeAt, orbitProblem, coesToRv, conicFromRv, ricBasis, ricToEci, chaseRvFromRic,
         rmoeFromCoes, coesFromRmoe, relativeState, sampleRelative, coeDifference, coeFromDifference, modelFit,
         classifyMotion, minRange, sampleTrajectory, flyPlan, propellant, fmt
     };

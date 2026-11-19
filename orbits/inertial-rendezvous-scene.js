@@ -6,8 +6,44 @@
     'use strict';
 
     const Kit = global.ToolKit;
+
+    /* ================================================================== */
+    /* ORBIT GEOMETRY MATH                                                */
+    /* Coplanar paths in the equatorial plane, for a model solved by      */
+    /* rendezvous-math.js (which also gives each craft's state in time).  */
+    /* km, s, rad. Angles are measured from the chase's starting point.   */
+    /* ================================================================== */
     const D2R = Math.PI / 180;
     const R2D = 180 / Math.PI;
+    const TWO_PI = 2 * Math.PI;
+
+    const circularPeriod = (r, mu) => TWO_PI * Math.sqrt(r * r * r / mu);
+    const conicRadius = (a, e, nu) => a * (1 - e * e) / (1 + e * Math.cos(nu));
+    const pointAtAngle = (r, angle) => ({ x: r * Math.cos(angle), y: r * Math.sin(angle) });
+
+    // Coplanar: the chase waits WT on its circle, then departs.
+    const departureAngle = (m) => m.n_chase * m.WT;
+    const targetAngleAtDeparture = (m) => -m.phi0_rad + m.n_target * m.WT;
+
+    // Coplanar Hohmann transfer, `sweep` rad past the departure point. Departure is perigee
+    // when raising and apogee when lowering.
+    function transferPoint(m, sweep) {
+        const Rc = m.Rchase, Rt = m.Rtarget;
+        const e = Math.abs(Rc - Rt) / (Rc + Rt);
+        const nuDep = Rc <= Rt ? 0 : Math.PI;
+        return pointAtAngle(conicRadius(m.a_transfer, e, nuDep + sweep), departureAngle(m) + sweep);
+    }
+
+    // Co-orbital phasing orbit at angle theta from the burn point, which is its apogee when
+    // the chase is behind and its perigee when it is ahead.
+    function phasingPoint(m, theta) {
+        const e = Math.abs(m.a_phasing - m.Rchase) / m.a_phasing;
+        return pointAtAngle(conicRadius(m.a_phasing, e, m.isBehind ? theta + Math.PI : theta), theta);
+    }
+
+    /* ================================================================== */
+    /* TIMELINE, SCENE, AND CAMERA                                        */
+    /* ================================================================== */
 
     /* ------------------------------------------------------------------ */
     /* Timeline Segments & Mission Clock                                  */
@@ -16,8 +52,7 @@
         if (!model) return [{ key: 'overview', from: 0, to: 1, t0: 0, t1: 1 }];
 
         const mu = (model.constants && model.constants.MU) || 398600.4418;
-        const R_target = model.Rtarget || model.Rchase;
-        const T_target = 2 * Math.PI * Math.sqrt(Math.pow(R_target, 3) / mu);
+        const T_target = circularPeriod(model.Rtarget || model.Rchase, mu);
         const t_together = 0.08 * T_target;
 
         const raw = [];
@@ -642,7 +677,15 @@
         // it (transfer, phasing, nu, desired, burns), so that a walkthrough can build them up.
         // traceNu: the coplanar nu_travel arc follows the target through the transfer instead
         // of being drawn whole. perigee: draw the co-orbital perigee altitude bar.
-        let shown = { vectors: true, angles: true, labels: true, values: true, reveal: null, compareHohmann: false, traceNu: false, perigee: false };
+        // Declutter options (the Inertial Rendezvous tool turns these off; the defaults keep
+        // the practice walkthrough as it was): radiusLabels names R_chase and R_target in the
+        // view; faintTransfer draws the unflown half of the transfer ellipse; futureBurns
+        // shows a burn's arrows dimly before the timeline reaches it. axisLevel sets the
+        // brightness of the I, J, K axes.
+        let shown = {
+            vectors: true, angles: true, labels: true, values: true, reveal: null, compareHohmann: false, traceNu: false, perigee: false,
+            radiusLabels: true, faintTransfer: true, futureBurns: true, axisLevel: 0.45
+        };
         // How much of each angle arc (and the perigee altitude bar) is drawn, 0 to 1, so that a
         // walkthrough can sweep one in when a step finds it
         const GROWN = { phi: 1, thetas: 1, nu: 1, desired: 1, perigee: 1 };
@@ -883,9 +926,9 @@
 
             // Coordinate axes
             const axisLen = axisLength(m);
-            placeArrow(axisI, 0.45, ORIGIN, axisDir(0).multiplyScalar(axisLen), sz);
-            placeArrow(axisJ, 0.45, ORIGIN, axisDir(Math.PI / 2).multiplyScalar(axisLen), sz);
-            placeArrow(axisK, 0.45, ORIGIN, new THREE.Vector3(0, 0, axisLen), sz);
+            placeArrow(axisI, shown.axisLevel, ORIGIN, axisDir(0).multiplyScalar(axisLen), sz);
+            placeArrow(axisJ, shown.axisLevel, ORIGIN, axisDir(Math.PI / 2).multiplyScalar(axisLen), sz);
+            placeArrow(axisK, shown.axisLevel, ORIGIN, new THREE.Vector3(0, 0, axisLen), sz);
 
             // Craft positions
             anchors.chasePos.set(state.chase.r[0] / R_E, state.chase.r[1] / R_E, state.chase.r[2] / R_E);
@@ -915,7 +958,7 @@
 
             /* Mode-specific visuals */
             if (m.mode === 'coplanar') {
-                const theta_dep = m.n_chase * m.WT;
+                const theta_dep = departureAngle(m);
                 const onStartOrbit = t_phys < m.WT || same;
 
                 // Radius lines: the chase's line follows it until the departure burn,
@@ -943,18 +986,13 @@
                     // Hohmann transfer: always prograde. Departure is perigee when
                     // raising and apogee when lowering, so the true anomaly at the
                     // departure point is 0 or 180 degrees.
-                    const a_tx_scene = m.a_transfer / R_E;
-                    const e_tx = Math.abs(rChaseScene - rTargetScene) / (rChaseScene + rTargetScene);
-                    const p_tx = a_tx_scene * (1 - e_tx * e_tx);
-                    const nuDep = rChaseScene <= rTargetScene ? 0 : Math.PI;
                     const txPoint = (sweep, out) => {
-                        const r = p_tx / (1 + e_tx * Math.cos(nuDep + sweep));
-                        const angle = theta_dep + sweep;
-                        return out.set(r * Math.cos(angle), r * Math.sin(angle), 0);
+                        const q = transferPoint(m, sweep);
+                        return out.set(q.x / R_E, q.y / R_E, 0);
                     };
                     const flying = p.key === 'transfer' || p.key === 'burn1';
                     drawTube(transferTube, 1, flying || p.key === 'burn2' ? 0.95 : 0.6, `${mid}_cp_tx`, (t, out) => txPoint(t * Math.PI, out), sz);
-                    drawTube(transferFaintTube, 1, 0.22, `${mid}_cp_tx_faint`, (t, out) => txPoint(Math.PI + t * Math.PI, out), sz);
+                    if (shown.faintTransfer) drawTube(transferFaintTube, 1, 0.22,`${mid}_cp_tx_faint`, (t, out) => txPoint(Math.PI + t * Math.PI, out), sz);
 
                     // Rendezvous point: the far end of the transfer
                     const arrTheta = theta_dep + Math.PI;
@@ -970,7 +1008,7 @@
                 const desiredShown = waiting && revealed('desired');
 
                 // Ghost target: where the target must be at the departure burn
-                const theta_target_dep = -m.phi0_rad + m.n_target * m.WT;
+                const theta_target_dep = targetAngleAtDeparture(m);
                 const ghostPos = tmpA.set(rTargetScene * Math.cos(theta_target_dep), rTargetScene * Math.sin(theta_target_dep), 0);
                 if (desiredShown) placeRing(ghostTarget, 0.75, ghostPos, sz * 2.2);
 
@@ -1044,7 +1082,6 @@
                 // Phasing orbit: touches the circle at the burn point (theta = 0), which
                 // is its apogee when the chase is behind and its perigee when ahead
                 const a_p_scene = m.a_phasing / R_E;
-                const e_p = Math.abs(m.a_phasing - rChaseKm) / m.a_phasing;
                 const isBehind = m.isBehind;
                 const isDangerous = m.h_p < m.constants.MIN_ALT;
 
@@ -1054,9 +1091,8 @@
                 if (m.phi0 > 0 && revealed('phasing')) {
                     const phasingLevel = p.key === 'phasing' ? 0.95 : 0.7;
                     drawTube(phasingTube, 1, phasingLevel, `${mid}_co_phasing_${a_p_scene.toFixed(4)}`, (t, out) => {
-                        const nu = t * 2 * Math.PI;
-                        const r = (a_p_scene * (1 - e_p * e_p)) / (1 + e_p * Math.cos(isBehind ? nu + Math.PI : nu));
-                        return out.set(r * Math.cos(nu), r * Math.sin(nu), 0);
+                        const q = phasingPoint(m, t * TWO_PI);
+                        return out.set(q.x / R_E, q.y / R_E, 0);
                     }, sz);
                 }
 
@@ -1159,6 +1195,7 @@
                     const vB = new THREE.Vector3(...ev.vBefore).multiplyScalar(vScale);
                     const vA = new THREE.Vector3(...ev.vAfter).multiplyScalar(vScale);
                     const s = burnState(evKey, p.key, p.k);
+                    if (!shown.futureBurns && s.level === UPCOMING) return;
                     const level = s.level;
 
                     // Tiny burns (a few m/s) get a minimum-length Delta-V arrow, labeled as enlarged
@@ -1238,7 +1275,9 @@
 
                 // Radii
                 const same = sameOrbit(currentModel);
-                if (currentModel.mode !== 'coorbital') {
+                if (!shown.radiusLabels) {
+                    // The sliders give the radii; the radial lines stay as the angle's sides
+                } else if (currentModel.mode !== 'coorbital') {
                     setLabelValue(labels.r1, kmText(currentModel.Rchase));
                     project(labels.r1, anchors.rChaseMid, 0.8);
                     if (!same) {
