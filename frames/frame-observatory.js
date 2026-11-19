@@ -4,7 +4,6 @@
 (async function () {
     'use strict';
 
-    const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
     const FM = window.FrameMath;
     const { RE, D2R } = FM;
     const $ = (id) => document.getElementById(id);
@@ -17,7 +16,7 @@
 
     let THREE;
     try {
-        THREE = await import(THREE_URL);
+        THREE = await Vendor.three();
     } catch (err) {
         showStatus('The 3D library could not be loaded. This tool needs an internet connection the first time it opens.');
         return;

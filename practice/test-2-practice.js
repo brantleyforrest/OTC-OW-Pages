@@ -553,7 +553,6 @@
     // The scene is made once the 3D library has loaded (or failed to load); until then the
     // latest problem and step wait in `pending`. The flat drawings and RIC panes work without it.
     function createViz() {
-        const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
         const statusEl = $('status');
         const hud = $('hud');
         const pending = { problem: null, stage: 'given', answersShown: false };
@@ -567,7 +566,7 @@
         (async () => {
             showStatus('Loading the 3D view...');
             let THREE = null;
-            try { THREE = await import(THREE_URL); } catch (err) { THREE = null; }
+            try { THREE = await Vendor.three(); } catch (err) { THREE = null; }
             showStatus('');
             scene = window.Test2Scene.create({ container: $('view'), THREE });
             if (pending.problem && pending.problem.view) {

@@ -8,9 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Ground Track Visualizer | OTC OW</title>
     <meta name="description" content="A split view of an orbit in 3D and its ground track on a world map. Adjust the six orbital elements to see how each one changes the path traced across Earth's surface.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="../vendor/fonts/fonts.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap'">
     <link rel="stylesheet" href="../assets/tool-theme.css">
     <style>
         :root {
@@ -545,6 +543,7 @@
         (function () {
             const t = Date.now();
             [
+                '../assets/vendor.js',
                 '../assets/tool-kit.js',
                 '../assets/earth-land.js',
                 '../assets/earth-scene.js',

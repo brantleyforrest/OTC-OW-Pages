@@ -8,10 +8,8 @@
     <meta http-equiv="Expires" content="0">
     <title>Test 1 Practice | OTC OW</title>
     <meta name="description" content="Practice problems for Test 1: R-V vectors to orbital elements, Hohmann transfers, simple plane changes, combined plane changes, coplanar and co-orbital rendezvous, time of flight with D = RT, and propulsion (the rocket equation, F = ma, and burn time), plus a card-matching drill for Kepler's three laws and Newton's four laws. Practice mode shows each problem in 3D and walks through the steps. Test mode accepts answers only, then shows the solution.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <link href="../vendor/fonts/fonts.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap'">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css" onerror="this.onerror=null;this.integrity='sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+';this.crossOrigin='anonymous';this.href='https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'">
     <link rel="stylesheet" href="../assets/tool-theme.css">
     <style>
         :root {
@@ -748,40 +746,46 @@
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
     <script>
         (function () {
             const t = Date.now();
-            [
-                '../assets/tool-kit.js',
-                '../assets/earth-land.js',
-                '../assets/earth-scene.js',
-                'answer-check.js',
-                'practice-math.js',
-                'satellite-motion.js',
-                'rv-coe-problems.js',
-                'rv-coe-scene.js',
-                'maneuvers-problems.js',
-                'test-1-maneuver-problems.js',
-                'test-1-maneuver-scene.js',
-                '../orbits/rendezvous-math.js',
-                '../orbits/inertial-rendezvous-scene.js',
-                'test-1-rendezvous-problems.js',
-                'test-1-rendezvous-scene.js',
-                'test-1-tof-problems.js',
-                'test-1-tof-scene.js',
-                'test-1-ground-track-problems.js',
-                'test-1-ground-track-scene.js',
-                'test-1-coe-box-problems.js',
-                'test-1-propulsion-problems.js',
-                'test-1-law-matching.js',
-                'test-1-practice.js'
-            ].forEach(function (src) {
-                const s = document.createElement('script');
-                s.src = src + '?t=' + t;
-                s.async = false;
-                document.body.appendChild(s);
-            });
+            const v = document.createElement('script');
+            v.src = '../assets/vendor.js?t=' + t;
+            v.onload = v.onerror = function () {
+                (window.Vendor ? Vendor.script('katex') : Promise.resolve()).then(function () {
+                    [
+                        '../assets/tool-kit.js',
+                        '../assets/earth-land.js',
+                        '../assets/earth-scene.js',
+                        'answer-check.js',
+                        'practice-math.js',
+                        'satellite-motion.js',
+                        'rv-coe-problems.js',
+                        'rv-coe-scene.js',
+                        'maneuvers-problems.js',
+                        'test-1-maneuver-problems.js',
+                        'test-1-maneuver-scene.js',
+                        '../orbits/rendezvous-math.js',
+                        '../orbits/inertial-rendezvous-scene.js',
+                        'test-1-rendezvous-problems.js',
+                        'test-1-rendezvous-scene.js',
+                        'test-1-tof-problems.js',
+                        'test-1-tof-scene.js',
+                        'test-1-ground-track-problems.js',
+                        'test-1-ground-track-scene.js',
+                        'test-1-coe-box-problems.js',
+                        'test-1-propulsion-problems.js',
+                        'test-1-law-matching.js',
+                        'test-1-practice.js'
+                    ].forEach(function (src) {
+                        const s = document.createElement('script');
+                        s.src = src + '?t=' + t;
+                        s.async = false;
+                        document.body.appendChild(s);
+                    });
+                });
+            };
+            document.body.appendChild(v);
         })();
     </script>
 </body>

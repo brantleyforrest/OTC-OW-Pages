@@ -606,7 +606,6 @@
     // current problem is shown. The answer form and the walkthrough do not depend on either.
     // If the 3D library cannot be loaded, the view reports that, and the rest of the page still works.
     function createViz() {
-        const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
         const statusEl = $('status');
         const hud = $('hud');
         const views = {
@@ -650,7 +649,7 @@
             showStatus('Loading the 3D view...');
             let THREE;
             try {
-                THREE = await import(THREE_URL);
+                THREE = await Vendor.three();
             } catch (err) {
                 showStatus('The 3D library could not be loaded. The view needs an internet connection the first time it opens. The answers and walkthrough still work.');
                 return;

@@ -12,7 +12,6 @@
 (async function () {
     'use strict';
 
-    const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
     const $ = id => document.getElementById(id);
     const Kit = window.ToolKit, M = window.RpoMath, V = window.RpoViews;
 
@@ -124,7 +123,7 @@
 
     /* ---------- Stage ---------- */
     let THREE = null;
-    try { THREE = await import(THREE_URL); } catch (err) { THREE = null; }
+    try { THREE = await Vendor.three(); } catch (err) { THREE = null; }
     const view = $('view');
     const stage = V.createFiveViewStage(view, { THREE, onResize: () => { if (sim) { refit(true); dirty = true; } } });
     const PLANE_NAMES = ['left', 'behind', 'above'];

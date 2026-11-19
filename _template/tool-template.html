@@ -10,9 +10,7 @@
     <meta name="robots" content="noindex">
     <title>Tool Name | OTC OW</title>
     <meta name="description" content="One sentence describing what this tool shows.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="../vendor/fonts/fonts.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap'">
     <link rel="stylesheet" href="../assets/tool-theme.css">
     <style>
         /* Styles used only by this tool go here. Shared styles belong in tool-theme.css. */
@@ -141,6 +139,7 @@
         (function () {
             const t = Date.now();
             [
+                '../assets/vendor.js',
                 '../assets/tool-kit.js',
                 'tool-template-2d.js'
                 // For a 3D tool, uncomment:

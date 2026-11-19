@@ -40,7 +40,7 @@ The Study tab links to:
 
 ## Technical Architecture
 
-* **Framework-Free:** Built using clean, native client-side web technologies (HTML5, responsive CSS, WebGL/Canvas, and vanilla JavaScript). The 3D tool loads Three.js from a CDN, so it needs an internet connection. Test 1 Practice also loads KaTeX from a CDN to render its math.
+* **Framework-Free:** Built using clean, native client-side web technologies (HTML5, responsive CSS, WebGL/Canvas, and vanilla JavaScript). Three.js, KaTeX, and the fonts load from `vendor/` when it exists and from a CDN otherwise. To work offline, run `python scripts/fetch_vendor.py` once to download them.
 * **Fast & Self-Contained:** Runs entirely in any standard modern web browser without requiring node build pipelines, backend servers, or external logins.
 * **Local Execution:** To run locally, simply clone the repository and open `index.html` in a web browser:
   ```bash

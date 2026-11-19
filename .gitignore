@@ -30,3 +30,7 @@ _server/secrets/
 _server/data/
 _server/deploy/out/
 node_modules/
+
+# Local copies of CDN libraries from scripts/fetch_vendor.py (pages fall back to the CDN without them)
+/vendor/
+/vendor-*/

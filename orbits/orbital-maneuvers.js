@@ -3,7 +3,6 @@
 (async function () {
     'use strict';
 
-    const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
     const MP = window.ManeuversProblems;
@@ -96,7 +95,7 @@
 
     let THREE;
     try {
-        THREE = await import(THREE_URL);
+        THREE = await Vendor.three();
     } catch (err) {
         showStatus('The 3D library could not be loaded. Sliders, values, and equations remain functional.');
     }

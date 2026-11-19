@@ -8,9 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Perturbations Explorer | OTC OW</title>
     <meta name="description" content="A 3D view of how drag, Earth's oblateness, the equator's ellipticity, the Sun and Moon, and sunlight change an orbit over time.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="../vendor/fonts/fonts.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap'">
     <link rel="stylesheet" href="../assets/tool-theme.css">
     <style>
         /* Mode colors. They match COLOR in perturbations.js. */
@@ -333,6 +331,7 @@
         (function () {
             const t = Date.now();
             [
+                '../assets/vendor.js',
                 '../assets/tool-kit.js',
                 '../assets/earth-land.js',
                 '../assets/earth-scene.js',

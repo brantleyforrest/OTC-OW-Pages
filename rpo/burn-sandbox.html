@@ -9,10 +9,8 @@
     <meta name="robots" content="noindex">
     <title>RIC Burn Sandbox | OTC OW</title>
     <meta name="description" content="Fire radial, in-track, and cross-track burns at chase and watch what each one does to its motion relative to the target, in the RIC views and an inertial view, with the RMOEs before and after each burn.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <link href="../vendor/fonts/fonts.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap'">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css" onerror="this.onerror=null;this.integrity='sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+';this.crossOrigin='anonymous';this.href='https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'">
     <link rel="stylesheet" href="../assets/tool-theme.css">
     <link rel="stylesheet" href="rpo-theme.css">
     <style>
@@ -310,23 +308,29 @@
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
     <script>
         (function () {
             const t = Date.now();
-            [
-                '../assets/tool-kit.js',
-                '../assets/earth-land.js',
-                '../assets/earth-scene.js',
-                'rpo-math.js',
-                'rpo-views.js',
-                'burn-sandbox.js'
-            ].forEach(function (src) {
-                const s = document.createElement('script');
-                s.src = src + '?t=' + t;
-                s.async = false;
-                document.body.appendChild(s);
-            });
+            const v = document.createElement('script');
+            v.src = '../assets/vendor.js?t=' + t;
+            v.onload = v.onerror = function () {
+                (window.Vendor ? Vendor.script('katex') : Promise.resolve()).then(function () {
+                    [
+                        '../assets/tool-kit.js',
+                        '../assets/earth-land.js',
+                        '../assets/earth-scene.js',
+                        'rpo-math.js',
+                        'rpo-views.js',
+                        'burn-sandbox.js'
+                    ].forEach(function (src) {
+                        const s = document.createElement('script');
+                        s.src = src + '?t=' + t;
+                        s.async = false;
+                        document.body.appendChild(s);
+                    });
+                });
+            };
+            document.body.appendChild(v);
         })();
     </script>
 </body>
