@@ -1,4 +1,4 @@
-// Test 2 Practice, Elements to RIC Signs (#coeric). The problem gives the classical orbital
+// Test 2 Practice, COE to RIC Signs (#coeric). The problem gives the classical orbital
 // elements of a circular target and of a chase that differs a little, both with ω = 0 and the same
 // true anomaly (0°, 90°, 180°, or 270°; only 0° or 180° when chase's e differs, so chase is at its
 // perigee or apogee). The student gives the sign (+, −, or 0) of each part of chase's RIC position
@@ -38,10 +38,10 @@
         return { type: t, diffs: inPlane().concat(cross()) };
     }
 
-    // Where the exact difference of the two orbits falls outside a field's tolerance of the linear
-    // answer, the solution says so. This happens for the in-track rate of a plane change: tilting
+    // Where the exact difference of the two orbits falls outside a numeric tolerance of the linear
+    // answer, the solution says so. With differences this large it often does: for example, tilting
     // the velocity by an angle shortens its in-track part by about v times the angle squared over 2,
-    // a second-order effect the linear model leaves out.
+    // a second-order effect the linear model leaves out. The graded answers are the linear signs.
     function exactNote(target, chase, st) {
         const rel = M.relativeState(target, chase, 0);
         const exact = [...rel.rho, ...rel.rhoDot];
@@ -52,7 +52,7 @@
         const list = off.map(fl => '$' + fl.tex + '_0 = ' + num(exactAnswers[fl.key]) + '$ ' + fl.unit).join(', ');
         return note('The exact difference of the two orbits gives ' + list + ' here, against the linear model’s ' +
             off.map(fl => '$' + num(answers[fl.key]) + '$').join(', ') +
-            '. The gap is a second-order effect of the plane difference, which the linear model leaves out. Answer with the linear model, as the course does.');
+            '. The gap is what the linear model leaves out, and it grows with the size of the differences. Answer with the linear model, as the course does.');
     }
 
     function generate(type) {
@@ -71,13 +71,15 @@
             raan: geo ? 0 : C2.stepIn(0, 355, 5),
             argp: 0, nu
         };
+        // Every difference is substantial: a by at least 50 km, e by at least 0.05, an angle by at
+        // least 1°. Chase's perigee must stay at least 200 km above Earth.
         const chase = Object.assign({}, target);
-        if (diffs.includes('a')) chase.a = a + C2.sign() * C2.halfKm(0.5, s.xc);
-        if (diffs.includes('e')) chase.e = Number((C2.halfKm(0.5, s.C) / chase.a).toFixed(7));
-        const angStep = geo ? 0.005 : a > 20000 ? 0.005 : 0.01;
-        const ang = C2.stepIn(angStep, angStep * 6, angStep);
-        if (diffs.includes('i')) chase.i = Number((target.i + (target.i > 0 ? C2.sign() : 1) * ang).toFixed(4));
-        if (node) chase.raan = Number(M.wrap360(target.raan + C2.sign() * ang).toFixed(4));
+        if (diffs.includes('a')) chase.a = a + C2.sign() * C2.stepIn(50, geo ? 500 : a > 20000 ? 400 : 200, 10);
+        if (diffs.includes('e')) chase.e = Number(C2.stepIn(0.05, 0.1, 0.01).toFixed(2));
+        if (chase.a * (1 - chase.e) < M.RE + 200) return generate(type);
+        const ang = C2.stepIn(1, 5, 1);
+        if (diffs.includes('i')) chase.i = target.i + (target.i > 0 ? C2.sign() : 1) * ang;
+        if (node) chase.raan = M.wrap360(target.raan + C2.sign() * ang);
 
         const r = M.rmoeFromCoes(target, chase);
         const st = M.stateFromRmoe(r, n, 0);
@@ -89,6 +91,10 @@
         const rel = M.relativeState(target, chase, 0);
         const exact = [...rel.rho, ...rel.rhoDot];
         if (SIGN_FIELDS.some(([key], k) => signs[key] !== '0' && Math.sign(exact[k]) !== (signs[key] === '+' ? 1 : -1))) return generate(type);
+        // A 0 must stay close to 0 in the exact orbits too: under 5 percent of the largest exact
+        // part of its kind (the same line a + or − must clear in the linear model).
+        const exactScale = [Math.max(...exact.slice(0, 3).map(Math.abs)), Math.max(...exact.slice(3).map(Math.abs))];
+        if (SIGN_FIELDS.some(([key], k) => signs[key] === '0' && Math.abs(exact[k]) >= 0.05 * exactScale[k < 3 ? 0 : 1])) return generate(type);
 
         // Steps: n; the RMOEs from the elements; where chase is; the boundary tables.
         const steps = [{ key: 'n', title: 'Mean motion of the target', result: '$n = ' + sci(n) + '$ rad/s',
@@ -138,29 +144,30 @@
             methods: [{ name: 'Tables', html: tableHtml + exactNote(target, chase, st) }] });
 
         const signRows = SIGN_FIELDS.map(([key, tex, name], k) => rule('$' + tex + '_0 = ' + C2.texNum(k < 3 ? C2.fixed(st[k], 3) : ms(st[k])) + '$ ' + (k < 3 ? 'km' : 'm/s') +
-            ' (' + name.toLowerCase() + ')', SYMBOL[signs[key]])).join('');
+            ' (' + name + ')', SYMBOL[signs[key]])).join('');
         steps.push({ key: 'answer', title: 'Each sign', result: SIGN_FIELDS.map(([key]) => SYMBOL[signs[key]]).join(' '),
             caption: 'Chase’s motion from these RMOEs, beside both orbits.',
             methods: [{ name: 'Signs', html: signRows + note(C2.reading(r, n, a)) }] });
 
         return {
             type: pick.type,
-            model: { kind: 'motion', target, chase, rmoe: r, n, revs: 2 },
-            title: 'Elements to RIC Signs',
+            model: { kind: 'motion', target, chase, rmoe: r, n, revs: 2, secondsPerRev: 15 },
+            title: 'COE to RIC Signs',
             prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit. Chase is on the orbit given beside it, at the same moment. Is each part of chase’s position and velocity in the RIC frame positive, negative, or zero? (Use the course’s linear model.)'),
             statement: statementHtml(target, chase),
             overviewCaption: 'The target (green square) and chase (gold triangle), each on its own orbit. The RIC panes fill in at the last step.',
             limitsHtml: 'Pick +, −, or 0 for each.',
-            gridHeads: ['Position', 'Velocity'],
+            gridHeads: ['\\bar\\rho', '\\dot{\\bar\\rho}'],   // TeX: the grid's two columns
             fields: GRID_ORDER.map(key => { const [, tex, name] = SIGN_FIELDS.find(f => f[0] === key); return { key, tex, name, unitType: 'sign' }; }),
             answers: Object.fromEntries(SIGN_FIELDS.map(([key]) => [key, { value: signs[key], text: SYMBOL[signs[key]] }])),
             steps
         };
     }
 
-    // The grid: rows R, I, C; columns position, velocity. The form fills two columns row by row.
-    const SIGN_FIELDS = [['x', 'x', 'R position'], ['y', 'y', 'I position'], ['z', 'z', 'C position'],
-        ['vx', '\\dot x', 'R velocity'], ['vy', '\\dot y', 'I velocity'], ['vz', '\\dot z', 'C velocity']];
+    // The grid: rows R, I, C; columns ρ̄ (position) and ρ̄̇ (velocity). The form fills two columns
+    // row by row.
+    const SIGN_FIELDS = [['x', 'x', 'R'], ['y', 'y', 'I'], ['z', 'z', 'C'],
+        ['vx', '\\dot x', 'R'], ['vy', '\\dot y', 'I'], ['vz', '\\dot z', 'C']];
     const GRID_ORDER = ['x', 'vx', 'y', 'vy', 'z', 'vz'];
     const SYMBOL = { '+': '+', '-': '−', '0': '0' };
     // Signs of the linear-model state. A part is 0 only when it is zero by construction (round-off

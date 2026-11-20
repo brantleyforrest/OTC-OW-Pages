@@ -64,12 +64,11 @@
         }
 
         /* ---------- rel: course-model motion from RMOEs alone ----------
-         * model: { a, n, rmoe, revs, showStart?, start?, before?, dv?, dvGiven?, pathGiven? }.
+         * model: { a, n, rmoe, revs, showStart?, start?, before?, dv?, dvGiven? }.
          * The target is on a circular equatorial orbit of radius a. start: chase's state before a burn
          * (default: the epoch state of rmoe); before: the RMOEs before that burn, drawn faintly until
          * the answer; dv: the burn, its arrow shown at the 'burn' step, or from the start when
-         * dvGiven; pathGiven: the whole path is part of the question (Burn Trajectories, Pick the
-         * Burn). */
+         * dvGiven. */
         function buildRel(model) {
             const n = model.n, revs = model.revs || 2;
             const spanT = revs * 2 * Math.PI / n;
@@ -106,8 +105,7 @@
             } else {
                 rho = sim.start;
                 const early = stageKey === 'given' || stageKey === 'burn';
-                if (m.pathGiven && stageKey === 'given') data = { chase: sim.start, trail: sim.course };
-                else if (m.before && early) {
+                if (m.before && early) {
                     data = { chase: sim.start, ghosts: [sim.before] };
                     if ((stageKey === 'burn' || m.dvGiven) && m.dv) data.burns = [{ at: sim.start, dv: m.dv }];
                 }
@@ -154,7 +152,7 @@
                 return;
             }
             const revs = sim.model.revs || 2;
-            t += dt * sim.spanT / (PLAY_SECONDS_PER_REV * revs);
+            t += dt * sim.spanT / ((sim.model.secondsPerRev || PLAY_SECONDS_PER_REV) * revs);
             if (t > sim.spanT) t = 0;
             draw();
         });

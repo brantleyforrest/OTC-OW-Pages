@@ -187,7 +187,7 @@
         .el-given tbody th { text-align: center; color: var(--text-muted); font-weight: 400; }
         .el-given tr.differs td, .el-given tr.differs th { color: var(--accent-gold); font-weight: 600; }
 
-        /* Picks: words or signs as a row of buttons, plots as a grid of cards */
+        /* Picks: words or signs as a row of buttons */
         .answer.pick { grid-column: 1 / -1; }
         .pick-group { display: flex; flex-wrap: wrap; gap: 0.35rem; }
         .pick-option {
@@ -211,27 +211,9 @@
         .answer.pick.right .pick-option:has(input:checked) { border-color: var(--answer-right); }
         .answer.pick.wrong .pick-option:has(input:checked) { border-color: var(--answer-wrong); }
 
-        .pick-plot .pick-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
-        .pick-plot .pick-option { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; padding: 0.35rem; }
-        .pick-plot .pick-option input { position: absolute; opacity: 0; pointer-events: none; }
-        .pick-tag {
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--accent-gold);
-            padding: 0 0.3rem;
-        }
-        .plot-pair { display: grid; grid-template-columns: 2fr 1fr; gap: 3px; }
-        .plot-cell { position: relative; display: block; height: 5.6rem; background: #03060c; border: 1px solid var(--border-subtle); border-radius: 4px; overflow: hidden; }
-        .plot-pair.single { grid-template-columns: minmax(0, 1fr); }
-        .plot-cell canvas { position: absolute; inset: 0; display: block; }
-
-        /* Sign grid (Elements to RIC Signs): rows R, I, C under the heads Position and Velocity */
+        /* Sign grid (COE to RIC Signs): rows R, I, C under the heads rho bar and rho bar dot */
         .answers.sign-grid .answer.pick-sign { grid-column: auto; }
-        .grid-head { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
-        @media (max-width: 420px) {
-            .pick-plot .pick-group { grid-template-columns: minmax(0, 1fr); }
-        }
+        .grid-head { font-size: 1.05rem; color: var(--text-muted); }
 
         /* Check-all lists: one column of boxes */
         .answers.check-list { grid-template-columns: minmax(0, 1fr); gap: 0.3rem; }
@@ -323,6 +305,8 @@
 
         .answer-score { font-size: 0.86rem; font-weight: 600; color: #ffffff; }
         .answer-score.warn { font-weight: 500; color: #fbbf24; }
+        /* Sketch-and-check problems: the answer in words, shown in place of a score */
+        .answer-score.reveal { font-weight: 400; line-height: 1.45; color: var(--text-main); }
         .answer-limits { margin-top: 0.45rem; }
 
         /* Walkthrough */

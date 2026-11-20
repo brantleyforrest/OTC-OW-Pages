@@ -22,7 +22,7 @@
     // (a section with one kind of problem shows no topic buttons).
     const Rmoe = window.Test2RmoeProblems;
     const SECTIONS = [
-        { key: 'coeric', label: 'Elements to RIC Signs', module: window.Test2CoericProblems,
+        { key: 'coeric', label: 'COE to RIC Signs', module: window.Test2CoericProblems,
           types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'Cross-Track'], ['both', 'Both']] },
         { key: 'vis-state', label: 'Visualize from Position and Velocity', module: window.Test2VisStateProblems,
           types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'With Cross-Track']] },
@@ -33,7 +33,7 @@
         { key: 'state', label: 'RMOEs to Position and Velocity', module: Rmoe && { generate: () => Rmoe.generate('reverse'), grade: Rmoe.grade },
           types: [['reverse', 'RMOEs to State']] },
         { key: 'burns', label: 'Burn Trajectories', module: window.Test2BurnsProblems,
-          types: [['random', 'Random'], ['drawing', 'Pick the Drawing'], ['burn', 'Pick the Burn']] }
+          types: [['random', 'Random'], ['+R', '+R'], ['-R', '−R'], ['+I', '+I'], ['-I', '−I']] }
     ].filter(s => s.module && (DEV || PUBLISHED.includes(s.key)));
     const byKey = Object.fromEntries(SECTIONS.map(s => [s.key, s]));
 
@@ -81,6 +81,9 @@
             limitsHtml: p.limitsHtml,
             overviewCaption: p.overviewCaption,
             gridHeads: p.gridHeads || null,
+            // selfCheck: nothing to grade; the student draws on paper, then shows the answer.
+            selfCheck: Boolean(p.selfCheck),
+            revealHtml: p.revealHtml || '',
             fields: p.fields,
             statement: p.statement,
             answers: p.answers,
@@ -94,7 +97,7 @@
     /* Answer Form                                                        */
     /* ------------------------------------------------------------------ */
     let answerRows = {};
-    const PICK_TYPES = ['choice', 'plot', 'sign'];
+    const PICK_TYPES = ['choice', 'sign'];
 
     function clearMarkOnChange(field) {
         if (state.submitted) return;
@@ -109,13 +112,13 @@
         box.textContent = '';
         answerRows = {};
         box.classList.toggle('check-list', fields.every((f) => f.unitType === 'check'));
-        // A sign grid: the fields fill the two columns row by row, under these column heads.
+        // A sign grid: the fields fill the two columns row by row, under these column heads (TeX).
         const heads = state.problem.gridHeads;
         box.classList.toggle('sign-grid', Boolean(heads));
         (heads || []).forEach((text) => {
             const head = document.createElement('div');
             head.className = 'grid-head';
-            head.textContent = text;
+            head.innerHTML = math(text);
             box.appendChild(head);
         });
         fields.forEach((field, index) => {
@@ -207,7 +210,7 @@
         input.addEventListener('change', () => clearMarkOnChange(field));
     }
 
-    // Radio buttons: words ('choice'), a sign ('sign'), or pairs of small plots ('plot').
+    // Radio buttons: words ('choice') or a sign ('sign').
     function buildPickRow(field) {
         const row = document.createElement('div');
         row.className = 'answer pick pick-' + field.unitType;
@@ -227,26 +230,9 @@
             input.name = `answer-${field.key}`;
             input.value = option.value;
             label.appendChild(input);
-            if (field.unitType === 'plot') {
-                const tag = document.createElement('span');
-                tag.className = 'pick-tag';
-                tag.textContent = option.value;
-                const pair = document.createElement('span');
-                pair.className = 'plot-pair' + (option.plots.length === 1 ? ' single' : '');
-                option.plots.forEach((spec) => {
-                    const cell = document.createElement('span');
-                    cell.className = 'plot-cell plot-' + spec.plane;
-                    const canvas = document.createElement('canvas');
-                    cell.appendChild(canvas);
-                    pair.appendChild(cell);
-                });
-                label.append(tag, pair);
-                drawPlotPair(pair, option.plots);
-            } else {
-                const text = document.createElement('span');
-                text.innerHTML = prose(option.html);
-                label.appendChild(text);
-            }
+            const text = document.createElement('span');
+            text.innerHTML = prose(option.html);
+            label.appendChild(text);
             input.addEventListener('change', () => clearMarkOnChange(field));
             inputs.push(input);
             group.appendChild(label);
@@ -256,30 +242,6 @@
         row.append(labelFor(field), group, noteEl);
         $('answers').appendChild(row);
         answerRows[field.key] = { row, inputs, noteEl, kind: 'pick' };
-    }
-
-    // The two plots of a pair share one scale, so the same distance looks the same in both.
-    // spec.fit (a list of RMOEs): fit to those paths instead, so several choices share one scale.
-    function drawPlotPair(pair, plots) {
-        const M = window.TestReviewMath.rpo;
-        const cells = [...pair.children];
-        const sample = (rmoe, spec) => M.sampleTrajectory(rmoe, spec.n, 0, (spec.revs || 1) * 2 * Math.PI / spec.n, Math.round(120 * (spec.revs || 1)) + 1);
-        const paths = plots.map((spec) => spec.path || sample(spec.rmoe, spec));
-        const fitPaths = plots[0].fit ? plots[0].fit.map((r) => sample(r, plots[0])) : paths;
-        const draw = () => {
-            const panes = cells.map((cell, k) => {
-                const pane = V.createRicPlane(cell.firstChild, { plane: plots[k].plane, compact: true });
-                pane.resize(cell.clientWidth || 120, cell.clientHeight || 90);
-                return pane;
-            });
-            V.fitPanes(panes, fitPaths, true);
-            panes.forEach((pane, k) => {
-                const path = paths[k], end = path.length / 3 - 1;
-                pane.draw({ trail: path, marker: [path[0], path[1], path[2]], chase: [path[3 * end], path[3 * end + 1], path[3 * end + 2]] });
-            });
-        };
-        let pending = 0;
-        Kit.observeSize(pair, () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(draw); });
     }
 
     // What the student gave: the text typed, '1' for a checked box, or the picked option's value
@@ -301,6 +263,7 @@
     function setScore(text, warn) {
         $('score').textContent = text;
         $('score').classList.toggle('warn', Boolean(warn));
+        $('score').classList.remove('reveal');
     }
 
     function noteFor(result, answer, isTest, field) {
@@ -316,9 +279,24 @@
         return pick ? '✗ Not this one' : '✗ Not within the limit';
     }
 
+    // A sketch-and-check problem: show the answer (the motion in the view, its name, and the
+    // walkthrough) so the student can check the drawing.
+    function revealAnswer() {
+        state.submitted = true;
+        $('score').innerHTML = state.problem.revealHtml;
+        $('score').classList.remove('warn');
+        $('score').classList.add('reveal');
+        viz.showAnswers();
+        state.problem.steps.forEach((step, index) => state.visited.add(index));
+        applyLayout();
+        refreshSteps();
+        viz.resize();
+    }
+
     function gradeAnswers() {
         const isTest = state.mode === 'test';
         const problem = state.problem;
+        if (problem.selfCheck) { revealAnswer(); return; }
         const results = problem.fields.map((field) => ({ field, result: problem.grade(field, answerText(field)) }));
         const blanks = results.filter((item) => item.result === 'blank').length;
         if (isTest && blanks && !state.blankWarned) {
@@ -454,7 +432,7 @@
         document.body.classList.toggle('answers-only', answersOnly);
         $('walk-panel').hidden = ungraded;
         $('check').hidden = state.submitted;
-        $('check').textContent = state.mode === 'test' ? 'Submit Answers' : 'Check Answers';
+        $('check').textContent = state.problem.selfCheck ? 'Show the Answer' : state.mode === 'test' ? 'Submit Answers' : 'Check Answers';
         $('new-problem').classList.toggle('primary', state.submitted);
     }
 

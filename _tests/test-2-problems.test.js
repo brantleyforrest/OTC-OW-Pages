@@ -91,19 +91,27 @@ function motionFromParts(r) {
     return ['perch', 'cross-track', 'stationary-nmc', 'nmc-cross-track', 'linear-drift', 'drifting-cross-track', 'drifting-nmc', 'corkscrew'][(D ? 4 : 0) + (E ? 2 : 0) + (Z ? 1 : 0)];
 }
 
-/* ---------- 1. Elements to RIC Signs ---------- */
-check(`Elements to RIC Signs: ${COUNT} problems, signs from the linear mapping by hand`, () => {
+/* ---------- 1. COE to RIC Signs ---------- */
+check(`COE to RIC Signs: ${COUNT} problems, signs from the linear mapping by hand`, () => {
     const zeros = new Set(), signs = new Set();
     for (let k = 0; k < COUNT; k++) {
         const p = Coeric.generate(['in-plane', 'cross', 'both', 'random'][k % 4]);
         checkPicks(Coeric, p);
-        assert.deepStrictEqual(p.gridHeads, ['Position', 'Velocity'], 'grid heads');
+        assert.deepStrictEqual(p.gridHeads, ['\\bar\\rho', '\\dot{\\bar\\rho}'], 'grid heads');
         assert.deepStrictEqual(p.fields.map(f => f.key), ['x', 'vx', 'y', 'vy', 'z', 'vz'], 'grid order: rows R, I, C');
         const { target, chase, n } = p.model;
         assert.strictEqual(target.argp, 0); assert.strictEqual(chase.argp, 0);
         assert.strictEqual(target.nu, chase.nu, 'same true anomaly');
         assert.ok([0, 90, 180, 270].includes(target.nu));
         if (chase.e > 0) assert.ok([0, 180].includes(chase.nu), 'perigee or apogee');
+        // Every difference is substantial: a by 50 km or more, e by 0.05 or more, angles by 1° or more.
+        const da = Math.abs(chase.a - target.a), di0 = Math.abs(chase.i - target.i), dO0 = Math.abs(M.wrap180(chase.raan - target.raan));
+        assert.ok(da === 0 || da >= 50, 'a differs by at least 50 km: ' + da);
+        assert.ok(chase.e === 0 || chase.e >= 0.05, 'e differs by at least 0.05: ' + chase.e);
+        assert.ok(di0 === 0 || di0 >= 1, 'i differs by at least 1°: ' + di0);
+        assert.ok(dO0 === 0 || dO0 >= 1, 'Ω differs by at least 1°: ' + dO0);
+        assert.ok(da + chase.e + di0 + dO0 > 0, 'something differs');
+        assert.ok(chase.a * (1 - chase.e) >= M.RE + 200, 'perigee at least 200 km up');
         // The linear mapping worked by hand.
         const u = target.nu * Math.PI / 180, a = target.a, D = Math.PI / 180;
         const di = (chase.i - target.i) * D, dO = M.wrap180(chase.raan - target.raan) * D, i = target.i * D;
@@ -129,7 +137,7 @@ check(`Elements to RIC Signs: ${COUNT} problems, signs from the linear mapping b
 // The course's element-difference answers against the exact r/v answer from the tools' math
 // (OrbitMath, course set): every value the exact answer would put outside the numeric tolerance
 // must be explained in the solution. Reports how often and by how much.
-check('Elements to RIC Signs: the exact answer departs beyond tolerance only where the solution says so', () => {
+check('COE to RIC Signs: the exact answer departs beyond tolerance only where the solution says so', () => {
     const OM = require('../assets/orbit-math.js');
     const O = OM.bind(globalThis.OrbitConstants.SETS.course).rpo;
     const C2 = globalThis.Test2Common;
@@ -149,49 +157,40 @@ check('Elements to RIC Signs: the exact answer departs beyond tolerance only whe
                 const tol = field.tolerance;
                 worst = Math.max(worst, Math.abs(exact[field.key].value - truth) / Math.max(Math.abs(truth) * tol.relative, tol.floor || 0));
             }
-            // A sign the exact model would flip must be a linear 0 (a second-order part).
+            // The exact model never flips a + or −, and keeps every 0 under 5 percent of the
+            // largest exact part of its kind.
             const ev = exact[field.key].value, ans = p.answers[field.key].value;
             if (ans !== '0' && Math.sign(ev) !== (ans === '+' ? 1 : -1)) flips++;
+            const j = STATE_KEYS.indexOf(field.key);
+            const kind = STATE_KEYS.slice(j < 3 ? 0 : 3, j < 3 ? 3 : 6).map(key => Math.abs(exact[key].value));
+            if (ans === '0') assert.ok(Math.abs(ev) < 0.05 * Math.max(...kind) + 1e-9, 'a 0 stays near 0 exactly: ' + field.key + ' ' + ev);
         }
         assert.strictEqual(html.includes('The exact difference of the two orbits'), any, 'note shown exactly when needed');
     }
-    console.log(`      ${off} of ${total} values fall outside the numeric tolerance when worked exactly; worst ${worst.toFixed(2)} times the tolerance`);
-    assert.ok(worst < 5, 'the gap stays a small multiple of the tolerance');
+    console.log(`      ${off} of ${total} values fall outside the numeric tolerance when worked exactly; worst ${worst.toFixed(1)} times the tolerance`);
     assert.strictEqual(flips, 0, 'the exact model never flips a + or − answer');
 });
 
 /* ---------- 2 and 3. Visualize ---------- */
 function checkVisual(module, p, given) {
-    checkPicks(module, p);
+    // Sketch and check: nothing to grade; the answer shown names the motion and reads the RMOEs.
+    assert.ok(p.title && p.prompt && p.steps.length > 0 && p.limitsHtml, 'shape');
+    assert.ok(p.selfCheck, 'a sketch-and-check problem');
+    assert.strictEqual(p.fields.length, 0, 'no answer fields');
     const { n, rmoe: r } = p.model;
-    assert.strictEqual(p.answers.motion.value, motionFromParts(r), 'motion name from the parts');
-    assert.strictEqual(M.classifyMotion(r).key, p.answers.motion.value, 'motion name from classifyMotion');
+    assert.strictEqual(p.motion, motionFromParts(r), 'motion name from the parts');
+    assert.strictEqual(M.classifyMotion(r).key, p.motion, 'motion name from classifyMotion');
+    assert.ok(p.revealHtml.includes(Visual.LABEL[p.motion]), 'the answer names the motion');
+    assert.strictEqual(p.model.revs, Visual.REVS, 'two revs, as the prompt says');
+    assert.ok(M.sampleTrajectory(r, n, 0, Visual.REVS * 2 * Math.PI / n, 41).every(Number.isFinite), 'finite motion');
     if (given) {
         // The RMOEs worked from the rounded givens by the equation-sheet forms give the same motion.
         const sheet = sheetRmoe(given, n);
         ['xc', 'yc0', 'C', 'zmax'].forEach(key => near(sheet[key], r[key], 0.01, 'givens give back ' + key));
-        assert.strictEqual(motionFromParts(sheet), p.answers.motion.value, 'motion from the givens');
+        assert.strictEqual(motionFromParts(sheet), p.motion, 'motion from the givens');
         if (r.C > 0) assert.ok(angleGap(sheet.M0, r.M0) < 0.5, 'M0 from the givens');
         if (r.zmax > 0) assert.ok(angleGap(sheet.dM0, r.dM0) < 0.5, 'dM0 from the givens');
     }
-    // Exactly one plot pair draws the true motion (cwPropagate of the epoch state); every other pair
-    // draws something visibly different.
-    const field = p.fields.find(f => f.unitType === 'plot');
-    assert.strictEqual(field.options.length, 4, 'four plot choices');
-    const T = Visual.REVS * 2 * Math.PI / n, N = 41;
-    const s0 = M.stateFromRmoe(r, n, 0);
-    const truth = new Float64Array(3 * N);
-    for (let j = 0; j < N; j++) { const s = M.cwPropagate(s0, n, T * j / (N - 1)); truth.set(s.slice(0, 3), 3 * j); }
-    const size = Math.max(r.C, Math.abs(r.xc) * 2, r.zmax, Math.abs(r.yc0) / 3, 2);
-    const pathOf = spec => spec.path ? Float64Array.from({ length: 3 * N }, (_, q) => spec.path[3 * Math.round((Math.floor(q / 3)) * (spec.path.length / 3 - 1) / (N - 1)) + q % 3])
-        : M.sampleTrajectory(spec.rmoe, n, 0, T, N);
-    const gapTo = P => { let w = 0; for (let q = 0; q < P.length; q++) w = Math.max(w, Math.abs(P[q] - truth[q])); return w; };
-    const matches = field.options.filter(o => gapTo(pathOf(o.plots[0])) < 1e-6);
-    assert.strictEqual(matches.length, 1, 'one plot is the true motion');
-    assert.strictEqual(matches[0].value, p.answers.plot.value, 'the true plot is the answer');
-    field.options.filter(o => o !== matches[0]).forEach(o => assert.ok(gapTo(pathOf(o.plots[0])) > 0.1 * size, 'a wrong plot looks different'));
-    field.options.forEach(o => o.plots.forEach(s => assert.ok(pathOf(s).every(Number.isFinite), 'finite plot')));
-    assert.deepStrictEqual(field.options[0].plots.map(s => s.plane), ['left', 'behind'], 'left, then behind');
 }
 
 check(`Visualize from Position and Velocity: ${COUNT} problems`, () => {
@@ -200,7 +199,7 @@ check(`Visualize from Position and Velocity: ${COUNT} problems`, () => {
         const type = ['in-plane', 'cross', 'random'][k % 3];
         const p = Vis.state.generate(type);
         checkVisual(Vis.state, p, p.model.given);
-        seen.add(p.answers.motion.value);
+        seen.add(p.motion);
         if (type === 'in-plane') assert.strictEqual(p.model.rmoe.zmax, 0, 'in-plane has no swing');
         if (type === 'cross') assert.ok(p.model.rmoe.zmax > 0, 'cross has a swing');
     }
@@ -212,7 +211,7 @@ check(`Visualize from RMOEs: ${COUNT} problems`, () => {
     for (let k = 0; k < COUNT; k++) {
         const p = Vis.rmoe.generate(['in-plane', 'cross', 'random'][k % 3]);
         checkVisual(Vis.rmoe, p, null);
-        seen.add(p.answers.motion.value);
+        seen.add(p.motion);
         [p.model.rmoe.M0, p.model.rmoe.dM0].forEach(v => assert.ok(v === null || v % 5 === 0, '5° steps'));
     }
     assert.strictEqual(seen.size, 8, 'all eight motions appear');
@@ -250,11 +249,16 @@ check(`RMOEs to Position and Velocity: ${COUNT} problems`, () => {
 check(`Burn Trajectories: ${COUNT} problems against CW from the target`, () => {
     const seen = new Set();
     for (let k = 0; k < COUNT; k++) {
-        const p = Burns.generate(k % 2 ? 'drawing' : 'burn');
-        checkPicks(Burns, p);
+        const asked = ['random', '+R', '-R', '+I', '-I'][k % 5];
+        const p = Burns.generate(asked);
         const { n, rmoe: r, dv } = p.model;
         const which = (dv[0] > 0 ? '+R' : dv[0] < 0 ? '-R' : dv[1] > 0 ? '+I' : '-I');
-        seen.add(p.type + which);
+        if (asked !== 'random') assert.strictEqual(which, asked, 'the topic picks the burn');
+        assert.strictEqual(p.type, which, 'the burn named is the burn made');
+        seen.add(which);
+        assert.ok(p.selfCheck && p.fields.length === 0 && p.model.dvGiven, 'draw, then check');
+        assert.ok(p.revealHtml.includes(which.replace('-', '−')), 'the answer names the burn');
+        assert.ok(p.prompt.includes(which.replace('-', '−')), 'the prompt names the burn');
         // CW from the target with this burn, by hand: the rules of thumb.
         const v = Math.abs(dv[0] || dv[1]);
         const T = 2 * 2 * Math.PI / n;
@@ -266,21 +270,8 @@ check(`Burn Trajectories: ${COUNT} problems against CW from the target`, () => {
             near(r.xc, 2 * dv[1] / n, 1e-9, 'in-track: x_C = 2 dv/n'); near(r.C, Math.abs(r.xc), 1e-9, 'in-track: C = |x_C|');
             near(after[1], -3 * dv[1] * T, 1e-6, 'in-track: drifts -3 dv per second');
         }
-        if (p.type === 'drawing') {
-            const field = p.fields[0];
-            assert.strictEqual(field.options.length, 4);
-            const right = field.options.find(o => o.value === p.answers.plot.value);
-            const spec = right.plots[0];
-            ['xc', 'yc0', 'C'].forEach(key => near(spec.rmoe[key], r[key], 1e-12, 'right drawing ' + key));
-            assert.strictEqual(new Set(field.options.map(o => Math.sign(o.plots[0].rmoe.xc) + ',' + Math.sign(o.plots[0].rmoe.yc0))).size, 4, 'four different drawings');
-            field.options.forEach(o => assert.strictEqual(o.plots[0].fit.length, 2, 'a pair of drawings shares a scale'));
-            assert.ok(p.model.dvGiven && !p.model.pathGiven);
-        } else {
-            assert.strictEqual(p.answers.burn.value, which, 'the burn named is the burn made');
-            assert.ok(p.viewIsGiven && p.model.pathGiven, 'the view is the question');
-        }
     }
-    assert.strictEqual(seen.size, 8, 'both kinds with all four burns');
+    assert.strictEqual(seen.size, 4, 'all four burns');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -1,8 +1,8 @@
 // Test 2 Practice, Burn Trajectories (#burns). Chase starts at the target (x_C = y_C0 = C = 0) and
 // makes one burn straight up (+R), down (−R), forward (+I), or back (−I). The motion is drawn over
-// two revs in the view from the left.
-//  - drawing: given the burn, pick its drawing from the four (one per burn direction).
-//  - burn: given the drawing (the view is part of the question), name the burn.
+// two revs in the view from the left. The student draws it on paper, then shows the answer (the
+// motion in the view and in words) and checks the drawing against it; nothing is graded.
+// Topic types: 'random' or one burn ('+R', '-R', '+I', '-I').
 // Every path is the course model (TestReviewMath.rpo.rmoeFromState of the state just after the burn).
 // No DOM access. Load after test-review-math.js, practice-math.js, test-2-common.js, test-2-visual.js.
 (function (global) {
@@ -42,23 +42,13 @@
     };
 
     function generate(type) {
-        const kind = type === 'drawing' || type === 'burn' ? type : C2.pick(['drawing', 'burn']);
         const a = C2.pickTargetA();
         const n = M.meanMotion(a);
         const dvMs = C2.pick(dvChoices(a));
         const dv = dvMs / 1000;
-        const burn = C2.pick(BURNS);
+        const burn = BURNS.find(b => b.value === type) || C2.pick(BURNS);
         const r = rmoeAfter(burn, dv, n);
         const radial = burn.axis === 0;
-
-        // The four drawings. The ±R pair shares one scale and the ±I pair another, so a radial
-        // ellipse is not shrunk to a dot beside the larger in-track loops.
-        const all = Object.fromEntries(BURNS.map(b => [b.value, rmoeAfter(b, dv, n)]));
-        const fitFor = b => (b.axis === 0 ? [all['+R'], all['-R']] : [all['+I'], all['-I']]);
-        const options = C2.shuffle(BURNS).map((b, k) => ({ value: 'ABCD'[k], burn: b.value,
-            plots: [{ rmoe: all[b.value], n, revs: VZ.REVS, plane: 'left', fit: fitFor(b) }] }));
-        const answerPlot = options.find(o => o.burn === burn.value).value;
-        options.forEach(o => { delete o.burn; });
 
         const ms = v => C2.fixed(v * 1000, 4);
         const ruleHtml = radial
@@ -74,48 +64,32 @@
                   (burn.sign > 0 ? 'Forward raises the orbit: higher is slower, so chase drifts backward.' : 'Back lowers the orbit: lower is faster, so chase drifts forward.'));
 
         const steps = [
-            { key: 'given', title: kind === 'burn' ? 'Read the picture' : 'Before the burn', result: kind === 'burn' ? (radial ? 'closed loop' : 'drifting loops') : 'at the target',
-              caption: kind === 'burn' ? 'Is the path closed or does it drift? Which side of the target is it on?' : 'Chase sits on the target with no relative motion until the burn.',
-              methods: [{ name: 'Start', html: kind === 'burn'
-                  ? rule('The path ' + (radial ? 'closes on itself each rev, so there is no drift: the burn was radial. It lies ' + (burn.sign > 0 ? 'behind' : 'ahead of') + ' the target.'
-                      : 'drifts ' + (burn.sign > 0 ? 'backward (to the right in the view from the left), in loops above' : 'forward (to the left in the view from the left), in loops below') + ' the target: the burn was in-track.'))
-                  : rule('$x_C = y_{C0} = C = 0$: chase starts at the target. Right after the burn its velocity is the burn, $\\dot\\rho_0 = \\Delta V$.') }] },
+            { key: 'given', title: 'Before the burn', result: 'at the target',
+              caption: 'Chase sits on the target with no relative motion until the burn.',
+              methods: [{ name: 'Start', html: rule('$x_C = y_{C0} = C = 0$: chase starts at the target. Right after the burn its velocity is the burn, $\\dot\\rho_0 = \\Delta V$.') }] },
             { key: 'burn', title: radial ? 'What a radial burn does' : 'What an in-track burn does', result: NAME[burn.value],
               caption: 'The burn arrow shows the direction of the ΔV.',
               methods: [{ name: 'Rule', html: ruleHtml }] },
-            { key: 'answer', title: 'The motion', result: NAME[burn.value],
+            { key: 'answer', title: 'The motion', result: radial ? 'closed ellipse' : 'drifting loops',
               caption: 'Two revs after the burn, in the view from the left.',
               methods: [{ name: 'Result', html: rule('A ' + NAME[burn.value] + ' burn gives ' + LOOK[burn.value]) + note(C2.reading(r, n, a)) }] }
         ];
 
-        const orbit = 'The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase starts at the target ($x_C = y_{C0} = C = 0$)';
-        const common = {
-            model: { kind: 'rel', a, n, rmoe: r, revs: VZ.REVS, showStart: true, start: [0, 0, 0, 0, 0, 0], before: AT_TARGET, dv: dvVector(burn, dv),
-                dvGiven: kind === 'drawing', pathGiven: kind === 'burn' },
+        return {
+            type: burn.value,
+            model: { kind: 'rel', a, n, rmoe: r, revs: VZ.REVS, showStart: true, start: [0, 0, 0, 0, 0, 0], before: AT_TARGET, dv: dvVector(burn, dv), dvGiven: true },
+            title: 'Burn Trajectories',
+            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase starts at the target ($x_C = y_{C0} = C = 0$) and burns ' +
+                C2.plain(dvMs, 3) + ' m/s straight ' + { '+R': 'up (+R)', '-R': 'down (−R)', '+I': 'forward (+I)', '-I': 'back (−I)' }[burn.value] + '. Draw its motion over the next two revs.'),
             statement: '',
+            overviewCaption: 'Chase at the target, with the burn arrow.',
+            limitsHtml: 'On paper, draw the view from the left (+R up, +I to the left) over two revs. Mark the target, draw an arrow for the ΔV and arrows for the way chase moves. Then show the answer and check your drawing against it.',
+            selfCheck: true,
+            revealHtml: prose('<b>' + NAME[burn.value] + ':</b> ' + LOOK[burn.value] + ' ' + C2.reading(r, n, a)),
+            fields: [],
+            answers: {},
             steps
         };
-        if (kind === 'drawing') {
-            return Object.assign(common, {
-                type: 'drawing',
-                title: 'Burn Trajectories: Pick the Drawing',
-                prompt: prose(orbit + ' and burns ' + C2.plain(dvMs, 3) + ' m/s straight ' + { '+R': 'up (+R)', '-R': 'down (−R)', '+I': 'forward (+I)', '-I': 'back (−I)' }[burn.value] + '. Pick the drawing of its motion over the next two revs.'),
-                overviewCaption: 'Chase at the target, with the burn arrow.',
-                limitsHtml: 'Each drawing is the view from the left (+R up, +I to the left). The ring is the start (the target) and the triangle is chase two revs later.',
-                fields: [{ key: 'plot', tex: '', name: 'Drawing', unitType: 'plot', options }],
-                answers: { plot: { value: answerPlot, text: 'Drawing ' + answerPlot } }
-            });
-        }
-        return Object.assign(common, {
-            type: 'burn',
-            viewIsGiven: true,
-            title: 'Burn Trajectories: Pick the Burn',
-            prompt: prose(orbit + ' and makes one burn straight up, down, forward, or back. The view shows its path over the next two revs. Which burn was it?'),
-            overviewCaption: 'Chase’s path over two revs after the burn. From the left, +I is drawn to the left.',
-            limitsHtml: 'Pick one burn.',
-            fields: [{ key: 'burn', tex: '', name: 'The burn', unitType: 'choice', options: BURNS.map(b => ({ value: b.value, html: b.html })) }],
-            answers: { burn: { value: burn.value, text: NAME[burn.value] } }
-        });
     }
 
     global.Test2BurnsProblems = { generate, grade: C2.grade, burns: BURNS.map(b => b.value), rmoeAfter };

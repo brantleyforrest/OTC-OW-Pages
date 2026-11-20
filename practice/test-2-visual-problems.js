@@ -1,8 +1,8 @@
 // Test 2 Practice, the two Visualize sections: picture the motion before calculating anything.
 //  - #vis-state: given chase's RIC position and velocity at epoch.
 //  - #vis-rmoe: given chase's six RMOEs.
-// The student names the relative motion and picks the pair of plots (from the left, then from
-// behind) that shows it over two revs. The RMOEs are picked first from round values for a chosen
+// The student draws the motion on paper (from the left and from behind, over two revs), then shows
+// the answer and checks the drawing against it; nothing is graded. The RMOEs are picked first from round values for a chosen
 // motion; for #vis-state the given state is worked from them and rounded as #rmoe does.
 // Topic types: 'random', 'in-plane' (no cross-track motion), 'cross' (with cross-track motion).
 // No DOM access. Load after test-review-math.js, practice-math.js, test-2-common.js, test-2-visual.js.
@@ -69,22 +69,21 @@
             (sw ? ' puts it at its ' + sw : '') + ' (0° +P.C. moving left, 90° far left, 180° −P.C., 270° far right).';
     }
 
+    // A sketch-and-check problem: no answer fields. The student draws the motion on paper, then
+    // shows the answer (the motion in the view and its name) and checks the drawing against it.
     function finish(r, n, a, type, key, extra) {
-        const { options, answer } = VZ.plotOptions(r, n);
         const label = VZ.LABEL[key];
         return Object.assign({
             type,
             title: '',
-            overviewCaption: 'Chase (gold triangle) at epoch. The walkthrough adds the motion.',
-            limitsHtml: 'Pick one motion and one pair of plots. In each plot the ring is where chase starts and the triangle where it is two revs later; +I is to the left (from the left) and +C is to the left (from behind).',
-            fields: [
-                { key: 'motion', tex: '', name: 'Relative motion', unitType: 'choice', options: VZ.MOTIONS },
-                { key: 'plot', tex: '', name: 'Plots (left, then behind)', unitType: 'plot', options }
-            ],
-            answers: {
-                motion: { value: key, text: label },
-                plot: { value: answer, text: 'Plots ' + answer }
-            }
+            selfCheck: true,
+            overviewCaption: 'Chase (gold triangle) at epoch. The answer or the walkthrough adds the motion.',
+            limitsHtml: 'On paper, draw two views over two revs: from the left (+R up, +I to the left) and from behind (+R up, +C to the left). ' +
+                'Mark the target, where chase starts, and arrows for the way it moves, and name the motion. Then show the answer and check your drawing against it.',
+            revealHtml: prose('<b>' + label + '.</b> ' + C2.reading(r, n, a)),
+            fields: [],
+            answers: {},
+            motion: key
         }, extra);
     }
 
@@ -122,7 +121,7 @@
         return finish(truth, n, a, type, key, {
             model: { kind: 'rel', a, n, rmoe: truth, revs: VZ.REVS, showStart: true, given: s },
             title: 'Visualize from Position and Velocity',
-            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s position and velocity in the RIC frame at epoch are given. Picture the motion: name it, and pick the pair of plots that shows it over two revs.'),
+            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s position and velocity in the RIC frame at epoch are given. Before calculating anything, picture the motion and draw it.'),
             statement: C2.givenState(s),
             steps
         });
@@ -150,7 +149,7 @@
         return finish(r, n, a, type, key, {
             model: { kind: 'rel', a, n, rmoe: r, revs: VZ.REVS, showStart: true },
             title: 'Visualize from RMOEs',
-            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s RMOEs at epoch are given. Picture the motion: name it, and pick the pair of plots that shows it over two revs.'),
+            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s RMOEs at epoch are given. Picture the motion and draw it.'),
             statement: C2.givenRmoe(r),
             steps
         });

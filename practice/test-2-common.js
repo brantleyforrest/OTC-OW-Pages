@@ -149,7 +149,7 @@
                 plain(4 * r.C, 2) + ' km long, ' + centerText + driftText;
         } else if (D) {
             text = 'Chase drifts ' + (drift < 0 ? 'backward' : 'forward') + ' about ' + plain(Math.abs(drift), 1) + ' km each rev, ' + plain(Math.abs(r.xc), 2) + ' km ' +
-                (r.xc > 0 ? 'above' : 'below') + ' the target, now ' + plain(Math.abs(r.yc0), 2) + ' km ' + (r.yc0 >= 0 ? 'ahead' : 'behind');
+                (r.xc > 0 ? 'above' : 'below') + ' the target, ' + (Math.abs(r.yc0) > eps ? 'now ' + plain(Math.abs(r.yc0), 2) + ' km ' + (r.yc0 > 0 ? 'ahead' : 'behind') : 'now even with it along the track');
         } else if (Math.abs(r.yc0) > eps) {
             text = 'Chase is perched ' + plain(Math.abs(r.yc0), 2) + ' km ' + (r.yc0 > 0 ? 'ahead of' : 'behind') + ' the target';
         } else text = 'Chase is at the target';
