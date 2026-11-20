@@ -37,8 +37,8 @@
         // Extra practice beyond the six test topics, kept at the end of the list.
         { key: 'vis-coe', label: 'Visualize from COEs', extra: true, module: window.Test2VisCoeProblems,
           types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'Cross-Track'], ['both', 'Both']] },
-        { key: 'later', label: 'RMOEs Later', extra: true, module: Rmoe && { generate: () => Rmoe.generate('later'), grade: Rmoe.grade },
-          types: [['later', 'RMOEs Later']] }
+        { key: 'later', label: 'RMOE Propagation', extra: true, module: Rmoe && { generate: () => Rmoe.generate('later'), grade: Rmoe.grade },
+          types: [['later', 'RMOE Propagation']] }
     ].filter(s => s.module && (DEV || PUBLISHED.includes(s.key)));
     const byKey = Object.fromEntries(SECTIONS.map(s => [s.key, s]));
 

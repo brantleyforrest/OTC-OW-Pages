@@ -7,5 +7,5 @@
 //
 // To publish a section, add its key: 'coeric', 'vis-coe', 'vis-state', 'vis-rmoe', 'rmoe', 'state', 'later' or 'burns'.
 window.Test2Release = {
-    published: []
+    published: ['coeric', 'vis-state', 'vis-rmoe', 'rmoe', 'state', 'burns', 'vis-coe', 'later']
 };

@@ -303,8 +303,8 @@ check(`Visualize from COEs: ${COUNT} problems`, () => {
     assert.ok(seen.size >= 6, 'many motions appear: ' + [...seen].join(', '));
 });
 
-/* ---------- 8. RMOEs Later ---------- */
-check(`RMOEs Later: ${COUNT} problems against CW propagation`, () => {
+/* ---------- 8. RMOE Propagation ---------- */
+check(`RMOE Propagation: ${COUNT} problems against CW propagation`, () => {
     const fracs = new Set();
     for (let k = 0; k < COUNT; k++) {
         const p = Rmoe.generate('later');

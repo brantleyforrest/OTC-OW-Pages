@@ -1,4 +1,4 @@
-// Test 2 Practice, ρ̄, ρ̄̇ to RMOEs (#rmoe), RMOEs to ρ̄, ρ̄̇ (#state), and RMOEs Later (#later).
+// Test 2 Practice, ρ̄, ρ̄̇ to RMOEs (#rmoe), RMOEs to ρ̄, ρ̄̇ (#state), and RMOE Propagation (#later).
 //  - forward: given a_target and chase's RIC position and velocity at epoch, find the six RMOEs and
 //    the drift rate (m/s and km/rev).
 //  - reverse: given the RMOEs with chase at a corner of the NMC, find its position and velocity.
@@ -226,7 +226,7 @@
         return {
             type: 'later',
             model: { kind: 'rel', a, n, rmoe: truth, revs: 2, showStart: true, before: truth },
-            title: 'RMOEs Later',
+            title: 'RMOE Propagation',
             prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s RMOEs at epoch are given, and the view shows its natural motion. ' +
                 'Find the RMOEs, the drift rate, and chase’s position and velocity in the RIC frame <b>' + fracText + ' later</b>.'),
             statement: C2.givenRmoe(truth),
