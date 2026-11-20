@@ -2,8 +2,9 @@
 // Distance is the angle swept along the orbit, Rate is the mean motion n, and Time is the flight
 // time. One kind finds the time to sweep from u_0 to u_1 (T = D / n). The other finds where the
 // satellite is after a given time (D = n T, then u_1 = u_0 + D). The worked steps follow the
-// Time of Flight & Orbit Prediction lesson, with its constants, mu = 398,600.44 km^3/s^2 and
-// R_earth = 6,378 km, and its order: mean motion, angular distance, then time or position.
+// Time of Flight & Orbit Prediction lesson, with the course constants (mu and R_earth from
+// test-review-math.js, section course), and its order: mean motion, angular distance, then time or
+// position.
 // Load as a classic script, after test-1-rendezvous-problems.js (for its time parser).
 (function (global) {
     'use strict';
@@ -12,11 +13,10 @@
     const Rendezvous = global.Test1RendezvousProblems;
     const { math, prose, calc, note } = global.PracticeMath;
 
-    const MU = 398600.44;
-    const R_EARTH = 6378;
+    const { MU, R_EARTH, meanMotion } = global.TestReviewMath.course;
     const D2R = Math.PI / 180;
     const R2D = 180 / Math.PI;
-    const MU_TEX = '398{,}600.44';
+    const { MU_TEX, RE_TEX } = global.TestReviewMath.course;
 
     // The orbit: a semi-major axis from low Earth orbit out to the middle of MEO, picked evenly
     // in its logarithm so that low orbits come up as often as high ones. Sometimes the orbit is
@@ -97,7 +97,7 @@
         return Check.isAccepted(tolerance, value, truth) ? 'right' : 'wrong';
     }
 
-    const MU_NOTE = 'The solutions use $\\mu = 398{,}600.44\\text{ km}^3/\\text{s}^2$ and $R_\\oplus = 6{,}378\\text{ km}$.';
+    const MU_NOTE = `The solutions use $\\mu = ${MU_TEX}\\text{ km}^3/\\text{s}^2$ and $R_\\oplus = ${RE_TEX}\\text{ km}$.`;
 
     /* ------------------------------------------------------------------ */
     /* Shared Steps                                                       */
@@ -111,7 +111,7 @@
             h = Math.max(300, snap(h, 50));
             a = R_EARTH + h;
         }
-        const n = Math.sqrt(MU / (a * a * a));
+        const n = meanMotion(a);
         return { a, h, asAltitude, n, period: 2 * Math.PI / n };
     }
 
@@ -121,7 +121,7 @@
 
     function rateStep(o) {
         const sizeWork = o.asAltitude
-            ? calc('a = R_\\oplus + h', [`${group(R_EARTH)} + ${group(o.h)}`], `${group(o.a)}\\text{ km}`)
+            ? calc('a = R_\\oplus + h', [`${RE_TEX} + ${group(o.h)}`], `${group(o.a, 3)}\\text{ km}`)
             : '';
         return {
             key: 'rate',

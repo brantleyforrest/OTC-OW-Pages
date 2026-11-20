@@ -46,10 +46,6 @@
         .stat-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .stat-value.small { font-size: 0.82rem; }
         .motion-name { font-size: 0.9rem; font-weight: 600; color: var(--accent-gold); }
-        .fit-good { color: #34d399; }
-        .fit-fair { color: #fbbf24; }
-        .fit-poor { color: #f87171; }
-        .fit-na { color: var(--text-muted); }
 
         .opt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin-bottom: 0.45rem; font-size: 0.76rem; color: var(--text-muted); }
         .opt-row .segmented button { padding: 0.22rem 0.5rem; font-size: 0.74rem; }
@@ -360,7 +356,7 @@
                             <div class="pv-eqs" id="pv-eqs"></div>
                         </div>
                         <div class="rm-table rmoe-view" id="rm-table">
-                            <span class="rm-head"></span><span class="rm-head"></span><span class="rm-head">Epoch</span><span class="rm-head">Now</span>
+                            <span class="rm-head"></span><span class="rm-head"></span><span class="rm-head">Epoch</span><span class="rm-head" id="rm-now-head">Now</span>
                         </div>
                         <div class="live-head rm-only" data-advanced>At epoch, in the RIC frame</div>
                         <div class="stat-grid three rm-only" data-advanced>
@@ -372,8 +368,8 @@
                             <div class="stat-item"><span class="stat-label">Ċ (m/s)</span><span class="stat-value small" id="s-vz"></span></div>
                         </div>
                         <div class="motion-name rmoe-view" id="motion" data-advanced></div>
+                        <p class="panel-text muted" id="cw-gap" hidden></p>
                         <p class="panel-text muted rmoe-view" id="drift-read" data-advanced></p>
-                        <p class="panel-text muted coe-only rmoe-view dev-only" id="fit-read" data-advanced></p>
                     </div>
 
                     <div class="panel">
@@ -453,7 +449,9 @@
                         '../assets/tool-kit.js',
                         '../assets/earth-land.js',
                         '../assets/earth-scene.js',
-                        'rpo-math.js',
+                        '../assets/orbit-constants.js',
+                        '../assets/orbit-math.js',
+                        '../assets/orbit-settings-panel.js',
                         'rpo-views.js',
                         'relative-motion-explorer.js'
                     ].forEach(function (src) {

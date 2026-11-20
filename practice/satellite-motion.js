@@ -86,27 +86,8 @@
         };
     }
 
-    // Kepler's equation, for an ellipse with eccentricity e. Both keep track of whole turns, so
-    // that the angle keeps growing as the satellite goes around again.
-    function trueFromMean(M, e) {
-        const turns = Math.round(M / TWO_PI);
-        const Mr = M - turns * TWO_PI;
-        let E = e < 0.8 ? Mr : Math.PI * Math.sign(Mr || 1);
-        for (let k = 0; k < 30; k++) {
-            const step = (E - e * Math.sin(E) - Mr) / (1 - e * Math.cos(E));
-            E -= step;
-            if (Math.abs(step) < 1e-12) break;
-        }
-        const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
-        return nu + turns * TWO_PI;
-    }
-
-    function meanFromTrue(nu, e) {
-        const turns = Math.round(nu / TWO_PI);
-        const nr = nu - turns * TWO_PI;
-        const E = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(nr / 2), Math.sqrt(1 + e) * Math.cos(nr / 2));
-        return E - e * Math.sin(E) + turns * TWO_PI;
-    }
+    // Kepler's equation that keeps whole turns: practice/test-review-math.js, section motion.
+    const { trueFromMean, meanFromTrue } = global.TestReviewMath.motion;
 
     // How far along a curve, by length, the curve's own parameter t is. A tube is drawn by
     // length, so this keeps a drawn path's end on a satellite that moves by time.

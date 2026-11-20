@@ -1,22 +1,21 @@
 // Rendezvous problems for the Test 1 Practice page: coplanar rendezvous (wait for the right phase
 // angle, then fly a Hohmann transfer) and co-orbital rendezvous (phasing orbits). The numbers come
-// from the solvers behind the Inertial Rendezvous tool (../orbits/rendezvous-math.js). The worked
-// steps follow the Inertial Frame Rendezvous lesson, with its constants, mu = 398,600.44 km^3/s^2
-// and R_earth = 6,378 km, and its order: Example 1 for coplanar, the Practice Problem for co-orbital.
-// Load as a classic script, after rendezvous-math.js and maneuvers-problems.js.
+// from the course rendezvous solvers (test-review-math.js, section rendezvous). The worked
+// steps follow the Inertial Frame Rendezvous lesson, with the course constants (mu and R_earth
+// from test-review-math.js, section course), and its order: Example 1 for coplanar, the Practice
+// Problem for co-orbital.
+// Load as a classic script, after test-review-math.js and maneuvers-problems.js.
 (function (global) {
     'use strict';
 
-    const RM = global.RendezvousMath;
+    const RM = global.TestReviewMath.rendezvous;
     const Base = global.ManeuversProblems;
     const Check = global.AnswerCheck;
     const { math, prose, calc, note, rule } = global.PracticeMath;
 
-    const MU = 398600.44;
-    const R_EARTH = 6378;
-    const MIN_ALT = 100;            // Lowest safe perigee altitude (km)
+    const { MU, R_EARTH, MIN_ALT } = global.TestReviewMath.course;   // MIN_ALT: lowest safe perigee altitude (km)
     const R2D = 180 / Math.PI;
-    const MU_TEX = '398{,}600.44';
+    const { MU_TEX, RE_TEX } = global.TestReviewMath.course;
 
     // Coplanar: the lower orbit, the higher orbit as a multiple of it, and how often the chase
     // starts on the higher one
@@ -135,7 +134,7 @@
     const positionItems = (pos) => item(`\\theta_{\\text{chase}} = ${pos.chase}°`) + item(`\\theta_{\\text{target}} = ${pos.target}°`);
 
     const TIME_FORMS = 'seconds, minutes, hours, or h:mm:ss';
-    const MU_NOTE = 'The solutions use $\\mu = 398{,}600.44\\text{ km}^3/\\text{s}^2$.';
+    const MU_NOTE = `The solutions use $\\mu = ${MU_TEX}\\text{ km}^3/\\text{s}^2$.`;
 
     /* ------------------------------------------------------------------ */
     /* Coplanar Rendezvous                                                */
@@ -364,9 +363,9 @@
         const perigeeWork = isBehind
             ? rule('The burn point is the apogee of the smaller phasing orbit, so $r_a = R$.')
                 + calc('r_p = 2a_{\\text{phasing}} - R', [`2(${group(a_phasing, 2)}) - ${km(R)}`], `${group(r_p, 2)}\\text{ km}`)
-                + calc('h_p = r_p - R_\\oplus', [`${group(r_p, 2)} - ${km(R_EARTH)}`], `${group(h_p, 2)}\\text{ km}`)
+                + calc('h_p = r_p - R_\\oplus', [`${group(r_p, 2)} - ${RE_TEX}`], `${group(h_p, 2)}\\text{ km}`)
             : rule('The burn point is the perigee of the larger phasing orbit, so $r_p = R$.')
-                + calc('h_p = r_p - R_\\oplus', [`${km(R)} - ${km(R_EARTH)}`], `${group(h_p, 2)}\\text{ km}`)
+                + calc('h_p = r_p - R_\\oplus', [`${km(R)} - ${RE_TEX}`], `${group(h_p, 2)}\\text{ km}`)
                 + note(`Apogee: $r_a = 2a_{\\text{phasing}} - R = ${group(r_a, 1)}\\text{ km}$.`);
         const verdict = safe
             ? `Safe: perigee is more than ${MIN_ALT} km above the surface.`
@@ -464,7 +463,7 @@
             positions: pos,
             title: 'Co-orbital Rendezvous',
             prompt: prose(`The chase and the target share one circular orbit. The chase flies ${kText} and meets the target back at the burn point. Find the initial phase angle, the target’s travel during one phasing orbit, the time to rendezvous, the phasing orbit’s size, its perigee altitude, the first burn, and the total $\\Delta V$.`),
-            statement: item(`R = ${km(R)}\\text{ km}`) + positionItems(pos) + item(`k = ${k}`) + item(`R_\\oplus = ${km(R_EARTH)}\\text{ km}`),
+            statement: item(`R = ${km(R)}\\text{ km}`) + positionItems(pos) + item(`k = ${k}`) + item(`R_\\oplus = ${RE_TEX}\\text{ km}`),
             overviewCaption: prose(`<b>The problem as given.</b> The chase and the target share one circular orbit. ${POSITION_DEF}`),
             limitsHtml: prose(`Accepted: $\\phi_0$ and $\\nu_{\\text{travel}}$ within 0.5°, $TOF_{\\text{rendezvous}}$ within 0.5% (${TIME_FORMS}), $a_{\\text{phasing}}$ within 0.5%, $h_p$ within 10 km, each $\\Delta V$ within 2% (km/s or m/s). Give $\\Delta V_1$ its sign: negative for a retrograde burn. ${MU_NOTE}`),
             fields,

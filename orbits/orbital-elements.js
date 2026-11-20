@@ -9,97 +9,23 @@
 
     /* ================================================================== */
     /* ORBIT MATH                                                         */
-    /* Classical orbital elements to position and velocity in ECI.        */
-    /* km and s. Elements in degrees; E and M in radians.                 */
-    /* An element set `el` is any object with a, e, i, raan, argp, nu.    */
+    /* In ../assets/orbit-math.js, section coe.                           */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-    const R_E = 6378.137;         // km
-    const MU = 398600.4418;       // km^3/s^2
-    const OMEGA_E = 7.292115e-5;  // rad/s, Earth's rotation
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-    const TWO_PI = 2 * Math.PI;
-
-    const periodOf = (a) => TWO_PI * Math.sqrt(a * a * a / MU);
-    const isEquatorial = (el) => el.i < 0.05 || el.i > 179.95;
-    const isCircular = (el) => el.e < 1e-4;
-
-    // Unit vectors in ECI: P toward perigee, Q in the plane 90 deg ahead of P,
-    // W along the angular momentum, and n toward the ascending node.
-    function orbitBasis(el) {
-        const O = el.raan * D2R, inc = el.i * D2R, w = el.argp * D2R;
-        const cosO = Math.cos(O), sinO = Math.sin(O);
-        const cosi = Math.cos(inc), sini = Math.sin(inc);
-        const cosw = Math.cos(w), sinw = Math.sin(w);
-        return {
-            P: { x: cosO * cosw - sinO * sinw * cosi, y: sinO * cosw + cosO * sinw * cosi, z: sinw * sini },
-            Q: { x: -cosO * sinw - sinO * cosw * cosi, y: -sinO * sinw + cosO * cosw * cosi, z: cosw * sini },
-            W: { x: sinO * sini, y: -cosO * sini, z: cosi },
-            n: { x: cosO, y: sinO, z: 0 }
-        };
-    }
-
-    // r = p / (1 + e cos nu), km
-    const radiusAt = (el, nuDeg) => el.a * (1 - el.e * el.e) / (1 + el.e * Math.cos(nuDeg * D2R));
-
-    // u P + v Q
-    const inPlane = (basis, u, v) => ({
-        x: basis.P.x * u + basis.Q.x * v,
-        y: basis.P.y * u + basis.Q.y * v,
-        z: basis.P.z * u + basis.Q.z * v
-    });
-
-    // ECI position (km) at true anomaly nu (deg).
-    function positionAt(el, basis, nuDeg) {
-        const r = radiusAt(el, nuDeg), nu = nuDeg * D2R;
-        return inPlane(basis, r * Math.cos(nu), r * Math.sin(nu));
-    }
-
-    // ECI velocity (km/s): v = sqrt(mu/p) [-sin nu P + (e + cos nu) Q].
-    function velocityAt(el, basis, nuDeg) {
-        const p = el.a * (1 - el.e * el.e), nu = nuDeg * D2R;
-        const k = Math.sqrt(MU / p);
-        return inPlane(basis, -k * Math.sin(nu), k * (el.e + Math.cos(nu)));
-    }
-
-    // Everything the readouts show for one element set.
-    function orbitState(el) {
-        const { a, e, nu } = el;
-        const basis = orbitBasis(el);
-        const r = radiusAt(el, nu);
-        return {
-            r,
-            hp: a * (1 - e) - R_E,
-            ha: a * (1 + e) - R_E,
-            speed: Math.sqrt(MU * (2 / r - 1 / a)),   // vis-viva
-            period: periodOf(a),
-            rVec: positionAt(el, basis, nu),
-            vVec: velocityAt(el, basis, nu),
-            // The north component of h classifies the motion.
-            direction: basis.W.z > 1e-6 ? 'Prograde' : basis.W.z < -1e-6 ? 'Retrograde' : 'Polar'
-        };
-    }
-
-    // Kepler's equation, M = E - e sin E, solved for E by Newton's method.
-    function solveKepler(M, e) {
-        let E = e < 0.8 ? M : Math.PI;
-        for (let iter = 0; iter < 12; iter++) {
-            const delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= delta;
-            if (Math.abs(delta) < 1e-9) break;
-        }
-        return E;
-    }
-
-    // Moves nu forward by a fraction of one orbit in time, so the satellite is fastest at perigee.
-    function advanceTrueAnomaly(nuDeg, e, orbitFraction) {
-        const nu = nuDeg * D2R;
-        const root = Math.sqrt(Math.max(0, 1 - e * e));
-        const E0 = Math.atan2(root * Math.sin(nu), e + Math.cos(nu));
-        const M = (((E0 - e * Math.sin(E0)) + orbitFraction * TWO_PI) % TWO_PI + TWO_PI) % TWO_PI;
-        const E = solveKepler(M, e);
-        const next = Math.atan2(root * Math.sin(E), Math.cos(E) - e) * R2D;
-        return (next + 360) % 360;
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        R_E, MU, OMEGA_E, D2R, R2D, TWO_PI, periodOf, isEquatorial, isCircular, orbitBasis, radiusAt,
+        inPlane, positionAt, velocityAt, orbitState
+    } = OM.coe;
+    // The satellite, stored as r and v and kept in step with the sliders (OrbitMath.propagate).
+    let track = OM.propagate.tracker();
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        track = OM.propagate.tracker();
+        ({
+            R_E, MU, OMEGA_E, D2R, R2D, TWO_PI, periodOf, isEquatorial, isCircular, orbitBasis, radiusAt,
+            inPlane, positionAt, velocityAt, orbitState
+        } = OM.coe);
     }
 
     /* ================================================================== */
@@ -179,7 +105,7 @@
         },
         geo: {
             name: 'Geostationary orbit',
-            a: 42164, e: 0.001, i: 0.2, raan: 0, argp: 0, nu: 0,
+            a: window.OrbitConstants.LESSON.rGeo, e: 0.001, i: 0.2, raan: 0, argp: 0, nu: 0,
             desc: 'An orbit over the equator, once in the time Earth takes to rotate once.'
         },
         sso: {
@@ -788,7 +714,8 @@
         anchors.e.copy(anchors.orbitCenter).multiplyScalar(0.5);
 
         // Satellite, with the position vector as one side of the true anomaly
-        anchors.sat.copy(positionAt(state, basis, nu)).divideScalar(R_E);
+        const satR = track.sat(state).r;
+        anchors.sat.set(satR[0], satR[1], satR[2]).divideScalar(R_E);
         satMarker.position.copy(anchors.sat);
         satMarker.scale.setScalar(0.55 * sz);
         rLine.visible = show.rLine && state.showFill;
@@ -847,8 +774,31 @@
         return `[${[v.x, v.y, v.z].map((c) => c.toFixed(decimals).replace('-', '−')).join(', ')}]`;
     }
 
+    // Which angles r and v leave undefined, and the angle that takes their place.
+    function undefinedNote(back, plain) {
+        const deg = (x) => `${Math.round(x) % 360}°`;
+        switch (back.kind) {
+            case 'circular inclined':
+                return `Circular orbit: ω and ν are undefined. The argument of latitude, u = ${deg(plain.nu)}, places the satellite.`;
+            case 'elliptical equatorial':
+                return `Equatorial orbit: Ω and ω are undefined. The longitude of perigee, ϖ = ${deg(plain.argp)}, points to perigee.`;
+            case 'circular equatorial':
+                return `Circular equatorial orbit: Ω, ω and ν are undefined. The true longitude, ℓ = ${deg(plain.nu)}, places the satellite.`;
+            default:
+                return '';
+        }
+    }
+
     function updatePanels() {
-        const { r, hp, ha, speed, period, rVec, vVec, direction } = orbitState(state);
+        // Every readout comes from the satellite's r and v.
+        const { direction } = orbitState(state);
+        const now = track.readout(state);
+        const back = now.elements;
+        const r = now.r, speed = now.v;
+        const hp = back.a * (1 - back.e) - R_E, ha = back.a * (1 + back.e) - R_E;
+        const period = periodOf(back.a);
+        const toXYZ = (v) => ({ x: v[0], y: v[1], z: v[2] });
+        const rVec = toXYZ(now.sat.r), vVec = toXYZ(now.sat.v);
 
         $('val-direction').textContent = direction;
         $('val-period').textContent = formatPeriod(period);
@@ -858,6 +808,16 @@
         $('val-v').textContent = `${formatNumber(speed, 2)} km/s`;
         $('val-r-vec').textContent = formatVector(rVec, 0);
         $('val-v-vec').textContent = formatVector(vVec, 2);
+
+        // The elements read back from r and v (the round trip), with undefined angles marked.
+        const angle = (name, value, digits) => (back.undefinedAngles[name] ? '—' : `${value.toFixed(digits)}°`);
+        $('val-coe-back').textContent = [
+            `a ${formatNumber(back.a, 0)} km`, `e ${back.e.toFixed(3)}`, `i ${back.i.toFixed(1)}°`,
+            `Ω ${angle('raan', back.raan, 0)}`, `ω ${angle('argp', back.argp, 0)}`, `ν ${angle('nu', back.nu, 0)}`
+        ].join('  ');
+        const note = undefinedNote(back, OM.elements.elementsFromRv(now.sat.r, now.sat.v));
+        $('val-coe-note').textContent = note;
+        $('val-coe-note').hidden = !note;
 
         updateCaption(hp);
     }
@@ -1320,7 +1280,8 @@
 
         if (state.playing) {
             const orbitFraction = (seconds * SPEEDS[state.speed].rate) / ORBIT_PLAY_SECONDS;
-            state.nu = advanceTrueAnomaly(state.nu, state.e, orbitFraction);
+            // Move r and v on by that share of a period, and read the true anomaly back.
+            state.nu = track.move(state, orbitFraction * periodOf(state.a)).nu;
             $('nu-range').value = state.nu;
             // Leave the field alone while it is being typed in.
             if (document.activeElement !== $('nu-number')) $('nu-number').value = state.nu.toFixed(1);
@@ -1337,6 +1298,16 @@
             dirty = false;
             renderFrame();
             updatePanels();
+        }
+    });
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "The sliders set the orbit at the start. With Cowell, the satellite moves under the chosen forces, and the elements read back from r and v change as it does.",
+        onSettingsChange() {
+            rebindMath();
+            dirty = true;
         }
     });
 })();

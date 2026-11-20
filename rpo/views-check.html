@@ -37,12 +37,13 @@
 
     <script>
         document.write('<script src="../assets/vendor.js?t=' + Date.now() + '"><\/script>');
-        document.write('<script src="rpo-math.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../assets/orbit-constants.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../assets/orbit-math.js?t=' + Date.now() + '"><\/script>');
         document.write('<script src="rpo-views.js?t=' + Date.now() + '"><\/script>');
     </script>
     <script>
         (function () {
-            const M = window.RpoMath, V = window.RpoViews;
+            const M = window.OrbitMath.rpo, V = window.RpoViews;
             const n = M.meanMotion(M.GEO_A), P = M.period(M.GEO_A);
             const CASES = [
                 { name: 'Stationary NMC with cross-track', revs: 1,

@@ -28,6 +28,9 @@ To preview the template itself, open `tool-template.html` from a local file. To 
 | `assets/tool-theme.css` | Navigation bar, one-screen layout, view box, labels, status box, panels, controls, and phone layout |
 | `assets/tool-kit.js` | Canvas sizing, animation loop, button groups, and label placement |
 | `assets/earth-scene.js` | 3D Earth with land outlines and atmosphere, and the star field. Needs `assets/earth-land.js` |
+| `assets/orbit-constants.js` | Every orbital constant (course set by default, WGS-84 as the alternative) and the settings store |
+| `assets/orbit-math.js` | Every orbital formula, in sections (`OrbitMath.rpo`, `OrbitMath.propagate`, and so on) that follow the constants setting |
+| `assets/orbit-settings-panel.js` | The Model badge in the top bar and the settings panel it opens: constants, propagator and forces, relative-motion model, Share |
 
 Put a style or helper in these shared files only if more than one tool needs it.
 
@@ -67,6 +70,8 @@ Upright phones match `(max-width: 640px) and (orientation: portrait)`. Rotated p
 - **Do not set a full-height minimum on each side column.** Stacked columns then add blank space. `.tool-side` already has the minimum height.
 - **Keep text short.** These tools build intuition. Give the idea, and leave fine detail to the lesson. Shorten text rather than hiding it in tabs or a scrolling box.
 - **Respect the page's fixed height.** Controls should stay compact, because each line they add takes height from the view.
+- **No constants or formulas in a tool's script.** Read them from `OrbitMath` (and `OrbitConstants`), and register with `OrbitSettingsPanel.registerPage` so the tool redraws when the settings change. Add a formula to `assets/orbit-math.js`, with a test, rather than to the page. Practice pages use `practice/test-review-math.js` instead.
+- **Store satellites as r and v.** Move them with `OrbitMath.propagate`, which follows the propagator setting; a slider that sets an angle sets where the satellite starts.
 - **Write division with a slash.** Use `/`, never `÷`, on every page and in every document.
 
 ## Before You Finish

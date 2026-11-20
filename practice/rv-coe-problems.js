@@ -12,8 +12,9 @@
 
     const { math, prose, column, calc, note, rule } = global.PracticeMath;
 
-    const MU = 398600.44;       // Earth's gravitational parameter (km^3/s^2), as in the lessons
-    const R_EARTH = 6378.137;   // Earth's equatorial radius (km), as in the lessons
+    // Solving a state vector is course math: practice/test-review-math.js, section rvCoe.
+    const RV = global.TestReviewMath.rvCoe;
+    const { MU, R_EARTH } = RV;
     const R2D = 180 / Math.PI;
 
     const MIN_ALTITUDE = 300;   // Lowest altitude used in a problem (km), so no orbit decays within days
@@ -22,9 +23,6 @@
     const MIN_E = 0.02;
     const MAX_E = 0.7;
 
-    // A circular problem's speed is rounded to three decimals, which leaves a tiny eccentricity.
-    // Anything below this counts as circular. Elliptical problems never come close to it.
-    const CIRCULAR_E = 0.001;
 
     // Each limit accepts an answer correctly rounded to that place value: a to three significant
     // figures, e to two decimal places, and angles to the whole degree.
@@ -40,58 +38,16 @@
     /* ------------------------------------------------------------------ */
     /* Vector Math                                                        */
     /* ------------------------------------------------------------------ */
-    const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
-    const cross = (p, q) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]];
-    const length = (p) => Math.sqrt(dot(p, p));
-    const arccos = (x) => Math.acos(Math.max(-1, Math.min(1, x))) * R2D;
-    const wrap360 = (x) => ((x % 360) + 360) % 360;
+    const { dot, cross, length, arccos, wrap360 } = RV;
 
     /* ------------------------------------------------------------------ */
     /* Solving a State Vector                                             */
     /* ------------------------------------------------------------------ */
     function solve(r, v) {
-        const R = length(r), V = length(v);
-        const rDotV = dot(r, v);
-        const energy = V * V / 2 - MU / R;
-        const aRaw = -MU / (2 * energy);
-
-        const h = cross(r, v), H = length(h);
-        const i = arccos(h[2] / H);
-
-        const n = [-h[1], h[0], 0], N = length(n);
-        const equatorial = N < 1e-6 * H;
-
-        const bracket = V * V - MU / R;
-        const eVec = r.map((c, k) => (bracket * c - rDotV * v[k]) / MU);
-        const eMag = length(eVec);
-        const circular = eMag < CIRCULAR_E;
-
-        const vCirc = Math.sqrt(MU / R);
-        const apsis = circular ? 'circular' : (V > vCirc ? 'perigee' : 'apogee');
-
-        const raanFlat = equatorial ? 0 : arccos(n[0] / N);
-        const raanRaw = n[1] < 0 ? 360 - raanFlat : raanFlat;
-
-        // An undefined angle is taken as 0°, and every angle measured from it is still defined.
-        // With no node (equatorial), the node direction is +I. With no perigee (circular), the
-        // perigee direction is the node direction. Angles are measured in the direction of travel.
-        const hHat = h.map((c) => c / H);
-        const nodeHat = equatorial ? [1, 0, 0] : n.map((c) => c / N);
-        const perigeeHat = circular ? nodeHat : eVec.map((c) => c / eMag);
-        const angleAround = (from, to) => {
-            const raw = Math.atan2(dot(hHat, cross(from, to)), dot(from, to)) * R2D;
-            return wrap360(Math.round(raw * 1e6) / 1e6);
-        };
-        const argpRaw = circular ? 0 : angleAround(nodeHat, perigeeHat);
-        const nuRaw = angleAround(perigeeHat, r.map((c) => c / R));
-
-        const raanUndefined = equatorial;
-        const argpUndefined = circular;
-        const nuUndefined = false;
-
-        // A circular orbit's radius is exact. The energy result differs from it only because the
-        // given speed is rounded.
-        const a = circular ? R : aRaw;
+        const {
+            R, V, rDotV, energy, a, aRaw, h, H, i, n, N, eVec, eMag, vCirc, apsis, circular, equatorial,
+            raanRaw, argpRaw, nuRaw, raanUndefined, argpUndefined, nuUndefined
+        } = RV.solve(r, v);
 
         const answers = {
             a: { value: a, text: `${fixed(a, 1)} km` },
@@ -129,13 +85,13 @@
 
     // The speed that makes this radius circular, the perigee, or the apogee of a random ellipse.
     function speedFor(kind, R, lowest) {
-        if (kind === 'circular') return Math.sqrt(MU / R);
+        if (kind === 'circular') return RV.circularSpeed(R);
         const eMax = kind === 'perigee'
             ? Math.min(MAX_E - 0.05, (MAX_APOGEE - R) / (MAX_APOGEE + R))
             : Math.min(MAX_E - 0.05, (R - lowest) / (R + lowest));
         if (eMax < 0.03) return null;
         const e = between(0.03, eMax);
-        return Math.sqrt(MU * (kind === 'perigee' ? 1 + e : 1 - e) / R);
+        return RV.apsisSpeed(kind, R, e);
     }
 
     const vectorAlong = (axis, value) => {
@@ -249,7 +205,7 @@
     const R_V = '\\bar{\\mathbf{r}}', V_V = '\\bar{\\mathbf{v}}';
     const I_HAT = '\\mathbf{\\hat{I}}', J_HAT = '\\mathbf{\\hat{J}}', K_HAT = '\\mathbf{\\hat{K}}';
     const V_CIRC = 'v_{\\text{circ}}';
-    const MU_TEXT = '398,600.44';
+    const MU_TEXT = global.TestReviewMath.course.MU_TEXT;
 
     const KM = '\\text{ km}', KM_S = '\\text{ km/s}', KM2_S2 = '\\text{ km}^2/\\text{s}^2';
 
@@ -312,7 +268,7 @@
         const circularNote = S.circular
             ? note(`The result is $${radiusText(S.R)}${KM}$ to within rounding, because the given speed is rounded. On a circle, $a = r$.`)
             : '';
-        const inverseA = 2 / S.R - S.V * S.V / MU;
+        const inverseA = RV.inverseA(S.R, S.V);
         const methods = [{
             name: 'Energy',
             value: S.aRaw,

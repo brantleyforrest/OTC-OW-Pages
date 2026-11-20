@@ -71,10 +71,14 @@ check('_template/README.md documents the cache-busting rule for new tools', () =
     assert.ok(readme.includes('cache-busting'), 'README must mention cache-busting');
 });
 
-check('IMPLEMENTATION-GUIDE-SITE.md documents the cache-busting rule for all pages', () => {
-    const guide = fs.readFileSync(path.join(rootDir, 'IMPLEMENTATION-GUIDE-SITE.md'), 'utf8');
-    assert.ok(guide.includes('cache-busting loader'), 'Guide must document cache-busting loader');
-});
+// The site guide is a local file that is not committed, so a fresh clone skips this check.
+const guidePath = path.join(rootDir, 'IMPLEMENTATION-GUIDE-SITE.md');
+if (fs.existsSync(guidePath)) {
+    check('The local site guide documents the cache-busting rule for all pages', () => {
+        const guide = fs.readFileSync(guidePath, 'utf8');
+        assert.ok(guide.includes('cache-busting loader'), 'Guide must document cache-busting loader');
+    });
+}
 
 console.log(`\nCache busting verification: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

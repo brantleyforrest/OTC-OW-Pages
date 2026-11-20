@@ -5,69 +5,23 @@
 
     /* ================================================================== */
     /* ORBIT MATH                                                         */
-    /* Specific energy of a two-body orbit. km, s, rad.                   */
+    /* In ../assets/orbit-math.js, section energy.                        */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-    const MU = 398600.4418;    // km^3/s^2
-    const RE = 6378.137;       // km
-    const D2R = Math.PI / 180;
-    const TWO_PI = 2 * Math.PI;
-
-    const wrap = (angle) => ((angle % TWO_PI) + TWO_PI) % TWO_PI;
-
-    // The orbit set by perigee and apogee altitudes (km).
-    function orbitFromAltitudes(hp, ha) {
-        const Rp = RE + hp;
-        const Ra = RE + ha;
-        const a = (Ra + Rp) / 2;
-        const e = (Ra - Rp) / (Ra + Rp);
-        const p = a * (1 - e * e);                       // semi-latus rectum
-        const eps = -MU / (2 * a);                       // specific mechanical energy
-        const period = TWO_PI * Math.sqrt(a * a * a / MU);
-        const speedAt = (R) => Math.sqrt(Math.max(0, 2 * (MU / R + eps)));   // energy equation
-        return { Rp, Ra, a, e, p, eps, period, Vp: speedAt(Rp), Va: speedAt(Ra), speedAt };
-    }
-
-    // Kepler's equation, M = E - e sin E, solved for E by Newton's method.
-    function eccentricAnomaly(M, e) {
-        let E = e > 0.8 ? Math.PI : M;
-        for (let i = 0; i < 30; i++) {
-            const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= step;
-            if (Math.abs(step) < 1e-12) break;
-        }
-        return E;
-    }
-
-    function trueFromMean(M, e) {
-        const E = eccentricAnomaly(M, e);
-        return wrap(2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(Math.max(1e-12, 1 - e)) * Math.cos(E / 2)));
-    }
-
-    function meanFromTrue(nu, e) {
-        const E = 2 * Math.atan2(Math.sqrt(Math.max(1e-12, 1 - e)) * Math.sin(nu / 2), Math.sqrt(1 + e) * Math.cos(nu / 2));
-        return wrap(E - e * Math.sin(E));
-    }
-
-    // Point on the ellipse from eccentric anomaly E, perigee along +x. Even steps in E draw a smooth curve.
-    function ellipsePoint(o, E) {
-        return { x: o.a * (Math.cos(E) - o.e), y: o.a * Math.sqrt(Math.max(0, 1 - o.e * o.e)) * Math.sin(E) };
-    }
-
-    // State at true anomaly nu, in the orbit plane with perigee along +x.
-    // Velocity components: v = sqrt(mu/p) [-sin nu, e + cos nu].
-    function pointAt(o, nu) {
-        const R = o.p / (1 + o.e * Math.cos(nu));
-        const vScale = Math.sqrt(MU / Math.max(1e-6, o.p));
-        const V = o.speedAt(R);
-        return {
-            nu, R, V,
-            x: R * Math.cos(nu),
-            y: R * Math.sin(nu),
-            vx: -vScale * Math.sin(nu),
-            vy: vScale * (o.e + Math.cos(nu)),
-            ke: V * V / 2,      // specific kinetic energy
-            pe: -MU / R         // specific potential energy
-        };
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        MU, RE, D2R, TWO_PI, wrap, orbitFromAltitudes, eccentricAnomaly, trueFromMean, meanFromTrue,
+        ellipsePoint, pointAt, meanMotion, energies
+    } = OM.energy;
+    // The satellite, stored as r and v: built at perigee from the altitudes (OrbitMath.propagate).
+    let track = OM.propagate.tracker();
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        track = OM.propagate.tracker();
+        ({
+            MU, RE, D2R, TWO_PI, wrap, orbitFromAltitudes, eccentricAnomaly, trueFromMean, meanFromTrue,
+            ellipsePoint, pointAt
+        } = OM.energy);
     }
 
     /* ================================================================== */
@@ -568,9 +522,20 @@
         g.fillText('=', left + slot * 2, plotBottom + 17);
     }
 
+    // The satellite now, from r and v: moved on from perigee by the mean anomaly's share of a period.
+    // Its speed, radius and energies are read from r and v.
+    function satPoint(o) {
+        const atPerigee = track.sat({ a: o.a, e: o.e, nu: 0 });
+        const s = OM.propagate.stateAt(atPerigee, state.M / meanMotion(o.a));
+        const R = Math.hypot(s.r[0], s.r[1], s.r[2]);
+        const V = Math.hypot(s.v[0], s.v[1], s.v[2]);
+        const nu = OM.elements.angleOnOrbit(s.r, { i: 0, raan: 0, argp: 0 }) * D2R;   // where it sits on the drawn orbit
+        return { nu, R, V, x: s.r[0], y: s.r[1], vx: s.v[0], vy: s.v[1], ...energies(R, V) };
+    }
+
     function renderFrame() {
         const o = orbit();
-        const now = pointAt(o, trueFromMean(state.M, o.e));
+        const now = satPoint(o);
 
         updateScene(o, now);
         updateCamera();
@@ -823,7 +788,7 @@
         chartW = w;
         chartH = h;
         Kit.fitCanvas2D(chartCanvas, chartCtx, w, h);
-        drawChart(orbit(), pointAt(orbit(), trueFromMean(state.M, orbit().e)));
+        drawChart(orbit(), satPoint(orbit()));
     });
 
     Kit.startLoop((seconds) => {
@@ -838,5 +803,15 @@
         if (!dirty) return;
         dirty = false;
         renderFrame();
+    });
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "The energy formulas are two-body. With Cowell, the satellite and its readouts follow its own motion, so drag shows energy draining away; the drawn orbit stays the two-body one.",
+        onSettingsChange() {
+            rebindMath();
+            dirty = true;
+        }
     });
 })();

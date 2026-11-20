@@ -1,20 +1,31 @@
 // Perturbations Explorer. Each mode shows one perturbation from the lesson "Perturbations & Orbit Types":
 // a gray ghost of the two-body orbit, fixed at its starting state, and a colored orbit that actually changes.
 //
-//     Mode       Lesson goal   What changes              Where it matters
-//     Drag       SOB 1         a and e fall              LEO
-//     J2         SOB 2         RAAN and perigee turn     LEO to HEO
-//     J2,2       SOB 3         GEO longitude swings      GEO
-//     3rd Body   SOB 3         GEO inclination grows     GEO
-//     SRP        SOB 3         GEO eccentricity cycles   GEO
+//     Mode       What changes              Where it matters
+//     Drag       a and e fall              LEO
+//     J2         RAAN and perigee turn     LEO to HEO
+//     J2,2       GEO longitude swings      GEO
+//     3rd Body   GEO inclination grows     GEO
+//     SRP        GEO eccentricity cycles   GEO
 //
-// All physics is in perturbations-model.js. This file only draws it.
+// All physics is in ../assets/orbit-math.js (section perturbation). This file only draws it.
 (async function () {
     'use strict';
 
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
-    const M = window.PerturbationModel;
+    // Physics from ../assets/orbit-math.js (section perturbation), on the constants the site's
+    // settings choose.
+    let M = window.OrbitMath.perturbation;
+    // Read the math again after the constants setting changes.
+    function rebindMath() { M = window.OrbitMath.perturbation; }
+    // A constant as the text prints it, digits grouped by thousands.
+    const groupDigits = (x, sep) => {
+        const [whole, frac] = String(x).split('.');
+        return whole.replace(/\B(?=(\d{3})+(?!\d))/g, sep) + (frac ? '.' + frac : '');
+    };
+    const MU_LINE = () => `μ = ${groupDigits(M.MU, ',')} km³/s²`;
+    const MU_RE_LINE = () => `${MU_LINE()}, R⊕ = ${groupDigits(M.RE, ',')} km`;
 
     const status = $('status');
     function showStatus(text) {
@@ -544,7 +555,7 @@
                 const period = M.periodSeconds(a) / 60, period0 = M.periodSeconds(first.a) / 60;
                 return {
                     title: 'Two-Body Values as Drag Acts',
-                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. Drag removes energy every orbit, so ε, a, e, and the period all fall.',
+                    constants: `${MU_RE_LINE()}. Drag removes energy every orbit, so ε, a, e, and the period all fall.`,
                     rows: [
                         { name: 'Semi-major axis', result: `${comma(a)} km`, work: work('a = (R<sub>a</sub> + R<sub>p</sub>) / 2', `R<sub>a</sub> = ${comma(ra)}, R<sub>p</sub> = ${comma(rp)}`) },
                         { name: 'Eccentricity', result: e.toFixed(4), work: work('e = (R<sub>a</sub> − R<sub>p</sub>) / (R<sub>a</sub> + R<sub>p</sub>)', `start ${first.e.toFixed(4)}`) },
@@ -836,7 +847,7 @@
                 const n = M.meanMotion(s.a);
                 return {
                     title: 'Two-Body Values J₂ Leaves Alone',
-                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. J₂ turns Ω and ω (rates in Live Values) but leaves a, e, and i unchanged on average, so these values stay fixed.',
+                    constants: `${MU_RE_LINE()}. J₂ turns Ω and ω (rates in Live Values) but leaves a, e, and i unchanged on average, so these values stay fixed.`,
                     rows: [
                         { name: 'Perigee radius', result: `${comma(rp)} km`, work: work('R<sub>p</sub> = a(1 − e)', `a = ${comma(s.a)} km, e = ${s.e.toFixed(3)}`) },
                         { name: 'Apogee radius', result: `${comma(ra)} km`, work: work('R<sub>a</sub> = a(1 + e)') },
@@ -1167,9 +1178,9 @@
                 const side = Math.abs(off) < 0.05 ? 'equal: it stays put' : off > 0 ? 'smaller: it falls behind (west)' : 'larger: it pulls ahead (east)';
                 return {
                     title: 'Why Height Moves Longitude',
-                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. The J₂,₂ push changes a by only kilometers, but that is enough to make n differ from Earth\'s spin.',
+                    constants: `${MU_RE_LINE()}. The J₂,₂ push changes a by only kilometers, but that is enough to make n differ from Earth's spin.`,
                     rows: [
-                        { name: 'Orbital radius', result: `${comma(r, 1)} km`, work: work('R = altitude + R⊕', `altitude = ${comma(r - 6378.137, 1)} km`) },
+                        { name: 'Orbital radius', result: `${comma(r, 1)} km`, work: work('R = altitude + R⊕', `altitude = ${comma(r - M.RE, 1)} km`) },
                         { name: 'Mean motion', result: `${sci(n, 6)} rad/s`, work: work('n = √(μ / a³)') },
                         { name: 'GEO mean motion', result: `${sci(N_GEO, 6)} rad/s`, work: work('n<sub>geo</sub> (constant)', `n is ${side}`) },
                         { name: 'Orbital period', result: `${(M.periodSeconds(r) / 3600).toFixed(4)} h`, work: work('Period = 2π √(a³ / μ)', 'sidereal day 23.9345 h') },
@@ -1348,7 +1359,7 @@
                 const yearTilt = M.geoTilt(1).incDeg;
                 return {
                     title: 'Undoing the Tilt',
-                    constants: 'μ = 398,600.44 km³/s². A plane change at the node removes the tilt. The lesson\'s yearly budget, 51.4 m/s, comes from a fuller model.',
+                    constants: `${MU_LINE()}. A plane change at the node removes the tilt. The lesson's yearly budget, 51.4 m/s, comes from a fuller model.`,
                     rows: [
                         { name: 'Circular-orbit speed at GEO', result: `${v.toFixed(3)} km/s`, work: work('V = √(μ / R)', 'R = 42,164 km') },
                         { name: 'Plane change for the tilt now', result: `${comma(planeChange(incDeg), 1)} m/s`, work: work('ΔV<sub>S</sub> = |2V sin(θ / 2)|', s.hold ? 'θ = 0 (held flat)' : `θ = ${incDeg.toFixed(2)}°`) },
@@ -1544,11 +1555,11 @@
                 const d = rp < a - 100 ? 0 : 1;
                 return {
                     title: 'Orbit Shape Under Sunlight',
-                    constants: 'μ = 398,600.44 km³/s², R⊕ = 6,378.137 km. Sunlight changes e but not a, so the period stays fixed while perigee dips and apogee rises.',
+                    constants: `${MU_RE_LINE()}. Sunlight changes e but not a, so the period stays fixed while perigee dips and apogee rises.`,
                     rows: [
                         { name: 'Perigee radius', result: `${comma(rp, d)} km`, work: work('R<sub>p</sub> = a(1 − e)', `a = 42,164 km, e = ${eText}`) },
                         { name: 'Apogee radius', result: `${comma(ra, d)} km`, work: work('R<sub>a</sub> = a(1 + e)') },
-                        { name: 'Perigee altitude', result: `${comma(rp - 6378.137, d)} km`, work: work('R = altitude + R⊕', `GEO altitude ${comma(a - 6378.137, d)} km`) },
+                        { name: 'Perigee altitude', result: `${comma(rp - M.RE, d)} km`, work: work('R = altitude + R⊕', `GEO altitude ${comma(a - M.RE, d)} km`) },
                         { name: 'Orbital period', result: `${(M.periodSeconds(a) / 3600).toFixed(3)} h`, work: work('Period = 2π √(a³ / μ)', 'unchanged') }
                     ]
                 };
@@ -1565,7 +1576,7 @@
                 const p = plotsFor(w, h);
                 drawGrid(g, p.left, [0, 91, 183, 274, 365].map((v) => ({ v, label: `${v}` })), p.yTicks, { xTitle: 'day', yTitle: p.yTitle });
                 const pts = [];
-                for (let d = 0; d <= 365.25; d += 2) pts.push([p.left.X(d), p.left.Y(M.srpEccVector(d, M.AREA_SRP[s.area]).e / p.scale)]);
+                for (let d = 0; d <= M.YEAR_DAYS; d += 2) pts.push([p.left.X(d), p.left.Y(M.srpEccVector(d, M.AREA_SRP[s.area]).e / p.scale)]);
                 strokePath(g, pts, COLOR.srp, 1.8, 0.35);
                 // Right: the yearly circle of the eccentricity vector.
                 const a = p.area;
@@ -1607,7 +1618,7 @@
             const scale = Math.pow(10, exp);
             const yMax = 1.1 * peak / scale;
             const split = Math.round(w * 0.62);
-            const left = makePlot({ x0: 40, y0: 10, x1: split - 8, y1: h - 26 }, 0, 365.25, 0, yMax);
+            const left = makePlot({ x0: 40, y0: 10, x1: split - 8, y1: h - 26 }, 0, M.YEAR_DAYS, 0, yMax);
             const area = { x0: split + 10, y0: 10, x1: w - 10, y1: h - 26 };
             // Equal scales on both axes: the circle spans x from -2r to 0 and y from -r to r.
             const k = Math.min((area.x1 - area.x0 - 12) / (2.4 * r), (area.y1 - area.y0 - 12) / (2.4 * r));
@@ -1961,5 +1972,18 @@
         dirty = false;
         renderFrame();
         updatePanels();
+    });
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "This page shows the averaged (secular) formulas the lesson teaches. The propagator setting does not change them.",
+        onSettingsChange() {
+            rebindMath();
+            for (const mode of Object.values(MODES)) mode.rebuild();
+            leadsChart.baseDirty = true;
+            captionDirty = true;
+            dirty = true;
+        }
     });
 })();

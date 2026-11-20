@@ -1,10 +1,10 @@
 // Test 2 Practice: helpers shared by the problem modules (random picks, target orbits, number
 // formats, and the givens table). No DOM access, so the modules also run in Node.
-// Load as a classic script, after rpo/rpo-math.js and practice-math.js.
+// Load as a classic script, after test-review-math.js and practice-math.js.
 (function (global) {
     'use strict';
 
-    const M = global.RpoMath;
+    const M = global.TestReviewMath.rpo;   // course relative-motion math
 
     const pick = list => list[Math.floor(Math.random() * list.length)];
     const chance = p => Math.random() < p;

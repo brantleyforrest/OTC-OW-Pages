@@ -15,6 +15,14 @@
 (function () {
     'use strict';
 
+    // The relative-motion math these views draw with: the page passes its own (orbit-math.js
+    // on the tools, test-review-math.js on Test 2 Practice) through RpoViews.useMath.
+    let viewMath = null;
+    function rpoMath() {
+        return viewMath || (window.OrbitMath && window.OrbitMath.rpo) || (window.TestReviewMath && window.TestReviewMath.rpo);
+    }
+    function useMath(m) { viewMath = m; }
+
     const COLORS = {
         chase: '#e0b64f',
         target: '#34d399',
@@ -436,7 +444,7 @@
 
     // A small static plot of one path with a direction arrow, for answer choices.
     function drawThumbnail(canvas, spec) {
-        const M = window.RpoMath;
+        const M = rpoMath();
         // spec.compact: a one-line axis key and no badge or scale bar; spec.fitPaths: fit to these
         // paths instead of this one (several thumbnails at one scale).
         const pane = createRicPlane(canvas, { plane: spec.plane || 'left', compact: !!spec.compact });
@@ -590,7 +598,7 @@
         const ringReach = { target: 0, chase: 0 };
         const reach = () => Math.max(orbitR, ringReach.target, ringReach.chase);
         const bg = (() => {
-            if (!window.EarthScene || !window.RpoMath) return null;
+            if (!window.EarthScene || !rpoMath()) return null;
             const bgScene = new THREE.Scene();
             const bgCamera = new THREE.PerspectiveCamera(60, 2, 1e-4, 1e4);
             const world = new THREE.Group();
@@ -694,7 +702,7 @@
         const targetRing = new Float32Array(RING * 3), chaseRing = new Float32Array(RING * 3);
         function setRing(mesh, arr, rv, key) {
             ringReach[key] = 0;
-            const M = window.RpoMath, RE = M.RE;
+            const M = rpoMath(), RE = M.RE;
             const conic = rv && rv.r && rv.v ? M.conicFromRv(rv.r, rv.v) : null;
             if (!conic || conic.e >= 0.99) { mesh.visible = false; mesh.userData.ready = false; return; }
             const { p, e, P, Q, nu0 } = conic;
@@ -713,7 +721,7 @@
         function setChaseOrbit(rv) { if (bg) setRing(bg.chaseOrbit, chaseRing, rv, 'chase'); }
         function setBackdropFrame(basis, rT, t) {
             if (!bg || !basis || !rT) { haveBasis = false; return; }
-            const M = window.RpoMath, RE = M.RE;
+            const M = rpoMath(), RE = M.RE;
             const n = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
             const I = n(basis.I), C = n(basis.C), R = n(basis.R);
             bg.world.matrix.set(
@@ -891,7 +899,7 @@
                 warmUpEarth();
                 // Look the same way as the box camera, at the target, from the distance at which the
                 // target's depth has the box's scale.
-                const RE = window.RpoMath.RE;
+                const RE = rpoMath().RE;
                 const D = halfH / Math.tan(BG_FOV * Math.PI / 360) / RE;
                 bg.camera.position.copy(camera.position).normalize().multiplyScalar(D);
                 bg.camera.quaternion.copy(camera.quaternion);
@@ -1022,14 +1030,14 @@
             // For tests: where an ECI-relative point (km from the target, in box axes) lands in the backdrop.
             backdropToScreen(xyzKm) {
                 if (!bg) return null;
-                const RE = window.RpoMath.RE;
+                const RE = rpoMath().RE;
                 const v = new THREE.Vector3(xyzKm[0] / RE, xyzKm[1] / RE, xyzKm[2] / RE).project(bg.camera);
                 return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h, v.z];
             },
             // For tests: where the chase ring's point at chase (its first sample, slid with the ring) lands.
             chaseTraceToScreen() {
                 if (!bg) return null;
-                const RE = window.RpoMath.RE;
+                const RE = rpoMath().RE;
                 // The slide is in the world group's ECI axes; the world matrix turns it into box axes.
                 const slide = bg.chaseOrbit.position.clone().sub(bg.holder.position).applyMatrix4(bg.world.matrix);
                 const v = chase.position.clone().divideScalar(RE).add(slide).project(bg.camera);
@@ -1074,7 +1082,7 @@
     // Returns { times, rho, rT, R, I, C, maxRho, box }: Float64Arrays of triples in km, plus the
     // largest |rho| and the RIC bounding box of the path (unpadded), for magnification and drawing.
     function framePath(targetCoe, times, rho) {
-        const M = window.RpoMath;
+        const M = rpoMath();
         const count = times.length;
         const rT = new Float64Array(count * 3), R = new Float64Array(count * 3);
         const I = new Float64Array(count * 3), C = new Float64Array(count * 3);
@@ -1098,7 +1106,7 @@
     // drives it: the page passes the same rho(t) the RIC panes draw. Positions are in km and
     // the scene unit is Earth's radius. Only the offset from the target is ever magnified.
     function createInertialView(THREE, canvas, options) {
-        const M = window.RpoMath, Kit = window.ToolKit;
+        const M = rpoMath(), Kit = window.ToolKit;
         options = options || {};
         const RE = M.RE;
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
@@ -1768,7 +1776,7 @@
 
     const RpoViews = {
         COLORS, PLANES, BOX_VIEWS, createRicPlane, createRicBox, boundingBox, fitPanes, drawThumbnail, gridStep, attachPanZoom,
-        framePath, createInertialView, createFiveViewStage, createDualStage, setupAdvancedSwitch
+        framePath, createInertialView, createFiveViewStage, createDualStage, setupAdvancedSwitch, useMath
     };
     if (typeof window !== 'undefined') window.RpoViews = RpoViews;
     if (typeof module !== 'undefined' && module.exports) module.exports = RpoViews;

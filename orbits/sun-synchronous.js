@@ -5,49 +5,22 @@
 
     /* ================================================================== */
     /* ORBIT MATH                                                         */
-    /* J2 nodal regression of a circular orbit. km, s, rad unless noted.  */
+    /* In ../assets/orbit-math.js, section sunSync.                       */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-    const MU = 398600.4418;      // km^3/s^2
-    const RE = 6378.137;         // km
-    const J2 = 1.08262668e-3;
-    const YEAR_DAYS = 365.2422;
-    const DAY_S = 86400;
-    const SUN_RATE = 2 * Math.PI / (YEAR_DAYS * DAY_S); // rad/s, mean Sun's motion in right ascension
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-
-    const wrap180 = (deg) => ((deg % 360) + 540) % 360 - 180;
-    const wrap360 = (deg) => ((deg % 360) + 360) % 360;
-    const wrap12 = (hours) => ((hours % 24) + 36) % 24 - 12;
-
-    // RAAN rate: dOmega/dt = -(3/2) J2 n (RE/a)^2 cos i, for e = 0.
-    const meanMotion = (a) => Math.sqrt(MU / (a * a * a));
-    const j2Factor = (a) => 1.5 * J2 * meanMotion(a) * (RE / a) * (RE / a);
-    const nodalRate = (a, inc) => -j2Factor(a) * Math.cos(inc);
-
-    // Sun-synchronous: set dOmega/dt equal to the Sun's rate and solve for cos i.
-    const sunSyncCos = (a) => -SUN_RATE / j2Factor(a);
-    const sunSyncInclination = (a) => Math.acos(sunSyncCos(a));
-
-    // Angles after a number of days, in degrees.
-    const sunRightAscension = (days) => days * DAY_S * SUN_RATE * R2D;
-    const raanAfter = (raan0Deg, a, inc, days) => raan0Deg + nodalRate(a, inc) * days * DAY_S * R2D;
-
-    // Local time at the node: 12:00 when the node points at the Sun, 15 deg per hour.
-    const nodeLocalTime = (raanDeg, sunDeg) => 12 + wrap180(raanDeg - sunDeg) / 15;
-    const raanForNodeTime = (hours, sunDeg) => sunDeg + (hours - 12) * 15;
-
-    // Position on a circular orbit of the given radius at argument of latitude u (deg).
-    function circularOrbitPosition(radius, raanDeg, inc, uDeg) {
-        const raan = raanDeg * D2R, u = uDeg * D2R;
-        const ci = Math.cos(inc), si = Math.sin(inc);
-        const co = Math.cos(raan), so = Math.sin(raan);
-        const cu = Math.cos(u), su = Math.sin(u);
-        return {
-            x: radius * (co * cu - so * su * ci),
-            y: radius * (so * cu + co * su * ci),
-            z: radius * su * si
-        };
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        MU, RE, J2, YEAR_DAYS, DAY_S, SUN_RATE, D2R, R2D, wrap180, wrap360, wrap12, meanMotion,
+        j2Factor, nodalRate, sunSyncCos, sunSyncInclination, sunRightAscension, raanAfter,
+        nodeLocalTime, raanForNodeTime, circularOrbitPosition
+    } = OM.sunSync;
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        ({
+            MU, RE, J2, YEAR_DAYS, DAY_S, SUN_RATE, D2R, R2D, wrap180, wrap360, wrap12, meanMotion,
+            j2Factor, nodalRate, sunSyncCos, sunSyncInclination, sunRightAscension, raanAfter,
+            nodeLocalTime, raanForNodeTime, circularOrbitPosition
+        } = OM.sunSync);
     }
 
     /* ================================================================== */
@@ -265,11 +238,14 @@
         if (el.textContent !== text) el.textContent = text;
     };
 
-    function placeOrbit(orbit, radius, satelliteDeg) {
+    // The satellite is drawn from its r (OrbitMath.elements): a circular orbit of radius a, at
+    // argument of latitude satelliteDeg, scaled down to the drawn radius.
+    function placeOrbit(orbit, radius, satelliteDeg, a) {
         orbit.group.rotation.set(orbit.inc, 0, orbit.raanDeg * D2R);
         orbit.group.scale.setScalar(radius);
-        const p = circularOrbitPosition(radius, orbit.raanDeg, orbit.inc, satelliteDeg);
-        orbit.satellite.position.set(p.x, p.y, p.z);
+        const { r } = OM.elements.rvFromElements({ a, e: 0, i: orbit.inc * R2D, raan: orbit.raanDeg, argp: 0, nu: satelliteDeg });
+        const k = radius / a;
+        orbit.satellite.position.set(r[0] * k, r[1] * k, r[2] * k);
         const node = circularOrbitPosition(radius, orbit.raanDeg, orbit.inc, 0);
         orbit.node.position.set(node.x, node.y, node.z);
     }
@@ -290,8 +266,8 @@
             setText(orbit.timeEl, formatTime(orbit.nodeHours));
         }
 
-        placeOrbit(sso, radius, state.satelliteDeg);
-        placeOrbit(polar, radius, state.satelliteDeg + 40);
+        placeOrbit(sso, radius, state.satelliteDeg, a);
+        placeOrbit(polar, radius, state.satelliteDeg + 40, a);
         polar.group.visible = polar.satellite.visible = polar.node.visible = state.showPolar;
 
         sunGroup.rotation.z = sun * D2R;
@@ -337,6 +313,10 @@
         setText($('eq-a'), `a = ${Math.round(a).toLocaleString('en-US')} km`);
         setText($('eq-i'), `${(sunSyncInclination(a) * R2D).toFixed(2)}°`);
         setText($('eq-cos'), `= ${cosI.toFixed(4).replace('-', '−')}`);
+        // The constants line follows the constants setting (the HTML holds the course values).
+        const plain = (v) => v.toLocaleString('en-US', { maximumFractionDigits: 6 });
+        setText($('eq-year'), `Ω̇ = 360° / ${YEAR_DAYS} days`);
+        setText($('eq-constants'), `J₂ = ${plain(J2 * 1000)} × 10⁻³, Rₑ = ${plain(RE)} km, μ = ${plain(MU)} km³/s². Circular orbit.`);
     }
 
     /* Camera. "Follow Sun" turns the camera with the Sun, so the stars appear to wheel past. */
@@ -545,5 +525,16 @@
         dirty = false;
         renderFrame();
         updatePanels();
+    });
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "This page shows the J₂ formulas the lesson teaches: nodal rate, inclination and node time. The propagator setting does not change them.",
+        onSettingsChange() {
+            rebindMath();
+            updateEquations();
+            dirty = true;
+        }
     });
 })();

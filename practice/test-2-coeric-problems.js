@@ -1,10 +1,11 @@
-// Test 2 Practice, Elements to Position and Velocity (#coeric). The problem gives the classical
-// orbital elements of a circular target and of a chase that differs a little, both with ω = 0 and
-// the same true anomaly (0°, 90°, 180°, or 270°; only 0° or 180° when chase's e differs, so chase
-// is at its perigee or apogee). The student finds chase's RIC position and velocity: first the
-// RMOEs the elements give, then the boundary tables. Answers: RpoMath.rmoeFromCoes, then
-// stateFromRmoe. A node difference is used only with a polar target, where it moves no point
-// along the track. No DOM access. Load after rpo-math.js, practice-math.js, and test-2-common.js.
+// Test 2 Practice, Elements to RIC Signs (#coeric). The problem gives the classical orbital
+// elements of a circular target and of a chase that differs a little, both with ω = 0 and the same
+// true anomaly (0°, 90°, 180°, or 270°; only 0° or 180° when chase's e differs, so chase is at its
+// perigee or apogee). The student gives the sign (+, −, or 0) of each part of chase's RIC position
+// and velocity, in the homework's grid (rows R, I, C; columns position, velocity). The walkthrough
+// works the numbers: the RMOEs the elements give, then the boundary tables. Answers:
+// TestReviewMath.rpo.rmoeFromCoes, then stateFromRmoe. A node difference is used only with a polar target, where it moves no point
+// along the track. No DOM access. Load after test-review-math.js, practice-math.js, and test-2-common.js.
 (function (global) {
     'use strict';
 
@@ -37,6 +38,23 @@
         return { type: t, diffs: inPlane().concat(cross()) };
     }
 
+    // Where the exact difference of the two orbits falls outside a field's tolerance of the linear
+    // answer, the solution says so. This happens for the in-track rate of a plane change: tilting
+    // the velocity by an angle shortens its in-track part by about v times the angle squared over 2,
+    // a second-order effect the linear model leaves out.
+    function exactNote(target, chase, st) {
+        const rel = M.relativeState(target, chase, 0);
+        const exact = [...rel.rho, ...rel.rhoDot];
+        const answers = C2.stateAnswers(st), exactAnswers = C2.stateAnswers(exact);
+        const off = C2.STATE_FIELDS().filter(fl => C2.grade(fl, String(exactAnswers[fl.key].value), answers[fl.key].value) === 'wrong');
+        if (!off.length) return '';
+        const num = (ans) => C2.texNum(ans.text.replace(/ .*$/, ''));
+        const list = off.map(fl => '$' + fl.tex + '_0 = ' + num(exactAnswers[fl.key]) + '$ ' + fl.unit).join(', ');
+        return note('The exact difference of the two orbits gives ' + list + ' here, against the linear model’s ' +
+            off.map(fl => '$' + num(answers[fl.key]) + '$').join(', ') +
+            '. The gap is a second-order effect of the plane difference, which the linear model leaves out. Answer with the linear model, as the course does.');
+    }
+
     function generate(type) {
         const pick = pickDiffs(type);
         const diffs = pick.diffs;
@@ -64,11 +82,18 @@
         const r = M.rmoeFromCoes(target, chase);
         const st = M.stateFromRmoe(r, n, 0);
         const ms = v => C2.fixed(v * 1000, 4);
+        const signs = signsOf(st);
+        if (!signs) return generate(type);      // a component too near zero to call: try again
+        // The exact difference of the two orbits must not flip a + or − (it can, for a small
+        // in-track rate, through the second-order effect of a plane difference): try again.
+        const rel = M.relativeState(target, chase, 0);
+        const exact = [...rel.rho, ...rel.rhoDot];
+        if (SIGN_FIELDS.some(([key], k) => signs[key] !== '0' && Math.sign(exact[k]) !== (signs[key] === '+' ? 1 : -1))) return generate(type);
 
         // Steps: n; the RMOEs from the elements; where chase is; the boundary tables.
         const steps = [{ key: 'n', title: 'Mean motion of the target', result: '$n = ' + sci(n) + '$ rad/s',
             caption: 'n sets how fast every angle advances: one turn per target orbit.',
-            methods: [{ name: 'Formula', html: calc('n = \\sqrt{\\mu / a^3}', ['\\sqrt{398600.44 / ' + C2.plain(a, 2) + '^3}'], sci(n) + '\\ \\text{rad/s}') }] }];
+            methods: [{ name: 'Formula', html: calc('n = \\sqrt{\\mu / a^3}', ['\\sqrt{' + M.MU + ' / ' + C2.plain(a, 2) + '^3}'], sci(n) + '\\ \\text{rad/s}') }] }];
 
         const inPlaneHtml = [
             calc('x_C = a_{chase} - a_{target}', [C2.plain(chase.a, 2) + ' - ' + C2.plain(a, 2)], C2.fixed(r.xc, 3) + '\\ \\text{km}'),
@@ -108,24 +133,51 @@
             calc('\\dot x_0', [], ms(st[3]) + '\\ \\text{m/s}'), calc('\\dot y_0', [], ms(st[4]) + '\\ \\text{m/s}'),
             calc('z_0', [], C2.fixed(st[2], 3) + '\\ \\text{km}'), calc('\\dot z_0', [], ms(st[5]) + '\\ \\text{m/s}')
         ].join('');
-        steps.push({ key: 'answer', title: 'Read the boundary tables', result: '',
+        steps.push({ key: 'tables', title: 'Read the boundary tables', result: '',
+            caption: 'Chase’s position and velocity from these RMOEs.',
+            methods: [{ name: 'Tables', html: tableHtml + exactNote(target, chase, st) }] });
+
+        const signRows = SIGN_FIELDS.map(([key, tex, name], k) => rule('$' + tex + '_0 = ' + C2.texNum(k < 3 ? C2.fixed(st[k], 3) : ms(st[k])) + '$ ' + (k < 3 ? 'km' : 'm/s') +
+            ' (' + name.toLowerCase() + ')', SYMBOL[signs[key]])).join('');
+        steps.push({ key: 'answer', title: 'Each sign', result: SIGN_FIELDS.map(([key]) => SYMBOL[signs[key]]).join(' '),
             caption: 'Chase’s motion from these RMOEs, beside both orbits.',
-            methods: [{ name: 'Tables', html: tableHtml + note(C2.reading(r, n, a)) }] });
+            methods: [{ name: 'Signs', html: signRows + note(C2.reading(r, n, a)) }] });
 
         return {
             type: pick.type,
             model: { kind: 'motion', target, chase, rmoe: r, n, revs: 2 },
-            title: 'Elements to Position and Velocity',
-            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit. Chase is on the orbit given beside it, at the same moment. Find chase’s position and velocity in the RIC frame (use the course’s linear model).'),
+            title: 'Elements to RIC Signs',
+            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit. Chase is on the orbit given beside it, at the same moment. Is each part of chase’s position and velocity in the RIC frame positive, negative, or zero? (Use the course’s linear model.)'),
             statement: statementHtml(target, chase),
             overviewCaption: 'The target (green square) and chase (gold triangle), each on its own orbit. The RIC panes fill in at the last step.',
-            limitsHtml: C2.LIMITS.replace(/ Tick.*$/, ''),
-            fields: C2.STATE_FIELDS(),
-            answers: C2.stateAnswers(st),
+            limitsHtml: 'Pick +, −, or 0 for each.',
+            gridHeads: ['Position', 'Velocity'],
+            fields: GRID_ORDER.map(key => { const [, tex, name] = SIGN_FIELDS.find(f => f[0] === key); return { key, tex, name, unitType: 'sign' }; }),
+            answers: Object.fromEntries(SIGN_FIELDS.map(([key]) => [key, { value: signs[key], text: SYMBOL[signs[key]] }])),
             steps
         };
     }
 
-    global.Test2CoericProblems = { generate, grade: C2.grade };
+    // The grid: rows R, I, C; columns position, velocity. The form fills two columns row by row.
+    const SIGN_FIELDS = [['x', 'x', 'R position'], ['y', 'y', 'I position'], ['z', 'z', 'C position'],
+        ['vx', '\\dot x', 'R velocity'], ['vy', '\\dot y', 'I velocity'], ['vz', '\\dot z', 'C velocity']];
+    const GRID_ORDER = ['x', 'vx', 'y', 'vy', 'z', 'vz'];
+    const SYMBOL = { '+': '+', '-': '−', '0': '0' };
+    // Signs of the linear-model state. A part is 0 only when it is zero by construction (round-off
+    // aside); one that is nonzero but small next to the largest part of its kind gives null, so the
+    // problem is made again rather than hang on a near-zero value.
+    function signsOf(st) {
+        const out = {};
+        const scale = [Math.max(...st.slice(0, 3).map(Math.abs)), Math.max(...st.slice(3).map(Math.abs))];
+        for (let k = 0; k < 6; k++) {
+            const s = scale[k < 3 ? 0 : 1], v = st[k];
+            if (Math.abs(v) <= Math.max(1e-9 * s, k < 3 ? 1e-9 : 1e-13)) out[SIGN_FIELDS[k][0]] = '0';
+            else if (Math.abs(v) < 0.05 * s) return null;
+            else out[SIGN_FIELDS[k][0]] = v > 0 ? '+' : '-';
+        }
+        return out;
+    }
+
+    global.Test2CoericProblems = { generate, grade: C2.grade, signsOf };
 })(typeof window !== 'undefined' ? window : globalThis);
 if (typeof module !== 'undefined') module.exports = globalThis.Test2CoericProblems;

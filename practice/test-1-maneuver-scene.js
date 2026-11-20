@@ -13,62 +13,9 @@
 
     /* ================================================================== */
     /* ORBIT GEOMETRY MATH                                                */
-    /* Positions on circular orbits and on the Hohmann transfer ellipse.  */
-    /* Distances in any length unit; angles in degrees. u is the argument */
-    /* of latitude, measured from the ascending node.                     */
+    /* In test-review-math.js, section maneuverGeometry.                  */
     /* ================================================================== */
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-
-    // Position on an orbit of radius r in the plane (inc, raan), at argument of latitude u.
-    function orbitPosition(r, inc, raan, u) {
-        const i = inc * D2R, o = raan * D2R, a = u * D2R;
-        return {
-            x: r * (Math.cos(o) * Math.cos(a) - Math.sin(o) * Math.sin(a) * Math.cos(i)),
-            y: r * (Math.sin(o) * Math.cos(a) + Math.cos(o) * Math.sin(a) * Math.cos(i)),
-            z: r * Math.sin(a) * Math.sin(i)
-        };
-    }
-
-    // Unit vector along the direction of motion there (d position / du).
-    function orbitDirection(inc, raan, u) {
-        const i = inc * D2R, o = raan * D2R, a = u * D2R;
-        return {
-            x: -Math.cos(o) * Math.sin(a) - Math.sin(o) * Math.cos(a) * Math.cos(i),
-            y: -Math.sin(o) * Math.sin(a) + Math.cos(o) * Math.cos(a) * Math.cos(i),
-            z: Math.cos(a) * Math.sin(i)
-        };
-    }
-
-    // Unit normal of the plane (direction of the angular momentum).
-    const orbitNormal = (inc, raan) => ({
-        x: Math.sin(raan * D2R) * Math.sin(inc * D2R),
-        y: -Math.cos(raan * D2R) * Math.sin(inc * D2R),
-        z: Math.cos(inc * D2R)
-    });
-
-    // Hohmann transfer between radii R1 and R2. eSigned < 0 when lowering, so that u = 0 is
-    // always the start at R1 and u = 180 the end at R2. Periods are in units of the transfer
-    // time (half the transfer orbit's period), from P proportional to a^(3/2).
-    function transferEllipse(R1, R2) {
-        const a = (R1 + R2) / 2;
-        const eSigned = (R2 - R1) / (R1 + R2);
-        const p = a * (1 - eSigned * eSigned);
-        return {
-            a, eSigned, p,
-            radiusAt: (u) => p / (1 + eSigned * Math.cos(u * D2R)),
-            T1: 2 * Math.pow(R1 / a, 1.5),
-            T2: 2 * Math.pow(R2 / a, 1.5)
-        };
-    }
-
-    // Angle u flown on the transfer after the share t (0 to 1) of its flight time (Kepler's
-    // equation, via SatelliteMotion). The spacecraft is fastest near perigee.
-    function transferU(t, eSigned) {
-        const e = Math.abs(eSigned), raise = eSigned > 0;
-        const M = Math.PI * (raise ? t : 1 + t);
-        return Motion.trueFromMean(M, e) * R2D - (raise ? 0 : 180);
-    }
+    const { D2R, R2D, orbitPosition, orbitDirection, orbitNormal, transferEllipse, transferU } = global.TestReviewMath.maneuverGeometry;
 
     /* ================================================================== */
     /* STEPS, SCENE, AND CAMERA                                           */

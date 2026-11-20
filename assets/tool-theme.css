@@ -1,3 +1,6 @@
+/* The Settings badge and panel styles are in orbit-settings-panel.css, shared with the home page. */
+@import url('orbit-settings-panel.css');
+
 /* Shared theme for tool pages. Matches the portal styling in index.html. */
 :root {
     --primary-navy: #0c2340;
@@ -847,3 +850,4 @@ body:has(.mode-row > .mode-switch) .tool-side > .col { padding-bottom: 3.5rem; }
 .mode-switch[aria-checked="true"] .track { background: var(--accent-gold); border-color: var(--accent-gold); }
 .mode-switch[aria-checked="true"] .track::after { left: calc(100% - 0.9rem); background: #0b1220; }
 .mode-switch:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 2px; border-radius: 4px; }
+

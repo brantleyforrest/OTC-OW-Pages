@@ -1,8 +1,7 @@
 // Test 2 Practice: the page controller, modeled on test-1-practice.js. A section is one entry in
 // SECTIONS plus one problem module (window.Test2<Name>Problems with generate(type) and grade).
 // A section that is not built yet is simply not in the list, so it never shows in the selector.
-// A module's generate may return an ordinary problem (answer form and walkthrough) or a card
-// deck ({ matching: true, title, prompt, deck }), which opens the matching panel instead.
+// Each section is one kind of homework problem: generate makes a new one, grade checks an answer.
 // Practice mode shows the view and the walkthrough; marks say only right or wrong.
 // Test mode shows only the problem and the answer form until the answers are graded.
 (function () {
@@ -19,26 +18,22 @@
     const PUBLISHED = (window.Test2Release && window.Test2Release.published) || [];
     document.documentElement.classList.toggle('dev-version', DEV);
 
-    // In the order the topics are taught. types: the topic buttons, the first one the default.
+    // The Test 2 topics, in the order taught. types: the topic buttons, the first one the default
+    // (a section with one kind of problem shows no topic buttons).
+    const Rmoe = window.Test2RmoeProblems;
     const SECTIONS = [
-        { key: 'axes', label: 'RIC Axes', module: window.Test2AxesProblems,
-          types: [['random', 'Random'], ['arrows', 'Arrows'], ['cards', 'Cards']] },
-        { key: 'motion', label: 'Elements to Motion', module: window.Test2MotionProblems,
-          types: [['random', 'Random'], ['perch', 'Perch'], ['linear-drift', 'Drift'], ['stationary-nmc', 'NMC'],
-              ['drifting-nmc', 'Drifting NMC'], ['cross-track', 'Cross-Track'], ['drifting-cross-track', 'Snake'],
-              ['nmc-cross-track', 'Cross-Track NMC'], ['corkscrew', 'Corkscrew']] },
-        { key: 'concepts', label: 'Concepts', module: window.Test2ConceptsProblems,
-          types: [['random', 'Random'], ['assumptions', 'CW Assumptions'], ['rmoe', 'RMOEs'], ['elements', 'Elements'], ['burns', 'Burns']] },
-        { key: 'coeric', label: 'Elements to Position and Velocity', module: window.Test2CoericProblems,
+        { key: 'coeric', label: 'Elements to RIC Signs', module: window.Test2CoericProblems,
           types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'Cross-Track'], ['both', 'Both']] },
-        { key: 'rmoe', label: 'Position and Velocity to RMOEs', module: window.Test2RmoeProblems,
-          types: [['random', 'Random'], ['forward', 'State to RMOEs'], ['reverse', 'RMOEs to State']] },
-        { key: 'plots', label: 'Reading Plots', module: window.Test2PlotsProblems,
-          types: [['random', 'Random'], ['read', 'Read the RMOEs'], ['later', 'Position Later']] },
-        { key: 'drift', label: 'Drift', module: window.Test2DriftProblems,
-          types: [['random', 'Random'], ['perch', 'Perch and Δa'], ['degrees', 'Degrees at GEO']] },
-        { key: 'signs', label: 'RMOE Signs', module: window.Test2SignsProblems,
-          types: [['random', 'Random']] }
+        { key: 'vis-state', label: 'Visualize from Position and Velocity', module: window.Test2VisStateProblems,
+          types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'With Cross-Track']] },
+        { key: 'vis-rmoe', label: 'Visualize from RMOEs', module: window.Test2VisRmoeProblems,
+          types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'With Cross-Track']] },
+        { key: 'rmoe', label: 'Position and Velocity to RMOEs', module: Rmoe && { generate: () => Rmoe.generate('forward'), grade: Rmoe.grade },
+          types: [['forward', 'State to RMOEs']] },
+        { key: 'state', label: 'RMOEs to Position and Velocity', module: Rmoe && { generate: () => Rmoe.generate('reverse'), grade: Rmoe.grade },
+          types: [['reverse', 'RMOEs to State']] },
+        { key: 'burns', label: 'Burn Trajectories', module: window.Test2BurnsProblems,
+          types: [['random', 'Random'], ['drawing', 'Pick the Drawing'], ['burn', 'Pick the Burn']] }
     ].filter(s => s.module && (DEV || PUBLISHED.includes(s.key)));
     const byKey = Object.fromEntries(SECTIONS.map(s => [s.key, s]));
 
@@ -46,7 +41,7 @@
     if (!SECTIONS.length) {
         document.querySelector('.tool-stage-col').style.display = 'none';
         document.querySelector('.mode-row').closest('.panel').style.display = 'none';
-        ['given', 'answer-form', 'answer-limits', 'walk-panel', 'cards-panel']
+        ['given', 'answer-form', 'answer-limits', 'walk-panel']
             .forEach((id) => { $(id).style.display = 'none'; });
         $('problem-title').textContent = 'Coming soon';
         $('problem-prompt').textContent = 'The Test 2 sections are still being built. Check back as the topics are taught.';
@@ -56,10 +51,6 @@
     const MODE_CAPTIONS = {
         practice: 'The view starts with the problem as given, and the walkthrough builds the solution step by step.',
         test: 'Enter your answers and submit. The view and the walkthrough open after grading.'
-    };
-    const CARD_CAPTIONS = {
-        practice: 'Each pair is checked as you make it. A wrong pair lets go, so you can try again.',
-        test: 'Pair every card, then submit. Pick a paired card to undo its pair before submitting.'
     };
 
     const hash = location.hash.slice(1);
@@ -75,9 +66,6 @@
     };
 
     const viz = createViz();
-    const cards = window.Test2Matching.create({
-        names: $('match-names'), clues: $('match-clues'), score: $('cards-score'), submit: $('cards-submit')
-    });
 
     /* ------------------------------------------------------------------ */
     /* Problems                                                           */
@@ -85,7 +73,6 @@
     function generate() {
         const section = byKey[state.section];
         const p = section.module.generate(state.types[state.section]);
-        if (p.matching) return p;
         return {
             view: p.model && p.model.kind ? 'scene' : null,
             viewIsGiven: Boolean(p.viewIsGiven),
@@ -93,6 +80,7 @@
             prompt: p.prompt,
             limitsHtml: p.limitsHtml,
             overviewCaption: p.overviewCaption,
+            gridHeads: p.gridHeads || null,
             fields: p.fields,
             statement: p.statement,
             answers: p.answers,
@@ -121,6 +109,15 @@
         box.textContent = '';
         answerRows = {};
         box.classList.toggle('check-list', fields.every((f) => f.unitType === 'check'));
+        // A sign grid: the fields fill the two columns row by row, under these column heads.
+        const heads = state.problem.gridHeads;
+        box.classList.toggle('sign-grid', Boolean(heads));
+        (heads || []).forEach((text) => {
+            const head = document.createElement('div');
+            head.className = 'grid-head';
+            head.textContent = text;
+            box.appendChild(head);
+        });
         fields.forEach((field, index) => {
             if (field.unitType === 'check') buildCheckRow(field);
             else if (PICK_TYPES.includes(field.unitType)) buildPickRow(field);
@@ -235,7 +232,7 @@
                 tag.className = 'pick-tag';
                 tag.textContent = option.value;
                 const pair = document.createElement('span');
-                pair.className = 'plot-pair';
+                pair.className = 'plot-pair' + (option.plots.length === 1 ? ' single' : '');
                 option.plots.forEach((spec) => {
                     const cell = document.createElement('span');
                     cell.className = 'plot-cell plot-' + spec.plane;
@@ -262,17 +259,20 @@
     }
 
     // The two plots of a pair share one scale, so the same distance looks the same in both.
+    // spec.fit (a list of RMOEs): fit to those paths instead, so several choices share one scale.
     function drawPlotPair(pair, plots) {
-        const M = window.RpoMath;
+        const M = window.TestReviewMath.rpo;
         const cells = [...pair.children];
-        const paths = plots.map((spec) => spec.path || M.sampleTrajectory(spec.rmoe, spec.n, 0, (spec.revs || 1) * 2 * Math.PI / spec.n, Math.round(120 * (spec.revs || 1)) + 1));
+        const sample = (rmoe, spec) => M.sampleTrajectory(rmoe, spec.n, 0, (spec.revs || 1) * 2 * Math.PI / spec.n, Math.round(120 * (spec.revs || 1)) + 1);
+        const paths = plots.map((spec) => spec.path || sample(spec.rmoe, spec));
+        const fitPaths = plots[0].fit ? plots[0].fit.map((r) => sample(r, plots[0])) : paths;
         const draw = () => {
             const panes = cells.map((cell, k) => {
                 const pane = V.createRicPlane(cell.firstChild, { plane: plots[k].plane, compact: true });
                 pane.resize(cell.clientWidth || 120, cell.clientHeight || 90);
                 return pane;
             });
-            V.fitPanes(panes, paths, true);
+            V.fitPanes(panes, fitPaths, true);
             panes.forEach((pane, k) => {
                 const path = paths[k], end = path.length / 3 - 1;
                 pane.draw({ trail: path, marker: [path[0], path[1], path[2]], chase: [path[3 * end], path[3 * end + 1], path[3 * end + 2]] });
@@ -447,18 +447,8 @@
     /* Modes, Sections, and Problems                                      */
     /* ------------------------------------------------------------------ */
     function applyLayout() {
-        const onCards = Boolean(state.problem && state.problem.matching);
-        document.body.classList.toggle('cards-only', onCards);
-        document.body.classList.toggle('no-view', !onCards && Boolean(state.problem) && !state.problem.view);
-        $('cards-panel').hidden = !onCards;
-        $('problem-panel').hidden = onCards;
-        $('mode-caption').textContent = (onCards ? CARD_CAPTIONS : MODE_CAPTIONS)[state.mode];
-        if (onCards) {
-            document.body.classList.remove('answers-only');
-            $('walk-panel').hidden = true;
-            $('new-problem').classList.toggle('primary', cards.isDone());
-            return;
-        }
+        document.body.classList.toggle('no-view', Boolean(state.problem) && !state.problem.view);
+        $('mode-caption').textContent = MODE_CAPTIONS[state.mode];
         const ungraded = state.mode === 'test' && !state.submitted;
         const answersOnly = ungraded && !state.problem.viewIsGiven;
         document.body.classList.toggle('answers-only', answersOnly);
@@ -474,13 +464,6 @@
         state.blankWarned = false;
         state.active = -1;
         state.visited = new Set();
-        if (state.problem.matching) {
-            $('cards-title').textContent = state.problem.title;
-            $('cards-prompt').innerHTML = prose(state.problem.prompt);
-            cards.deal({ mode: state.mode, deck: state.problem.deck });
-            applyLayout();
-            return;
-        }
         $('problem-title').textContent = state.problem.title;
         $('problem-prompt').innerHTML = state.problem.prompt;
         $('given').innerHTML = state.problem.statement;
@@ -522,6 +505,7 @@
         const group = $('topic');
         group.textContent = '';
         const section = byKey[state.section];
+        group.hidden = section.types.length < 2;
         section.types.forEach(([value, label]) => {
             const b = document.createElement('button');
             b.type = 'button';
@@ -541,10 +525,6 @@
         newProblem();
     });
 
-    $('cards-panel').addEventListener('click', () => {
-        if (state.problem && state.problem.matching) $('new-problem').classList.toggle('primary', cards.isDone());
-    });
-    $('cards-submit').addEventListener('click', () => cards.submit());
     $('new-problem').addEventListener('click', newProblem);
 
     /* ------------------------------------------------------------------ */

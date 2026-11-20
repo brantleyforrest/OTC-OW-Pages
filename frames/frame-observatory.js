@@ -4,8 +4,11 @@
 (async function () {
     'use strict';
 
-    const FM = window.FrameMath;
-    const { RE, D2R } = FM;
+    // Math from ../assets/orbit-math.js (section frames), on the constants the site's settings choose.
+    let FM = window.OrbitMath.frames;
+    // Read the math again after the constants setting changes.
+    function rebindMath() { FM = window.OrbitMath.frames; ({ RE, D2R } = FM); }
+    let { RE, D2R } = FM;
     const $ = (id) => document.getElementById(id);
 
     const statusEl = $('status');
@@ -76,18 +79,18 @@
 
     const ORBITS = {
         GEO: {
-            radius: FM.GEO_RADIUS,
+            get radius() { return FM.GEO_RADIUS; },
             inclination: 0,
             separation: 300,
             tiltOffset: 0.4 * D2R,
-            trailWindow: FM.SIDEREAL_DAY,
+            get trailWindow() { return FM.SIDEREAL_DAY; },
             speedStop: 4,
             globalDistance: 20.5,
             localDistance: 0.46,
             caption: 'About 35,786 km above the equator. One orbit takes one Earth rotation.'
         },
         LEO: {
-            radius: RE + 700,
+            get radius() { return RE + 700; },
             inclination: 45,
             separation: 150,
             tiltOffset: 1.5 * D2R,
@@ -1289,4 +1292,25 @@
     }
     updateCoordinates();
     requestAnimationFrame(loop);
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "With Cowell, both spacecraft move under the chosen forces from their starting r and v.",
+        onSettingsChange() {
+            rebindMath();
+            rebuildScenario();
+            updateOrbitRing();
+            dirty = true;
+        },
+        // The orbit and frame buttons, then the inputs (choosing an orbit resets the tilt).
+        getShareState() {
+            return { ...window.OrbitSettingsPanel.genericState(), orbit: state.orbit, frame: state.frame };
+        },
+        applyShareState(s) {
+            if (Object.prototype.hasOwnProperty.call(ORBITS, s.orbit)) selectOrbit(s.orbit);
+            if ([...document.querySelectorAll('.frame-btn')].some((b) => b.dataset.frame === s.frame)) selectFrame(s.frame);
+            window.OrbitSettingsPanel.applyGenericState(s);
+        }
+    });
 })();

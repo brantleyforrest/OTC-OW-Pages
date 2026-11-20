@@ -161,7 +161,7 @@
                         <div class="eq-list">
                             <div class="eq-row">
                                 <div class="eq-head"><span class="eq-name"><b>Node drift needed</b></span><span class="eq-result" id="eq-rate"></span></div>
-                                <div class="eq-work"><span>Ω̇ = 360° / 365.2422 days</span></div>
+                                <div class="eq-work"><span id="eq-year">Ω̇ = 360° / 365.2422 days</span></div>
                             </div>
                             <div class="eq-row">
                                 <div class="eq-head"><span class="eq-name"><b>Mean motion</b></span><span class="eq-result" id="eq-n"></span></div>
@@ -172,7 +172,7 @@
                                 <div class="eq-work"><span>cos i = −Ω̇ / (1.5 J₂ n (Rₑ/a)²)</span><span class="eq-val" id="eq-cos"></span></div>
                             </div>
                         </div>
-                        <p class="eq-constants">J₂ = 1.0826 × 10⁻³, Rₑ = 6,378 km, μ = 398,600 km³/s². Circular orbit.</p>
+                        <p class="eq-constants" id="eq-constants">J₂ = 1.0826 × 10⁻³, Rₑ = 6,378 km, μ = 398,600 km³/s². Circular orbit.</p>
                     </div>
 
                     <div class="panel">
@@ -196,6 +196,9 @@
                 '../assets/tool-kit.js',
                 '../assets/earth-land.js',
                 '../assets/earth-scene.js',
+                '../assets/orbit-constants.js',
+                '../assets/orbit-math.js',
+                '../assets/orbit-settings-panel.js',
                 'sun-synchronous.js'
             ].forEach(function (src) {
                 const s = document.createElement('script');

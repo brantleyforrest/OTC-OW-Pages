@@ -5,81 +5,24 @@
 
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
-    const MP = window.ManeuversProblems;
     const MathRenderer = window.PracticeMath || { math: (s) => s };
 
     /* ================================================================== */
     /* MANEUVER MATH                                                      */
-    /* Impulsive burns between circular orbits. km, s, km/s, degrees.     */
-    /* The Hohmann, plane change, and combined solvers are shared with    */
-    /* the practice page in practice/maneuvers-problems.js; this block    */
-    /* adds the choice of where a combined maneuver turns the plane.      */
+    /* In ../assets/orbit-math.js, section maneuver.                      */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-    const MU = (MP && MP.constants && MP.constants.MU) || 398600.4418;
-    const R_EARTH = (MP && MP.constants && MP.constants.R_EARTH) || 6378.137;
-    const D2R = Math.PI / 180;
-
-    // Pure plane change at speed v through angle theta: dV = 2 v sin(theta/2).
-    const planeChangeDv = (v, thetaDeg) => 2 * v * Math.sin(thetaDeg * D2R / 2);
-
-    // Speed change and plane change in one burn (law of cosines).
-    const combinedBurnDv = (vBefore, vAfter, thetaDeg) =>
-        Math.sqrt(vBefore * vBefore + vAfter * vAfter - 2 * vBefore * vAfter * Math.cos(thetaDeg * D2R));
-
-    // A combined Hohmann transfer and plane change, with the plane turned at the higher orbit
-    // (the solver's default), at the lower orbit, or as a separate burn at the higher orbit.
-    function solveCombinedOptions(R1, R2, i1, i2, location) {
-        const base = MP.solveCombined(R1, R2, i1, i2);
-        const { isRaise, v1, v_tx1, v_tx2, v2, delta_theta } = base;
-
-        // Plane turned with the burn at the lower orbit.
-        const dv1_lower = isRaise ? combinedBurnDv(v1, v_tx1, delta_theta) : Math.abs(v_tx1 - v1);
-        const dv2_lower = isRaise ? Math.abs(v2 - v_tx2) : combinedBurnDv(v_tx2, v2, delta_theta);
-        const dv_total_lower = dv1_lower + dv2_lower;
-
-        // Hohmann plus a separate pure plane change at the higher orbit.
-        const dv_total_separate = base.dv_separate + (isRaise ? base.dv1 : base.dv2);
-
-        let dv1 = base.dv1, dv2 = base.dv2, dv_total = base.dv_total;
-        if (location === 'lower') {
-            dv1 = dv1_lower;
-            dv2 = dv2_lower;
-            dv_total = dv_total_lower;
-        } else if (location === 'separate') {
-            dv_total = dv_total_separate;
-        }
-
-        return {
-            ...base,
-            planeChangeLocation: location,
-            dv1,
-            dv2,
-            dv_total,
-            dv_higher_total: base.dv_total,
-            dv_lower_total: dv_total_lower,
-            dv_separate_total: dv_total_separate,
-            dv1_lower,
-            dv2_lower
-        };
-    }
-
-    // The solved maneuver for one maneuver type and its input values.
-    function solveManeuver(type, vals) {
-        if (type === 'hohmann') {
-            return { ...MP.solveHohmann(vals.R1, vals.R2), type };
-        }
-        if (type === 'inclination') {
-            const res = MP.solveInclinationChange(vals.r - R_EARTH, vals.i1, vals.i2, vals.raan, vals.u_sc);
-            return { ...res, type, r: vals.r };
-        }
-        if (type === 'polar_raan') {
-            const res = MP.solvePolarRaanChange(vals.r - R_EARTH, vals.raan1, vals.raan2, vals.u_sc);
-            return { ...res, type, r: vals.r, i: 90 };
-        }
-        if (type === 'combined') {
-            return { ...solveCombinedOptions(vals.R1, vals.R2, vals.i1, vals.i2, vals.location), type };
-        }
-        return null;
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        MU, R_EARTH, D2R, solveHohmann, solveInclinationChange, solvePolarRaanChange, solveCombined,
+        planeChangeDv, combinedBurnDv, solveCombinedOptions, solveManeuver
+    } = OM.maneuver;
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        ({
+            MU, R_EARTH, D2R, solveHohmann, solveInclinationChange, solvePolarRaanChange, solveCombined,
+            planeChangeDv, combinedBurnDv, solveCombinedOptions, solveManeuver
+        } = OM.maneuver);
     }
 
     /* ================================================================== */
@@ -239,7 +182,7 @@
             if (leoGeoBtn) {
                 leoGeoBtn.addEventListener('click', () => {
                     vals.R1 = 6678;
-                    vals.R2 = 42164;
+                    vals.R2 = window.OrbitConstants.LESSON.rGeo;
                     $('sl-r1').value = vals.R1;
                     $('sl-r2').value = vals.R2;
                     $('val-r1').textContent = fmtKm(vals.R1);
@@ -426,6 +369,13 @@
     const C_TH = '#38bdf8';
     const C_TM = '#c4a1ff';
 
+    // A constant as the equations print it, digits grouped by thousands.
+    const groupDigits = (x, sep) => {
+        const [whole, frac] = String(x).split('.');
+        return whole.replace(/\B(?=(\d{3})+(?!\d))/g, sep) + (frac ? '.' + frac : '');
+    };
+    const muTex = () => groupDigits(MU, '{,}');
+
     function renderEquations(model) {
         if (!equationCardsEl) return;
         const type = model.type;
@@ -459,7 +409,7 @@
                 'v_circ',
                 'Circular Speeds',
                 `\\textcolor{${C_O1}}{V_1} = \\sqrt{\\frac{\\mu}{\\textcolor{${C_O1}}{R_1}}}, \\quad \\textcolor{${C_O2}}{V_2} = \\sqrt{\\frac{\\mu}{\\textcolor{${C_O2}}{R_2}}}`,
-                `= \\sqrt{\\frac{398{,}600.44}{\\textcolor{${C_O1}}{${Math.round(R1).toLocaleString('en-US')}}}}, \\quad \\sqrt{\\frac{398{,}600.44}{\\textcolor{${C_O2}}{${Math.round(R2).toLocaleString('en-US')}}}}`,
+                `= \\sqrt{\\frac{${muTex()}}{\\textcolor{${C_O1}}{${Math.round(R1).toLocaleString('en-US')}}}}, \\quad \\sqrt{\\frac{${muTex()}}{\\textcolor{${C_O2}}{${Math.round(R2).toLocaleString('en-US')}}}}`,
                 `= \\textcolor{${C_O1}}{${kmsTex(v1)}}, \\quad \\textcolor{${C_O2}}{${kmsTex(v2)}}`,
                 0.0
             );
@@ -468,7 +418,7 @@
                 'v_tx',
                 'Transfer Speeds (Vis-Viva)',
                 `\\textcolor{${C_TX}}{V_{\\text{tx}_1}} = \\sqrt{\\mu\\left(\\frac{2}{\\textcolor{${C_O1}}{R_1}} - \\frac{1}{\\textcolor{${C_TX}}{a_{\\text{tx}}}}\\right)}, \\quad \\textcolor{${C_TX}}{V_{\\text{tx}_2}} = \\sqrt{\\mu\\left(\\frac{2}{\\textcolor{${C_O2}}{R_2}} - \\frac{1}{\\textcolor{${C_TX}}{a_{\\text{tx}}}}\\right)}`,
-                `= \\sqrt{398{,}600.44\\left(\\frac{2}{${Math.round(R1).toLocaleString('en-US')}} - \\frac{1}{${Math.round(a_tx).toLocaleString('en-US')}}\\right)}, \\; \\dots`,
+                `= \\sqrt{${muTex()}\\left(\\frac{2}{${Math.round(R1).toLocaleString('en-US')}} - \\frac{1}{${Math.round(a_tx).toLocaleString('en-US')}}\\right)}, \\; \\dots`,
                 `= \\textcolor{${C_TX}}{${kmsTex(v_tx1)}}, \\quad \\textcolor{${C_TX}}{${kmsTex(v_tx2)}}`,
                 0.22
             );
@@ -504,7 +454,7 @@
                 'tof',
                 'Transfer Time of Flight',
                 `\\textcolor{${C_TM}}{\\text{TOF}} = \\pi \\sqrt{\\frac{\\textcolor{${C_TX}}{a_{\\text{tx}}}^3}{\\mu}}`,
-                `= \\pi \\sqrt{\\frac{\\textcolor{${C_TX}}{${Math.round(a_tx).toLocaleString('en-US')}}^3}{398{,}600.44}}`,
+                `= \\pi \\sqrt{\\frac{\\textcolor{${C_TX}}{${Math.round(a_tx).toLocaleString('en-US')}}^3}{${muTex()}}}`,
                 `= \\textcolor{${C_TM}}{${tof_min.toFixed(1)}\\text{ min}} \\; (${hms})`,
                 0.5
             );
@@ -519,7 +469,7 @@
                 'v_circ',
                 'Circular Orbital Speed',
                 `\\textcolor{${C_O1}}{V} = \\sqrt{\\frac{\\mu}{\\textcolor{${C_O1}}{r}}}`,
-                `= \\sqrt{\\frac{398{,}600.44}{\\textcolor{${C_O1}}{${Math.round(r).toLocaleString('en-US')}}}}`,
+                `= \\sqrt{\\frac{${muTex()}}{\\textcolor{${C_O1}}{${Math.round(r).toLocaleString('en-US')}}}}`,
                 `= \\textcolor{${C_O1}}{${kmsTex(v)}}`,
                 0.0
             );
@@ -635,7 +585,7 @@
                 'tof',
                 'Transfer Time of Flight',
                 `\\textcolor{${C_TM}}{\\text{TOF}} = \\pi \\sqrt{\\frac{\\textcolor{${C_TX}}{a_{\\text{tx}}}^3}{\\mu}}`,
-                `= \\pi \\sqrt{\\frac{\\textcolor{${C_TX}}{${Math.round(a_tx).toLocaleString('en-US')}}^3}{398{,}600.44}}`,
+                `= \\pi \\sqrt{\\frac{\\textcolor{${C_TX}}{${Math.round(a_tx).toLocaleString('en-US')}}^3}{${muTex()}}}`,
                 `= \\textcolor{${C_TM}}{${tof_min.toFixed(1)}\\text{ min}} \\; (${hms})`,
                 0.5
             );
@@ -1183,4 +1133,40 @@
     updateAll();
     updateShown();
     goToStep(0);
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "The Δv values are the two-body solutions. With Cowell, the transfer is flown under the chosen forces after burn 1, so it can arrive a little off the target orbit.",
+        onSettingsChange() {
+            rebindMath();
+            updateAll();
+        },
+        // The maneuver type and its values, then the check boxes.
+        getShareState() {
+            return { ...window.OrbitSettingsPanel.genericState(), type: state.type, values: state.values[state.type] };
+        },
+        applyShareState(s) {
+            const btn = [...typeButtons].find((b) => b.dataset.type === s.type);
+            if (btn && s.type !== state.type) btn.click();
+            Object.assign(state.values[state.type], cleanValues(DEFAULTS[state.type], s.values));
+            buildSlidersHtml();
+            updateAll();
+            goToStep(0);
+            // Only the check boxes: the sliders already hold the values above.
+            const checks = {};
+            for (const [id, v] of Object.entries(s.inputs || {})) if (document.getElementById(id) && document.getElementById(id).type === 'checkbox') checks[id] = v;
+            window.OrbitSettingsPanel.applyGenericState({ inputs: checks });
+        }
+    });
+    // Values from a shared link: only the keys the defaults have, each with the default's type.
+    function cleanValues(defaults, given) {
+        const out = {};
+        for (const [key, def] of Object.entries(defaults)) {
+            const v = given && given[key];
+            if (typeof def === 'number' && typeof v === 'number' && Number.isFinite(v)) out[key] = v;
+            if (typeof def === 'string' && typeof v === 'string' && /^[a-z_]{1,20}$/.test(v)) out[key] = v;
+        }
+        return out;
+    }
 })();

@@ -19,13 +19,13 @@
     const Rendezvous = global.Test1RendezvousProblems;
     const { math, prose, calc, note, rule } = global.PracticeMath;
 
-    const MU = 398600.44;
-    const R_EARTH = 6378;
-    const EARTH_DEG_PER_HOUR = 15;          // The course approximation
+    // Ground-track math is course math: practice/test-review-math.js, section groundTrack.
+    const GT = global.TestReviewMath.groundTrack;
+    const { MU, R_EARTH, EARTH_DEG_PER_HOUR, eccentricityFor, solveKepler, meanFromTrue, trackPoint, timeAtU } = GT;
     const D2R = Math.PI / 180;
     const R2D = 180 / Math.PI;
     const TWO_PI = 2 * Math.PI;
-    const MU_TEX = '398{,}600.44';
+    const MU_TEX = global.TestReviewMath.course.MU_TEX;
 
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
     const wrap360 = (deg) => ((deg % 360) + 360) % 360;
@@ -57,63 +57,13 @@
         { id: 'tundra', name: 'a Tundra orbit', family: 'elliptical', apsisHours: 4, i: 60, argp: [270, 270, 90], shifts: [360] }
     ];
 
-    // The eccentricity for which the satellite takes `hours` to fly from perigee to true anomaly
-    // 90°, the ascending node when the argument of perigee is 270° (and, by symmetry, from the
-    // node to perigee when it is 90°). The time shrinks as e grows, so bisection finds it.
-    function eccentricityFor(hours, period) {
-        const timeTo90 = (e) => (Math.acos(e) - e * Math.sqrt(1 - e * e)) / TWO_PI * period / 3600;
-        let low = 0, high = 0.95;
-        for (let k = 0; k < 60; k++) {
-            const mid = (low + high) / 2;
-            if (timeTo90(mid) > hours) low = mid;
-            else high = mid;
-        }
-        return (low + high) / 2;
-    }
 
     /* ------------------------------------------------------------------ */
     /* Orbit Motion                                                       */
     /* ------------------------------------------------------------------ */
-    function solveKepler(M, e) {
-        let E = e < 0.8 ? M : Math.PI;
-        for (let k = 0; k < 30; k++) {
-            const delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= delta;
-            if (Math.abs(delta) < 1e-12) break;
-        }
-        return E;
-    }
 
-    function meanFromTrue(nuDeg, e) {
-        const nu = nuDeg * D2R;
-        const E = Math.atan2(Math.sqrt(1 - e * e) * Math.sin(nu), e + Math.cos(nu));
-        return E - e * Math.sin(E);
-    }
 
-    // The point below the satellite t seconds after it crossed the first labeled ascending node,
-    // at longitude lambda1. Returns latitude, longitude (east positive), and the argument of
-    // latitude u, all in degrees.
-    function trackPoint(m, t) {
-        const M = m.M0 + m.n * t;
-        const E = solveKepler(M, m.e);
-        const nu = Math.atan2(Math.sqrt(1 - m.e * m.e) * Math.sin(E), Math.cos(E) - m.e) * R2D;
-        const u = (nu + m.argp) * D2R;
-        const inc = m.i * D2R;
-        const lat = Math.asin(Math.sin(inc) * Math.sin(u)) * R2D;
-        const alpha = Math.atan2(Math.cos(inc) * Math.sin(u), Math.cos(u)) * R2D;
-        const lon = wrap180(m.lambda1 + alpha - EARTH_DEG_PER_HOUR * t / 3600);
-        return { lat, lon, u: wrap360(u * R2D) };
-    }
 
-    // The first time after `after` seconds at which the satellite's argument of latitude is u.
-    function timeAtU(m, uDeg, after = 0) {
-        const M = meanFromTrue(uDeg - m.argp, m.e);
-        let t = (M - m.M0) / m.n;
-        const period = TWO_PI / m.n;
-        t -= Math.floor((t - after) / period) * period;
-        if (t <= after + 1e-6) t += period;
-        return t;
-    }
 
     /* ------------------------------------------------------------------ */
     /* Formatting                                                         */

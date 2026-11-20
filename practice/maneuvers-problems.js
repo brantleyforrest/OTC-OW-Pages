@@ -14,8 +14,10 @@
 
     const { math, prose, column, calc, note, rule } = global.PracticeMath;
 
-    const MU = 398600.4418;     // Earth gravitational parameter (km^3/s^2)
-    const R_EARTH = 6378.137;   // Earth equatorial radius (km)
+    // The solvers are course math: practice/test-review-math.js, section maneuver.
+    const MAN = global.TestReviewMath.maneuver;
+    const { MU, R_EARTH, solveHohmann, solveInclinationChange, solvePolarRaanChange, solveCombined } = MAN;
+    const GEO = global.OrbitConstants.LESSON.rGeo;
     const D2R = Math.PI / 180;
     const R2D = 180 / Math.PI;
 
@@ -95,44 +97,6 @@
     /* ------------------------------------------------------------------ */
     /* 1. HOHMANN TRANSFER SOLVER & GENERATOR                             */
     /* ------------------------------------------------------------------ */
-    function solveHohmann(R1, R2) {
-        const a1 = R1;
-        const a2 = R2;
-        const a_tx = (R1 + R2) / 2;
-
-        const v1 = Math.sqrt(MU / R1);
-        const v_tx1 = Math.sqrt(MU * (2 / R1 - 1 / a_tx));
-        const dv1 = Math.abs(v_tx1 - v1);
-
-        const v_tx2 = Math.sqrt(MU * (2 / R2 - 1 / a_tx));
-        const v2 = Math.sqrt(MU / R2);
-        const dv2 = Math.abs(v2 - v_tx2);
-
-        const dv_total = dv1 + dv2;
-        const tof_s = Math.PI * Math.sqrt(Math.pow(a_tx, 3) / MU);
-        const tof_min = tof_s / 60;
-
-        const isRaise = R2 >= R1;
-
-        return {
-            type: 'hohmann',
-            R1,
-            R2,
-            a1,
-            a2,
-            a_tx,
-            v1,
-            v_tx1,
-            dv1,
-            v_tx2,
-            v2,
-            dv2,
-            dv_total,
-            tof_s,
-            tof_min,
-            isRaise
-        };
-    }
 
     function buildHohmannProblem(data, isLectureExample = false) {
         const { R1, R2, a1, a2, a_tx, v1, v_tx1, dv1, v_tx2, v2, dv2, dv_total, tof_s, tof_min, isRaise } = data;
@@ -298,58 +262,6 @@
     /* ------------------------------------------------------------------ */
     /* 2. SIMPLE INCLINATION CHANGE SOLVER & GENERATOR                    */
     /* ------------------------------------------------------------------ */
-    function solveInclinationChange(alt, i1, i2, raan = 45, u_sc = 270) {
-        const r = R_EARTH + alt;
-        const v = Math.sqrt(MU / r);
-        const delta_i = Math.abs(i2 - i1);
-        const delta_theta = delta_i;
-        const dv = 2 * v * Math.sin((delta_theta / 2) * D2R);
-
-        // Period
-        const period_s = 2 * Math.PI * Math.sqrt(Math.pow(r, 3) / MU);
-        const period_min = period_s / 60;
-
-        // Burn must occur at Ascending Node (u = 0° / 360°) or Descending Node (u = 180°)
-        // Determine distance to next node from current spacecraft position u_sc
-        const u_norm = ((u_sc % 360) + 360) % 360;
-        let next_node = '';
-        let next_node_at = '';
-        let delta_u_to_node = 0;
-        if (u_norm <= 180) {
-            next_node = 'Descending Node';
-            next_node_at = '180°';
-            delta_u_to_node = 180 - u_norm;
-        } else {
-            next_node = 'Ascending Node';
-            next_node_at = '0° / 360°';
-            delta_u_to_node = 360 - u_norm;
-        }
-        const u_burn = u_norm + delta_u_to_node;
-        const time_to_burn_s = (delta_u_to_node / 360) * period_s;
-        const time_to_burn_min = time_to_burn_s / 60;
-
-        return {
-            type: 'inclination',
-            alt,
-            r,
-            v,
-            i1,
-            i2,
-            delta_i,
-            delta_theta,
-            dv,
-            raan,
-            u_sc,
-            period_s,
-            period_min,
-            next_node,
-            next_node_at,
-            delta_u_to_node,
-            u_burn,
-            time_to_burn_s,
-            time_to_burn_min
-        };
-    }
 
     function buildInclinationProblem(data, isLectureExample = false) {
         const { alt, r, v, i1, i2, delta_i, delta_theta, dv, raan, u_sc, period_min, next_node, next_node_at, delta_u_to_node, time_to_burn_min } = data;
@@ -468,59 +380,6 @@
     /* ------------------------------------------------------------------ */
     /* 3. POLAR ORBIT RAAN CHANGE SOLVER & GENERATOR                      */
     /* ------------------------------------------------------------------ */
-    function solvePolarRaanChange(alt, raan1, raan2, u_sc = 30) {
-        const r = R_EARTH + alt;
-        const v = Math.sqrt(MU / r);
-        const delta_raan = Math.abs(raan2 - raan1);
-        const delta_theta = delta_raan;
-        const dv = 2 * v * Math.sin((delta_theta / 2) * D2R);
-
-        const period_s = 2 * Math.PI * Math.sqrt(Math.pow(r, 3) / MU);
-        const period_min = period_s / 60;
-
-        // Polar planes intersect along Earth's spin axis (the North and South poles).
-        // North Pole is at u = 90°, South Pole is at u = 270°.
-        const u_norm = ((u_sc % 360) + 360) % 360;
-        let next_pole = '';
-        let next_pole_at = '';
-        let delta_u_to_pole = 0;
-        if (u_norm <= 90) {
-            next_pole = 'North Pole';
-            next_pole_at = 'u = 90°';
-            delta_u_to_pole = 90 - u_norm;
-        } else if (u_norm <= 270) {
-            next_pole = 'South Pole';
-            next_pole_at = 'u = 270°';
-            delta_u_to_pole = 270 - u_norm;
-        } else {
-            next_pole = 'North Pole';
-            next_pole_at = 'u = 90°';
-            delta_u_to_pole = 360 - u_norm + 90;
-        }
-        const u_burn = u_norm + delta_u_to_pole;
-        const time_to_burn_min = (delta_u_to_pole / 360) * period_min;
-
-        return {
-            type: 'polar_raan',
-            alt,
-            r,
-            v,
-            i: 90,
-            raan1,
-            raan2,
-            delta_raan,
-            delta_theta,
-            dv,
-            u_sc,
-            period_s,
-            period_min,
-            next_pole,
-            next_pole_at,
-            delta_u_to_pole,
-            u_burn,
-            time_to_burn_min
-        };
-    }
 
     function buildPolarRaanProblem(data, isLectureExample = false) {
         const { alt, r, v, raan1, raan2, delta_raan, delta_theta, dv, u_sc, period_min, next_pole, next_pole_at, delta_u_to_pole, time_to_burn_min } = data;
@@ -637,35 +496,6 @@
     /* The plane change goes in the burn at the higher of the two orbits, */
     /* where the spacecraft is slowest.                                   */
     /* ------------------------------------------------------------------ */
-    function solveCombined(R1, R2, i1, i2) {
-        const base = solveHohmann(R1, R2);
-        const { v1, v_tx1, v_tx2, v2, isRaise } = base;
-        const delta_theta = Math.abs(i2 - i1);
-        const theta = delta_theta * D2R;
-
-        const v_initial = isRaise ? v_tx2 : v1;
-        const v_final = isRaise ? v2 : v_tx1;
-        const dv_combined = Math.sqrt(v_initial * v_initial + v_final * v_final - 2 * v_initial * v_final * Math.cos(theta));
-        const dv_separate = 2 * v_initial * Math.sin(theta / 2) + Math.abs(v_final - v_initial);
-
-        const dv1 = isRaise ? base.dv1 : dv_combined;
-        const dv2 = isRaise ? dv_combined : base.dv2;
-
-        return {
-            ...base,
-            type: 'combined',
-            i1,
-            i2,
-            delta_theta,
-            v_initial,
-            v_final,
-            dv_combined,
-            dv_separate,
-            dv1,
-            dv2,
-            dv_total: dv1 + dv2
-        };
-    }
 
     function formatHms(seconds) {
         const total = Math.round(seconds);
@@ -918,7 +748,7 @@
             [7000, 6578],   // Orbit lowering (7000 km to 6578 km)
             [7200, 6678],   // Orbit lowering
             [6578, 12000],  // LEO to MEO
-            [6678, 42164]   // LEO to GEO (Geostationary)
+            [6678, GEO]     // LEO to GEO (Geostationary)
         ];
         const [R1, R2] = randomChoice(pairs);
         return buildHohmannProblem(solveHohmann(R1, R2), false);
@@ -971,7 +801,7 @@
             [6678, 26562],  // LEO to GPS
             [6578, 26562],
             [6778, 26562],
-            [6678, 42164],  // LEO to GEO
+            [6678, GEO],    // LEO to GEO
             [6578, 20000],
             [6678, 12000],
             [26562, 6678],  // Orbit lowering

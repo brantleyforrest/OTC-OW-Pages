@@ -23,7 +23,7 @@
     const Rendezvous = global.Test1RendezvousProblems;
     const { math, prose, calc, note } = global.PracticeMath;
 
-    const G0 = 9.81;
+    const G0 = global.TestReviewMath.course.G0;
     const ISP = 'I_{\\text{sp}}';
     const ROCKET = `\\Delta V = ${ISP}\\, g_0 \\ln\\!\\left(\\dfrac{m_i}{m_f}\\right)`;
 
@@ -170,7 +170,7 @@
 
         // The rocket equation and its rearrangements
         dv: (mi, mf, isp, dv) => calc(ROCKET, [
-            `(${group(isp)}\\text{ s})(9.81\\text{ m/s}^2) \\ln\\!\\left(\\dfrac{${fine(mi)}}{${fine(mf)}}\\right)`,
+            `(${group(isp)}\\text{ s})(${G0}\\text{ m/s}^2) \\ln\\!\\left(\\dfrac{${fine(mi)}}{${fine(mf)}}\\right)`,
             `${group(isp * G0, 1)} \\times \\ln(${ratio(mi / mf)})`
         ], `${speed(dv)}\\text{ m/s}`),
         mf: (mi, dv, isp, mf) => {
@@ -194,8 +194,8 @@
             `e^{${(dv / (isp * G0)).toFixed(5)}}`
         ], ratio(R)) + note(`Rearranged rocket equation: divide both sides by $${ISP} g_0$, then raise $e$ to each side.`),
         isp: (dv, mi, mf, isp) => calc(`${ISP} = \\dfrac{\\Delta V}{g_0 \\ln(m_i / m_f)}`, [
-            `\\dfrac{${speed(dv)}}{9.81 \\ln(${ratio(mi / mf)})}`,
-            `\\dfrac{${speed(dv)}}{9.81 \\times ${Math.log(mi / mf).toFixed(6)}}`
+            `\\dfrac{${speed(dv)}}{${G0} \\ln(${ratio(mi / mf)})}`,
+            `\\dfrac{${speed(dv)}}{${G0} \\times ${Math.log(mi / mf).toFixed(6)}}`
         ], `${group(isp, 1)}\\text{ s}`) + note('Rearranged rocket equation: divide $\\Delta V$ by $g_0 \\ln(m_i / m_f)$.'),
 
         // a = F / m and its rearrangements
@@ -303,7 +303,7 @@
         if (has('time_s')) text += ' Times in seconds, minutes, hours, days, or h:mm:ss.';
         if (has('count')) text += ' The number of burns must be exact.';
         if (has('yesno')) text += ' Answer feasibility with yes or no.';
-        return prose(`${text} The solutions use $g_0 = 9.81\\text{ m/s}^2$ and only the rocket equation, $a = F/m$, and $\\Delta t = \\Delta V / a$.`);
+        return prose(`${text} The solutions use $g_0 = ${G0}\\text{ m/s}^2$ and only the rocket equation, $a = F/m$, and $\\Delta t = \\Delta V / a$.`);
     }
 
     /* ------------------------------------------------------------------ */

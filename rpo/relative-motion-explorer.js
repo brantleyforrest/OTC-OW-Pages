@@ -1,19 +1,24 @@
 // Relative Motion Explorer. Three ways to set the same motion of chase relative to the target:
 //  - Set COEs: the target's classical orbital elements and chase's differences from them. Both
-//    spacecraft fly their own two-body orbits (the exact model, RpoMath.relativeState), so the
+//    spacecraft fly their own two-body orbits (the exact model, OrbitMath.rpo.relativeState), so the
 //    target's orbit may be eccentric (Advanced only).
 //  - Set RMOEs: the six relative motion orbital elements, with sliders (the course model, the CW
-//    solution in RpoMath.stateFromRmoe; needs a circular target).
+//    solution in OrbitMath.rpo.stateFromRmoe; needs a circular target).
 //  - Set Position and Velocity: chase's RIC state at epoch, with each RMOE worked from it.
-// Switching modes keeps the motion: COEs to RMOEs by RpoMath.rmoeFromCoes, RMOEs to COEs by its
-// inverse, RpoMath.coesFromRmoe. The motion is drawn in the three flat RIC views (from the left,
+// Switching modes keeps the motion: COEs to RMOEs by OrbitMath.rpo.rmoeFromCoes, RMOEs to COEs by its
+// inverse, OrbitMath.rpo.coesFromRmoe. The motion is drawn in the three flat RIC views (from the left,
 // from behind, from above), the 3D RIC box, and an inertial view, with annotations for what each
 // RMOE controls. Built from the RMOE Explorer and Relative Motion: Two Views.
 (async function () {
     'use strict';
 
     const $ = id => document.getElementById(id);
-    const Kit = window.ToolKit, M = window.RpoMath, V = window.RpoViews;
+    // Relative-motion math from ../assets/orbit-math.js (section rpo), on the constants the site's
+    // settings choose; RpoViews reads OrbitMath.rpo itself.
+    const Kit = window.ToolKit, V = window.RpoViews;
+    let M = window.OrbitMath.rpo;
+    // Read the math again after the constants setting changes.
+    function rebindMath() { M = window.OrbitMath.rpo; }
 
     /* ---------- Data tables ----------
      * TARGETS: the three target orbits (the Target buttons). RANGES: RMOE slider [min, max, step]
@@ -24,7 +29,7 @@
      * text for each (notice, coeNotice). Preset numbers are for GEO; the other targets scale them.
      * Add a preset by adding one row. */
     const TARGETS = {
-        geo: { a: 42164, e: 0, i: 0, raan: 0, argp: 0, nu: 0 },
+        geo: { a: window.OrbitConstants.LESSON.rGeo, e: 0, i: 0, raan: 0, argp: 0, nu: 0 },
         gps: { a: 26562, e: 0, i: 55, raan: 30, argp: 0, nu: 0 },
         leo: { a: 8000, e: 0, i: 51.6, raan: 30, argp: 0, nu: 0 }
     };
@@ -161,8 +166,14 @@
     // Set COEs keeps state.rmoe equal to the RMOEs the elements give (for a circular target).
     function syncRmoeFromCoes() { if (isCircular()) state.rmoe = stored(M.rmoeFromCoes(state.target, chaseCoe())); }
 
+    // The RIC model setting (site settings): in the RMOE mode, CW (default) or the exact model, in
+    // which chase starts from the RMOEs' relative state and both spacecraft fly their own orbits.
+    // The COE mode is always exact. Either way the RIC axes are rectilinear or curvilinear.
+    const ricModel = () => window.OrbitConstants.Settings.get();
     function rebuild() {
         const oldP = sim ? sim.P : 0;
+        const settings = ricModel();
+        const axes = settings.ricAxes;
         const rev = oldP > 0 ? state.t / oldP : 0;
         const coe = { ...state.target };
         const n = M.meanMotion(coe.a), P = 2 * Math.PI / n;
@@ -172,12 +183,23 @@
         for (let k = 0; k < count; k++) times[k] = spanT * k / (count - 1);
         const circular = isCircular();
         if (state.mode === 'coe') {
-            // The exact model: both orbits, propagated on their own.
+            // The exact model: both orbits, stored as r and v and propagated on their own.
             const chase = chaseCoe();
-            const path = M.sampleRelative(coe, chase, 0, spanT, count);
-            const frame = V.framePath(coe, times, path);
-            sim = { exact: true, coe, chase, circular, n, P, spanT, count, path, frame, maxRange: frame.maxRho,
-                rmoe: circular ? M.rmoeFromCoes(coe, chase) : null };
+            const tSat = M.targetSat(coe), cSat = M.targetSat(chase);
+            const s = M.sampleRelativeSats(tSat, cSat, 0, spanT, count, axes);
+            const frame = V.framePath(coe, times, s.rect);
+            const rmoe = circular ? M.rmoeFromCoes(coe, chase) : null;
+            sim = { exact: true, coe, chase, circular, n, P, spanT, count, path: s.path, frame,
+                rmoe, tSat, cSat, axes, cwPath: rmoe && settings.cwOverlay ? M.sampleTrajectory(rmoe, n, 0, spanT, count) : null };
+        } else if (settings.ricModel === 'exact') {
+            // The exact model from the RMOEs: chase starts at their relative state.
+            const rmoe = mathRmoe();
+            const tSat = M.targetSat(coe);
+            const cSat = M.chaseSatFromRic(M.stateFromRmoe(rmoe, n, 0), tSat, 0, axes);
+            const s = M.sampleRelativeSats(tSat, cSat, 0, spanT, count, axes);
+            const frame = V.framePath(coe, times, s.rect);
+            sim = { exact: true, fromRmoe: true, coe, chase: null, circular: true, n, P, spanT, count, rmoe, path: s.path, frame,
+                tSat, cSat, axes, cwPath: settings.cwOverlay ? M.sampleTrajectory(rmoe, n, 0, spanT, count) : null };
         } else {
             const rmoe = mathRmoe();
             const path = M.sampleTrajectory(rmoe, n, 0, spanT, count);
@@ -293,26 +315,32 @@
         if (!sim) return;
         const t = state.t;
         let now, basis, chaseRv, rDraw, rTable;
+        let rectNow;
         if (sim.exact) {
-            const rel = M.relativeState(sim.coe, sim.chase, t);
+            const rel = M.relativeStateSats(sim.tSat, sim.cSat, t, sim.axes);
             now = rel.rho;
+            rectNow = rel.rect.rho;
             basis = rel.basis;
-            chaseRv = M.coesToRv(M.coeAt(sim.chase, t));
-            // Drawn from chase's true relative state, so the NMC trace always passes through chase;
-            // the table's Now column follows the epoch RMOEs, so it agrees with the Epoch column.
+            chaseRv = rel.chase;   // the chase's own r and v, propagated
+            // Drawn from chase's true relative state, so the NMC trace always passes through chase.
+            // The table's Now column: from the RMOEs, the instantaneous RMOEs fitted to the exact
+            // state; from COEs, the epoch RMOEs moved on by CW, so it agrees with the Epoch column.
             rDraw = sim.circular ? M.rmoeFromState([...rel.rho, ...rel.rhoDot], sim.n) : null;
-            rTable = sim.circular ? M.rmoeAt(sim.rmoe, sim.n, t) : null;
+            rTable = sim.fromRmoe ? rDraw : (sim.circular ? M.rmoeAt(sim.rmoe, sim.n, t) : null);
         } else {
             now = M.stateFromRmoe(sim.rmoe, sim.n, t);
             rDraw = rTable = M.rmoeAt(sim.rmoe, sim.n, t);
             basis = M.ricBasis(sim.coe, t);
             chaseRv = M.chaseRvFromRic(now, basis);   // the course model's chase, in ECI
+            rectNow = now;
         }
         const k = sampleIndex(t);
         const trail = sim.path.subarray(0, 3 * (k + 1));
         const nmcLoop = state.nmcTrace && rDraw ? M.nmcLoop(rDraw) : null;   // the whole NMC chase is on now, dotted
+        // The CW overlay: the course model's path, drawn faintly beside the exact one.
+        const ghosts = sim.cwPath ? [sim.path, sim.cwPath] : [sim.path];
         const data = {
-            chase: now, trail, ghosts: [sim.path], nmcLoop,
+            chase: now, trail, ghosts, nmcLoop,
             rmoe: rDraw && (state.annot.center || state.hot === 'xc' || state.hot === 'yc0') ? rDraw : null,
             showNmc: state.annot.size || state.annot.corners
         };
@@ -326,9 +354,10 @@
         if (stage.inertial) {
             // ghost: the whole path is drawn faintly from the start, so the carried trail never
             // vanishes when the clock wraps back to epoch.
-            stage.inertial.update({ t, rho: now, basis, rT: basis.r, from: 0, to: k, ghost: true });
+            stage.inertial.update({ t, rho: rectNow, basis, rT: basis.r, from: 0, to: k, ghost: true });
         }
         updateLive(rTable);
+        updateModelLabels(now, t);
     }
 
     /* ---------- Panels ---------- */
@@ -422,13 +451,6 @@
             $('co-da').textContent = fmt(r.xc, 2) + ' km';
             $('co-e').textContent = (r.C / aChase).toExponential(3);
             $('co-th').textContent = fmt(r.zmax / sim.coe.a * M.R2D, 5) + '°';
-        }
-        if (sim.exact && hasRmoe) {
-            const fit = M.modelFit(sim.coe, sim.maxRange);
-            const words = { good: 'good', fair: 'fair', poor: 'poor', na: 'does not apply' };
-            const pct = 100 * sim.maxRange / sim.coe.a;
-            $('fit-read').innerHTML = 'How well the course model matches: <span class="fit-' + fit + '">' + words[fit] + '</span>' +
-                (fit === 'na' ? '.' : ' (chase gets ' + (pct < 0.01 ? pct.toExponential(1) : pct.toFixed(pct < 1 ? 3 : 2)) + '% of a from the target).');
         }
         const P = sim.P;
         $('co-p').textContent = P > 7200 ? (P / 3600).toFixed(3) + ' h' : (P / 60).toFixed(2) + ' min';
@@ -653,7 +675,7 @@
         const ms = v => tnum(v * 1000, 6) + '/1000';     // a velocity typed in m/s, put into km/s
         const nT = tsci(n);
         const rows = [];
-        rows.push({ key: null, eq: `n = \\sqrt{\\mu / a^3} = \\sqrt{398600.44 / ${fmtNum(a, 3)}^3} = ${nT}\\ \\text{rad/s}` });
+        rows.push({ key: null, eq: `n = \\sqrt{\\mu / a^3} = \\sqrt{${fmtNum(M.MU, 2)} / ${fmtNum(a, 3)}^3} = ${nT}\\ \\text{rad/s}` });
         rows.push({ key: 'xc', eq: `x_C = 4x_0 + \\frac{2\\dot y_0}{n} = 4${tnum(x0, 4)} + \\frac{2\\,${ms(vy)}}{${nT}} = ${tres(r.xc, 3)}\\ \\text{km}` });
         rows.push({ key: 'yc0', eq: `y_{C0} = y_0 - \\frac{2\\dot x_0}{n} = ${tnum(y0, 4)} - \\frac{2\\,${ms(vx)}}{${nT}} = ${tres(r.yc0, 3)}\\ \\text{km}` });
         rows.push({ key: 'C', eq: `C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2} = \\sqrt{${tnum(r.xc - x0, 3)}^2 + ${tnum((r.yc0 - y0) / 2, 3)}^2} = ${tres(r.C, 3)}\\ \\text{km}` });
@@ -736,6 +758,20 @@
         if (mode === 'coe' && !isDev()) return;
         if (mode !== state.mode) applyMode(mode === 'coe' || mode === 'pv' ? mode : 'rmoe');
     });
+
+    // Labels that say which model the readouts come from, and the CW overlay's live gap.
+    function updateModelLabels(now, t) {
+        const head = $('rm-now-head');
+        if (head) head.textContent = sim.fromRmoe ? 'Now (instantaneous, exact)' : 'Now (CW)';
+        const gapEl = $('cw-gap');
+        if (!gapEl) return;
+        gapEl.hidden = !sim.cwPath;
+        if (sim.cwPath) {
+            const c = M.stateFromRmoe(sim.rmoe, sim.n, t);
+            const g = Math.hypot(now[0] - c[0], now[1] - c[1], now[2] - c[2]);
+            gapEl.textContent = 'Exact minus CW now: ' + (g < 1 ? fmt(g * 1000, 1) + ' m' : fmt(g, 3) + ' km') + ' (faint path: CW)';
+        }
+    }
 
     function updateLive(rNow) {
         $('time-read').textContent = (state.t / sim.P).toFixed(2) + ' rev';
@@ -1010,4 +1046,19 @@
         },
         setOrbits(target, diff) { return commit({ ...target }, { ...ZERO_DIFF, ...diff }, null); }
     };
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "With Cowell, the target and chase move under the chosen forces. The RMOE mode follows the RIC model setting (CW, or the exact difference); the COE mode always subtracts the two propagated orbits.",
+        onSettingsChange() {
+            rebindMath();
+            rebuild();
+            refit(true);
+            updateInputs();
+            updateStatic();
+            fillElTable();
+            dirty = true;
+        }
+    });
 })();

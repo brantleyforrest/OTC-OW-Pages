@@ -19,7 +19,7 @@
 
     const { math, prose, calc, note, rule, column } = global.PracticeMath;
     const D2R = Math.PI / 180;
-    const R_EARTH = 6378;
+    const R_EARTH = global.TestReviewMath.course.R_EARTH;
     const MIN_PERIGEE = 6578;               // Perigee at least 200 km up
 
     // The kinds of orbit, and how often each comes up

@@ -1,8 +1,12 @@
 // Run with: node _tests/rpo-math.test.js
-// Checks rpo/rpo-math.js against values that were worked out and verified separately.
+// Checks the relative-motion math (orbit-math.js, section rpo) against values that were worked out and verified separately.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const M = require('../rpo/rpo-math.js');
+const OM = require('../assets/orbit-math.js');
+// Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
+const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
+if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);
+const M = OM.bind(TEST_SET).rpo;
 
 let passed = 0;
 let failed = 0;
@@ -122,10 +126,33 @@ check('two-burn transfer and its singular times (GEO)', () => {
     assert.strictEqual(M.transferVelocity([0, 0, 1], [0, 0, 2], nGeo, PGeo / 2), null, 'cross-track at half rev');
 });
 
-check('planner examples (flyPlan)', () => {
+// Flies a list of burns with CW coasts between them, as the Burn Sandbox does.
+function flyPlan(state0, n, burns, tEnd) {
+    const order = burns.map((b, k) => ({ b, k })).sort((p, q) => (p.b.t - q.b.t) || (p.k - q.k)).map(p => p.b);
+    const legs = [];
+    let state = state0.slice(), t = 0, dvTotal = 0;
+    const coastTo = (t1) => {
+        if (t1 <= t) return;
+        legs.push({ t0: t, t1 });
+        state = M.cwPropagate(state, n, t1 - t);
+        t = t1;
+    };
+    order.forEach(b => {
+        if (b.t > tEnd) return;
+        coastTo(b.t);
+        state = M.applyBurn(state, b.dv);
+        dvTotal += Math.hypot(b.dv[0], b.dv[1], b.dv[2]);
+    });
+    coastTo(tEnd);
+    return { state, dvTotal, legs };
+}
+// M at the positive plane crossing.
+const planeCrossingM = (r) => (r.M0 === null || r.dM0 === null ? null : M.wrap360(r.M0 - r.dM0));
+
+check('planner examples (burns with CW coasts)', () => {
     const n = M.meanMotion(6517.16), P = M.period(6517.16);
     const run = (rmoe, burns, endRev) => {
-        const out = M.flyPlan(M.stateFromRmoe(rmoe, n, 0), n, burns.map(([rev, dv]) => ({ t: rev * P, dv: ms(dv) })), endRev * P);
+        const out = flyPlan(M.stateFromRmoe(rmoe, n, 0), n, burns.map(([rev, dv]) => ({ t: rev * P, dv: ms(dv) })), endRev * P);
         return { e: M.rmoeFromState(out.state, n), total: out.dvTotal * 1000, legs: out.legs, state: out.state };
     };
     const perch = y => ({ xc: 0, yc0: y, C: 0, M0: null, zmax: 0, dM0: null });
@@ -139,24 +166,16 @@ check('planner examples (flyPlan)', () => {
     r = run(nmc3, [[0.25, [-1.2, 0, 0]], [0.75, [1.2, 0, 0]]], 0.75);
     near(r.e.yc0, 0, 1e-6); near(r.e.C, 1, 1e-6); near(r.total, 2.4, 1e-9);
     r = run(nmc3, [[1, [0, 0, 3.6]]], 1);
-    near(r.e.C, 3, 1e-6); near(r.e.zmax, 3, 1e-6); nearAngle(M.planeCrossingM(r.e), 0, 1e-4, 'M_+PC');
+    near(r.e.C, 3, 1e-6); near(r.e.zmax, 3, 1e-6); nearAngle(planeCrossingM(r.e), 0, 1e-4, 'M_+PC');
     r = run(perch(-12), [[0, [0, -0.190986, 0]], [2, [0, 0.190986, 0]], [2, [-3.6, 0, 0]], [2.25, [0, 0, 3.6]]], 2.25);
     near(r.e.xc, 0, 1e-5); near(r.e.yc0, 0, 1e-3); near(r.e.C, 3, 1e-3); near(r.e.zmax, 3, 1e-6);
-    nearAngle(M.planeCrossingM(r.e), 0, 0.01, 'M_+PC'); near(r.total, 7.5820, 1e-4);
+    nearAngle(planeCrossingM(r.e), 0, 0.01, 'M_+PC'); near(r.total, 7.5820, 1e-4);
     assert.strictEqual(r.legs.length, 2, 'two coasts: the burns that share a time make no coast');
     // The two wrong plans.
     r = run({ xc: 1, yc0: 20, C: 0, M0: null, zmax: 0, dM0: null }, [[0, [0, -0.6, 0]]], 0);
     near(r.e.C, 1, 1e-6); near(r.e.yc0, 20, 1e-6);
     r = run(nmc3, [[0.25, [-2.4, 0, 0]]], 0.25);
     near(r.e.C, 1, 1e-6); near(r.e.yc0, 4, 1e-6);
-});
-
-check('passive safety (minRange)', () => {
-    const n = 0.0012;
-    const loops = pc => M.minRange(M.stateFromRmoe({ xc: 0.2, yc0: 0, C: 2, M0: 0, zmax: 2, dM0: M.wrap360(0 - pc) }, n, 0), n, 12, 256);
-    near(loops(0), 1.80, 0.02);
-    // Far left and right at the top and bottom is the unsafe timing for a centered NMC that picks up a drift.
-    assert.ok(loops(90) < 0.5 && loops(270) < 0.5, 'unsafe timing passes close to the target');
 });
 
 check('Kepler equation', () => {
@@ -270,16 +289,14 @@ check('element differences are inverses of each other, 200 pairs', () => {
     }
 });
 
-check('model fit, motion names, formats, propellant, orbit checks', () => {
-    assert.strictEqual(M.modelFit(gT, 100), 'good'); assert.strictEqual(M.modelFit(gT, 1000), 'fair');
-    assert.strictEqual(M.modelFit(gT, 5000), 'poor'); assert.strictEqual(M.modelFit(eT, 1), 'na');
+check('motion names, formats, orbit checks', () => {
     const name = (xc, C, zmax, yc0) => M.classifyMotion({ xc, yc0: yc0 || 5, C, zmax, M0: 0, dM0: 0 }).key;
     assert.deepStrictEqual([name(0, 0, 0), name(1, 0, 0), name(0, 1, 0), name(1, 1, 0), name(0, 0, 1), name(1, 0, 1), name(0, 1, 1), name(1, 1, 1)],
         ['perch', 'linear-drift', 'stationary-nmc', 'drifting-nmc', 'cross-track', 'drifting-cross-track', 'nmc-cross-track', 'corkscrew']);
     assert.strictEqual(M.classifyMotion({ xc: 0, yc0: 0, C: 0, zmax: 0, M0: null, dM0: null }).label, 'At the target');
     assert.strictEqual(M.fmt.km(1.23456), '1.235'); assert.strictEqual(M.fmt.km(123.456), '123.46');
     assert.strictEqual(M.fmt.ms(0.000190986), '0.1910'); assert.strictEqual(M.fmt.deg(null), 'undefined');
-    near(M.propellant(609, 240, 2 * 0.038686) * 1000, 20.0, 0.05);
+    assert.strictEqual(M.fmt.km(-0.0001), '0.000'); assert.strictEqual(M.fmt.ms(-1e-9), '0.0000'); assert.strictEqual(M.fmt.deg(-0.01), '0.0');
     assert.strictEqual(M.orbitProblem(gT), null); assert.strictEqual(M.orbitProblem({ a: 6400, e: 0 }), 'perigee');
     assert.strictEqual(M.orbitProblem({ a: 7000, e: 0.96 }), 'e'); assert.strictEqual(M.orbitProblem({ a: -1, e: 0 }), 'a');
     const b = M.boundaryTable({ xc: 1, yc0: 2, C: 3, M0: 0, zmax: 4, dM0: 0 }, 0.001);

@@ -7,6 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Interactive Tools | OTC OW</title>
+    <link rel="stylesheet" href="assets/orbit-settings-panel.css">
     <link href="vendor/fonts/fonts.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap'">
     <style>
         :root {
@@ -859,8 +860,8 @@
                 display: inline;
             }
 
-            /* With the third tab showing, the GitHub link keeps its icon and drops its label so the bar fits. */
-            html.dev-mode .nav-link-ext span {
+            /* The GitHub link keeps its icon and drops its label so the bar fits beside Settings. */
+            .nav-link-ext span {
                 display: none;
             }
 
@@ -1127,6 +1128,13 @@
                     <span class="nav-text-full">Burn</span>
                     <span class="nav-text-short">Burn</span>
                 </a>
+                <button type="button" class="nav-link nav-settings" id="nav-settings" aria-label="Settings" data-orbit-settings>
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span class="nav-text-full">Settings</span>
+                </button>
                 <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
                     <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
@@ -1242,7 +1250,7 @@
                             </div>
                             <h2 class="card-title">Maneuver Planner</h2>
                             <p class="card-desc">Write a short list of small burns, see the whole path they produce, and check it against where you meant to go.</p>
-                            <a href="rpo/maneuver-planner.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <span class="btn-launch disabled" aria-disabled="true" title="This page is not built yet">Not Built Yet</span>
                         </div>
                         </div>
                     </div>
@@ -1462,7 +1470,7 @@
                 <span class="status-pill wip">Work in Progress</span>
                 <h2>Test 2 Practice</h2>
                 <p class="desc">
-                    Relative motion in the RIC frame: naming the RIC axes in a drawing, the relative motion that follows from two sets of orbital elements, and the ideas behind the CW equations, with card-matching drills. More sections are added as the topics are taught. Practice mode walks through the steps beside the picture. Test mode accepts answers only, then shows the solution.
+                    Homework-style problems on relative motion in the RIC frame: signs of chase's position and velocity from two element sets, picturing the motion from a state or from RMOEs, converting between position and velocity and RMOEs, and the motion after a radial or in-track burn. Practice mode walks through the steps beside the picture. Test mode accepts answers only, then shows the solution.
                 </p>
 
                 <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
@@ -1740,6 +1748,11 @@
         if (window.Test2Release && window.Test2Release.published.length) {
             document.getElementById('card-test-2').classList.remove('dev-only');
         }
+    </script>
+    <script>
+        // The Settings button in the nav bar opens the same settings popup as the tools' Model badge.
+        document.write('<script src="assets/orbit-constants.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="assets/orbit-settings-panel.js?t=' + Date.now() + '"><\/script>');
     </script>
 </body>
 </html>

@@ -165,8 +165,13 @@ globalThis.Option = class { constructor(text, value) { this.text = text; this.va
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.MutationObserver = class { observe() {} disconnect() {} };
 
-const M = require('../rpo/rpo-math.js');
-globalThis.RpoMath = M;
+const OM = require('../assets/orbit-math.js');
+// Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
+const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
+if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);
+const M = OM.bind(TEST_SET).rpo;
+// The page reads OrbitMath.rpo, which follows the settings: put them on the same set.
+globalThis.OrbitConstants.Settings.set({ constants: TEST_SET.id });
 
 globalThis.ToolKit = {
     startLoop: () => {},
@@ -197,6 +202,7 @@ const makeMockPane = (name, plane) => ({
 });
 
 globalThis.RpoViews = {
+    useMath: () => {},
     PLANES: {
         left: { h: 1, v: 0 },
         behind: { h: 2, v: 0 },

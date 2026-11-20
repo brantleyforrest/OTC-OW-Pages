@@ -11,68 +11,13 @@
 
     /* ================================================================== */
     /* ORBIT GEOMETRY MATH                                                */
-    /* Positions on circular orbits and on the Hohmann transfer ellipse.  */
-    /* Distances in any length unit; angles in degrees. u is the argument */
-    /* of latitude, measured from the ascending node.                     */
+    /* In ../assets/orbit-math.js, section maneuverGeometry.              */
+    /* Geometry only: no constants.                                       */
     /* ================================================================== */
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-
-    // Position on an orbit of radius r in the plane (inc, raan), at argument of latitude u.
-    function orbitPosition(r, inc, raan, u) {
-        const i = inc * D2R, o = raan * D2R, a = u * D2R;
-        return {
-            x: r * (Math.cos(o) * Math.cos(a) - Math.sin(o) * Math.sin(a) * Math.cos(i)),
-            y: r * (Math.sin(o) * Math.cos(a) + Math.cos(o) * Math.sin(a) * Math.cos(i)),
-            z: r * Math.sin(a) * Math.sin(i)
-        };
-    }
-
-    // Unit vector along the direction of motion there (d position / du).
-    function orbitDirection(inc, raan, u) {
-        const i = inc * D2R, o = raan * D2R, a = u * D2R;
-        return {
-            x: -Math.cos(o) * Math.sin(a) - Math.sin(o) * Math.cos(a) * Math.cos(i),
-            y: -Math.sin(o) * Math.sin(a) + Math.cos(o) * Math.cos(a) * Math.cos(i),
-            z: Math.cos(a) * Math.sin(i)
-        };
-    }
-
-    // Unit normal of the plane (direction of the angular momentum).
-    const orbitNormal = (inc, raan) => ({
-        x: Math.sin(raan * D2R) * Math.sin(inc * D2R),
-        y: -Math.cos(raan * D2R) * Math.sin(inc * D2R),
-        z: Math.cos(inc * D2R)
-    });
-
-    // Hohmann transfer between radii R1 and R2. eSigned < 0 when lowering, so that u = 0 is
-    // always the start at R1 and u = 180 the end at R2.
-    function transferEllipse(R1, R2) {
-        const a = (R1 + R2) / 2;
-        const eSigned = (R2 - R1) / (R1 + R2);
-        const p = a * (1 - eSigned * eSigned);
-        return { a, eSigned, p, radiusAt: (u) => p / (1 + eSigned * Math.cos(u * D2R)) };
-    }
-
-    // Angle u flown on the transfer after the share t (0 to 1) of its flight time,
-    // from Kepler's equation M = E - e sin E. The spacecraft is fastest near perigee.
-    function transferU(t, eSigned) {
-        if (t <= 0) return 0;
-        if (t >= 1) return 180;
-        const e = Math.abs(eSigned), raise = eSigned >= 0;
-        const M = Math.PI * (raise ? t : 1 + t);
-        let E = M;
-        for (let k = 0; k < 12; k++) {
-            const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= step;
-            if (Math.abs(step) < 1e-10) break;
-        }
-        const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
-        return ((nu * R2D + 360) % 360) - (raise ? 0 : 180);
-    }
-
-    // Pure plane change at speed v through angle theta: dV = 2 v sin(theta/2).
-    const planeChangeDv = (v, thetaDeg) => 2 * v * Math.sin(thetaDeg * D2R / 2);
+    const OM = window.OrbitMath;
+    const {
+        D2R, R2D, orbitPosition, orbitDirection, orbitNormal, transferEllipse, transferU, planeChangeDv
+    } = OM.maneuverGeometry;
 
     /* ================================================================== */
     /* TIMELINE, SCENE, AND CAMERA                                        */
@@ -906,6 +851,23 @@
             return { level: DONE, grow: 1, active: false };
         }
 
+        // The satellite on the transfer, from r and v: burn 1 leaves it at the start of the transfer
+        // moving at v_tx1 along its path, and r and v are propagated for the share k of the flight
+        // time (OrbitMath.propagate, read live so it follows the settings).
+        function transferPropagated(d, k, out) {
+            const m = d.model;
+            if (!d.transferSat) {
+                const p = orbitPosition(m.R1, d.iTransfer, 0, 0), dir = orbitDirection(d.iTransfer, 0, 0);
+                const r0 = [p.x, p.y, p.z], v0 = [dir.x * m.v_tx1, dir.y * m.v_tx1, dir.z * m.v_tx1];
+                const a = (m.R1 + m.R2) / 2;
+                d.transferSat = OM.propagate.satellite(r0, v0, 0);
+                d.transferTime = Math.PI * Math.sqrt(a * a * a / OM.constants.mu);
+            }
+            // The propagator the settings choose (Kepler, or Cowell with its forces).
+            const { r } = OM.propagate.stateAt(d.transferSat, k * d.transferTime);
+            return out.set(r[0] / R_E, r[1] / R_E, r[2] / R_E);
+        }
+
         function satelliteTransfer(d, out) {
             const p = phase;
             switch (p.key) {
@@ -913,7 +875,7 @@
                     ? orbitPoint(d.R1, d.i1, 0, 360 * p.k - 60, out)
                     : orbitPoint(d.R1, d.i1, 0, -60 * (1 - p.k), out);
                 case 'burn1': return out.copy(d.P1);
-                case 'transfer': return d.transferAt(transferU(p.k, d.eSigned), out);
+                case 'transfer': return transferPropagated(d, p.k, out);
                 case 'burn2': return out.copy(d.P2);
                 case 'burn3': return out.copy(d.burns.burn3.P);
                 default: return orbitPoint(d.R2, d.i2, 0, 180 + 90 * p.k, out);

@@ -4,24 +4,21 @@
 
     /* ================================================================== */
     /* EARTH ROTATION MATH                                                */
-    /* Seconds and degrees.                                               */
+    /* In ../assets/orbit-math.js, section earthRotation.                 */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-    const D2R = Math.PI / 180;
-
-    const SOLAR_DAY = 86400;                     // average solar day, s
-    const TROPICAL_YEAR = 365.2422 * SOLAR_DAY;  // s
-    const REAL_ORBIT_RATE = 360 / TROPICAL_YEAR; // degrees per second, Earth around the Sun
-
-    // In one solar day Earth spins 360 deg plus the angle it moved along its orbit.
-    const SIDEREAL_DAY = 360 / (360 / SOLAR_DAY + REAL_ORBIT_RATE); // s
-    const SPIN_RATE = 360 / SIDEREAL_DAY;        // degrees per second
-
-    // Spin needed for the Sun to return to the same place in the sky.
-    const SOLAR_DAY_ROTATION = 360 * SPIN_RATE / (SPIN_RATE - REAL_ORBIT_RATE); // deg
-    const EXTRA_ROTATION_PER_DAY = SOLAR_DAY_ROTATION - 360;                     // deg
-
-    const timeForRotation = (deg) => deg / SPIN_RATE;                  // s
-    const orbitTravelDuring = (seconds) => REAL_ORBIT_RATE * seconds;  // deg
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        D2R, SOLAR_DAY, TROPICAL_YEAR, REAL_ORBIT_RATE, SIDEREAL_DAY, SPIN_RATE, SOLAR_DAY_ROTATION,
+        EXTRA_ROTATION_PER_DAY, timeForRotation, orbitTravelDuring
+    } = OM.earthRotation;
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        ({
+            D2R, SOLAR_DAY, TROPICAL_YEAR, REAL_ORBIT_RATE, SIDEREAL_DAY, SPIN_RATE, SOLAR_DAY_ROTATION,
+            EXTRA_ROTATION_PER_DAY, timeForRotation, orbitTravelDuring
+        } = OM.earthRotation);
+    }
 
     /* ================================================================== */
     /* ANIMATION, DRAWING, AND CONTROLS                                   */
@@ -614,4 +611,15 @@
 
     // Redraw once the page fonts are ready, because the canvas labels use them.
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "This page has no satellite; only the constants setting changes it.",
+        onSettingsChange() {
+            rebindMath();
+            updateComparison();
+            refresh();
+        }
+    });
 })();

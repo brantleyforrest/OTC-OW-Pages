@@ -253,6 +253,24 @@
             white-space: nowrap;
         }
 
+        .coe-back {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+            margin-top: 0.3rem;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+        }
+
+        .coe-back .vector-coords {
+            white-space: pre-wrap;
+        }
+
+        .coe-note {
+            font-size: 0.7rem;
+            line-height: 1.35;
+        }
+
         .vector-coords {
             font-family: var(--font-mono);
             font-weight: 600;
@@ -467,6 +485,11 @@
                         <div class="vector-box">
                             <div class="vector-row"><span>Position, r̄ (km)</span><span class="vector-coords" id="val-r-vec"></span></div>
                             <div class="vector-row"><span>Velocity, v̄ (km/s)</span><span class="vector-coords" id="val-v-vec"></span></div>
+                            <div class="coe-back">
+                                <span>Elements read back from r̄ and v̄</span>
+                                <span class="vector-coords" id="val-coe-back"></span>
+                                <span class="coe-note" id="val-coe-note" hidden></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -484,6 +507,9 @@
                 '../assets/tool-kit.js',
                 '../assets/earth-land.js',
                 '../assets/earth-scene.js',
+                '../assets/orbit-constants.js',
+                '../assets/orbit-math.js',
+                '../assets/orbit-settings-panel.js',
                 'orbital-elements.js'
             ].forEach(function (src) {
                 const s = document.createElement('script');

@@ -7,29 +7,23 @@
 
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
-    const RM = window.RendezvousMath;
 
     /* ================================================================== */
     /* RENDEZVOUS MATH                                                    */
-    /* The solvers live in rendezvous-math.js (pure functions, no DOM).   */
-    /* This block picks the constants and the solver for each mode.       */
+    /* In ../assets/orbit-math.js, section rendezvousPlan.                */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-    const MU = (RM && RM.constants && RM.constants.MU) || 398600.4418;
-    const R_EARTH = (RM && RM.constants && RM.constants.R_EARTH) || 6378.137;
-    const MIN_ALT = (RM && RM.constants && RM.constants.MIN_ALT) || 100;
-    const R2D = 180 / Math.PI;
-
-    // The lesson's worked examples use these rounded constants
-    const LESSON_MU = 398600.44;
-    const LESSON_R_EARTH = 6378.0;
-
-    function solveRendezvous(mode, vals, useLessonConstants) {
-        const mu = useLessonConstants ? LESSON_MU : MU;
-        const rEarth = useLessonConstants ? LESSON_R_EARTH : R_EARTH;
-        if (mode === 'coplanar') return RM.solveCoplanar({ ...vals, mu, rEarth });
-        if (mode === 'coorbital') return RM.solveCoOrbital({ ...vals, mu, rEarth });
-        return null;
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        MU, R_EARTH, MIN_ALT, R2D, LESSON_MU, LESSON_R_EARTH, solveRendezvous
+    } = OM.rendezvousPlan;
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        ({
+            MU, R_EARTH, MIN_ALT, R2D, LESSON_MU, LESSON_R_EARTH, solveRendezvous
+        } = OM.rendezvousPlan);
     }
+    const RM = OM.rendezvous;
 
     /* ================================================================== */
     /* RENDERING AND CONTROLS                                             */
@@ -73,7 +67,12 @@
     const degTex = (v, d = 2) => `${Number(v).toFixed(d)}^\\circ`;
     const radTex = (v) => `${Number(v).toFixed(4)}\\text{ rad}`;
     const secTex = (v) => `${texNum(v, 1)}\\text{ s}`;
-    const MU_TEX = '398{,}600.44';
+    // A constant as the equations print it, digits grouped by thousands.
+    const groupDigits = (x, sep) => {
+        const [whole, frac] = String(x).split('.');
+        return whole.replace(/\B(?=(\d{3})+(?!\d))/g, sep) + (frac ? '.' + frac : '');
+    };
+    const muTex = (m) => groupDigits(m.constants.MU, '{,}');
 
     function formatHms(seconds) {
         if (!Number.isFinite(seconds)) return '∞';
@@ -379,9 +378,9 @@
         let html = '';
 
         html += card(m, 'mean_motions', 'Mean Motions', [
-            ['sym', `${S.nC} = \\sqrt{\\frac{\\mu}{${S.RC}^3}} = \\sqrt{\\frac{${MU_TEX}}{${col(C_O1, texNum(Rchase))}^3}}`],
+            ['sym', `${S.nC} = \\sqrt{\\frac{\\mu}{${S.RC}^3}} = \\sqrt{\\frac{${muTex(m)}}{${col(C_O1, texNum(Rchase))}^3}}`],
             ['res', `= ${col(C_O1, `${sci(n_chase)}\\text{ rad/s}`)} \\; (${(n_chase * R2D).toFixed(6)}^\\circ\\text{/s})`],
-            ['sym', `${S.nT} = \\sqrt{\\frac{\\mu}{${S.RT}^3}} = \\sqrt{\\frac{${MU_TEX}}{${col(C_O2, texNum(Rtarget))}^3}}`],
+            ['sym', `${S.nT} = \\sqrt{\\frac{\\mu}{${S.RT}^3}} = \\sqrt{\\frac{${muTex(m)}}{${col(C_O2, texNum(Rtarget))}^3}}`],
             ['res', `= ${col(C_O2, `${sci(n_target)}\\text{ rad/s}`)} \\; (${(n_target * R2D).toFixed(6)}^\\circ\\text{/s})`]
         ]);
 
@@ -399,7 +398,7 @@
 
         html += card(m, 'tof', 'Time of Flight', [
             ['sym', `${S.TOF} = \\pi\\sqrt{\\frac{${S.aTx}^3}{\\mu}}`],
-            ['num', `= \\pi\\sqrt{\\frac{${col(C_TX, texNum(a_transfer))}^3}{${MU_TEX}}}`],
+            ['num', `= \\pi\\sqrt{\\frac{${col(C_TX, texNum(a_transfer))}^3}{${muTex(m)}}}`],
             ['res', `= ${col(C_TM, secTex(TOF))} \\; (${hmsTex(TOF)})`]
         ]);
 
@@ -461,7 +460,7 @@
         }
 
         html += card(m, 'target_motion', 'Target Mean Motion', [
-            ['sym', `${S.nT} = \\sqrt{\\frac{\\mu}{R^3}} = \\sqrt{\\frac{${MU_TEX}}{${texNum(Rchase)}^3}}`],
+            ['sym', `${S.nT} = \\sqrt{\\frac{\\mu}{R^3}} = \\sqrt{\\frac{${muTex(m)}}{${texNum(Rchase)}^3}}`],
             ['res', `= ${col(C_O2, `${sci(n_target)}\\text{ rad/s}`)} \\; (${(n_target * R2D).toFixed(6)}^\\circ\\text{/s})`],
             ['sym', `\\text{Period}_{\\text{target}} = \\frac{2\\pi}{${S.nT}} = ${col(C_O2, secTex(T_target))}`]
         ]);
@@ -489,14 +488,14 @@
 
         html += card(m, 'orbit_sizing', 'Phasing Orbit Size', [
             ['sym', `${S.aPh} = \\sqrt[3]{\\mu\\left(\\frac{${S.Pph}}{2\\pi}\\right)^2}`],
-            ['num', `= \\sqrt[3]{${MU_TEX}\\left(\\frac{${texNum(Period_phasing, 1)}}{2\\pi}\\right)^2}`],
+            ['num', `= \\sqrt[3]{${muTex(m)}\\left(\\frac{${texNum(Period_phasing, 1)}}{2\\pi}\\right)^2}`],
             ['res', `= ${col(C_PH, kmTex(a_phasing))}`]
         ]);
 
         html += card(m, 'velocities', 'Speeds at the Burn Point', [
             ['sym', `${S.VC} = \\sqrt{\\frac{\\mu}{R}} = ${col(C_O1, kmsTex(V_chase))}`],
             ['sym', `${S.VPh} = \\sqrt{\\mu\\left(\\frac{2}{R} - \\frac{1}{${S.aPh}}\\right)}`],
-            ['num', `= \\sqrt{${MU_TEX}\\left(\\frac{2}{${texNum(Rchase)}} - \\frac{1}{${texNum(a_phasing)}}\\right)}`],
+            ['num', `= \\sqrt{${muTex(m)}\\left(\\frac{2}{${texNum(Rchase)}} - \\frac{1}{${texNum(a_phasing)}}\\right)}`],
             ['res', `= ${col(C_PH, kmsTex(V_phasing))}`]
         ]);
 
@@ -559,7 +558,7 @@
         if (!constraintChipsEl) return;
         let chipsHtml = '';
         if (model.lessonExample) {
-            chipsHtml += `<span class="constraint-chip info">${model.lessonExample}: μ = 398,600.44, R⊕ = 6,378 km</span>`;
+            chipsHtml += `<span class="constraint-chip info">${model.lessonExample}: μ = ${groupDigits(LESSON_MU, ',')}, R⊕ = ${groupDigits(LESSON_R_EARTH, ',')} km</span>`;
         }
         if (isSameOrbit(model)) {
             chipsHtml += '<span class="constraint-chip warn">Same orbit: use Co-orbital</span>';
@@ -574,6 +573,12 @@
             } else {
                 chipsHtml += `<span class="constraint-chip ok">Perigee ${group(h)} km: above 100 km</span>`;
             }
+        }
+        // With Cowell, the plan is flown under the chosen forces: how far it misses the target.
+        const miss = OM.rendezvous.missAtArrival ? OM.rendezvous.missAtArrival(model) : null;
+        if (miss !== null && !isSameOrbit(model)) {
+            const text = miss < 1 ? `${(miss * 1000).toFixed(miss < 0.001 ? 3 : 0)} m` : `${group(Math.round(miss))} km`;
+            chipsHtml += `<span class="constraint-chip ${miss < 1 ? 'ok' : 'warn'}">Flown with Cowell: misses the target by ${text} at arrival</span>`;
         }
         constraintChipsEl.innerHTML = chipsHtml;
         constraintChipsEl.hidden = !chipsHtml;
@@ -985,4 +990,43 @@
     updateShown();
     goToStep(0);
 
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "Plans are solved two-body. With Cowell and forces on, the chase flies the plan under those forces, and the page shows how far it misses at arrival.",
+        onSettingsChange() {
+            rebindMath();
+            updateAll();
+        },
+        // The mode, its values and whether they are the lesson's example, then the check boxes.
+        getShareState() {
+            return {
+                ...window.OrbitSettingsPanel.genericState(),
+                mode: state.mode, values: state.values[state.mode], lesson: state.lessonExample[state.mode]
+            };
+        },
+        applyShareState(s) {
+            if (DEFAULTS[s.mode] && s.mode !== state.mode) setMode(s.mode);
+            Object.assign(state.values[state.mode], cleanValues(DEFAULTS[state.mode], s.values));
+            state.lessonExample[state.mode] = s.lesson === true;
+            buildSlidersHtml();
+            updateAll();
+            goToStep(0);
+            updateLessonButton();
+            // Only the check boxes: the sliders already hold the values above.
+            const checks = {};
+            for (const [id, v] of Object.entries(s.inputs || {})) if (document.getElementById(id) && document.getElementById(id).type === 'checkbox') checks[id] = v;
+            window.OrbitSettingsPanel.applyGenericState({ inputs: checks });
+        }
+    });
+    // Values from a shared link: only the keys the defaults have, each with the default's type.
+    function cleanValues(defaults, given) {
+        const out = {};
+        for (const [key, def] of Object.entries(defaults)) {
+            const v = given && given[key];
+            if (typeof def === 'number' && typeof v === 'number' && Number.isFinite(v)) out[key] = v;
+            if (typeof def === 'string' && typeof v === 'string' && /^[a-z_]{1,20}$/.test(v)) out[key] = v;
+        }
+        return out;
+    }
 })();

@@ -4,75 +4,23 @@
 
     /* ================================================================== */
     /* ORBIT MATH                                                         */
-    /* Two-body motion about Earth. km, s, and degrees unless noted.      */
+    /* In ../assets/orbit-math.js, section orbit.                         */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-    const MU = 398600.4418;    // km^3/s^2
-    const R_E = 6378.137;      // km
-    const D2R = Math.PI / 180;
-    const TWO_PI = 2 * Math.PI;
-
-    const wrap360 = (deg) => ((deg % 360) + 360) % 360;
-
-    // Orbit equation: r = a(1 - e^2) / (1 + e cos nu)
-    const semiLatus = (a, e) => a * (1 - e * e);
-    const radiusAt = (a, e, nu) => semiLatus(a, e) / (1 + e * Math.cos(nu * D2R));
-    const perigeeRadius = (a, e) => a * (1 - e);
-    const apogeeRadius = (a, e) => a * (1 + e);
-    const semiMinorAxis = (a, e) => a * Math.sqrt(1 - e * e);
-
-    // Vis-viva and circular speed, km/s
-    const orbitSpeed = (r, a) => Math.sqrt(MU * (2 / r - 1 / a));
-    const circularSpeed = (r) => Math.sqrt(MU / r);
-
-    // Position in the orbit plane: x toward perigee, y toward nu = 90 deg.
-    function positionAt(a, e, nu) {
-        const r = radiusAt(a, e, nu);
-        return { x: r * Math.cos(nu * D2R), y: r * Math.sin(nu * D2R) };
-    }
-
-    // The same ellipse from eccentric anomaly E (rad). Even steps in E give a smooth curve.
-    function positionAtEccentric(a, e, E) {
-        return { x: a * (Math.cos(E) - e), y: semiMinorAxis(a, e) * Math.sin(E) };
-    }
-
-    function orbitValues(a, e, nu) {
-        const r = radiusAt(a, e, nu);
-        return {
-            r,
-            rp: perigeeRadius(a, e),
-            ra: apogeeRadius(a, e),
-            v: orbitSpeed(r, a),
-            vc: circularSpeed(r)
-        };
-    }
-
-    // Kepler's equation, M = E - e sin E (M and E in rad).
-    function eccentricFromTrue(nu, e) {
-        const half = nu * D2R / 2;
-        return 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(half), Math.sqrt(1 + e) * Math.cos(half));
-    }
-
-    function trueFromEccentric(E, e) {
-        return wrap360(2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2)) / D2R);
-    }
-
-    // Newton's method, starting from M +/- e.
-    function solveKepler(M, e) {
-        let E = M + (Math.sin(M) >= 0 ? e : -e);
-        for (let i = 0; i < 16; i++) {
-            const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-            E -= step;
-            if (Math.abs(step) < 1e-10) break;
-        }
-        return E;
-    }
-
-    // Kepler's second law: M grows evenly with time, so step M and solve for the new nu.
-    function advanceTrueAnomaly(nu, deltaM, e) {
-        const E0 = eccentricFromTrue(nu, e);
-        let M = E0 - e * Math.sin(E0) + deltaM;
-        M = ((M + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
-        return trueFromEccentric(solveKepler(M, e), e);
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        MU, R_E, D2R, TWO_PI, wrap360, radiusAt, perigeeRadius, apogeeRadius, semiMinorAxis,
+        circularSpeed, positionAt, positionAtEccentric, orbitValues, meanMotion
+    } = OM.orbit;
+    // The satellite, stored as r and v and kept in step with the sliders (OrbitMath.propagate).
+    let track = OM.propagate.tracker();
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        track = OM.propagate.tracker();
+        ({
+            MU, R_E, D2R, TWO_PI, wrap360, radiusAt, perigeeRadius, apogeeRadius, semiMinorAxis,
+            circularSpeed, positionAt, positionAtEccentric, orbitValues, meanMotion
+        } = OM.orbit);
     }
 
     /* ================================================================== */
@@ -98,7 +46,7 @@
 
     /* Limits and animation ranges */
     const LIMITS = {
-        a: { min: 6378, max: 500000, sweepMin: 10000, sweepMax: 60000 },
+        a: { min: Math.floor(R_E), max: 500000, sweepMin: 10000, sweepMax: 60000 },
         e: { min: 0, max: 0.99, sweepMin: 0, sweepMax: 0.7 },
         nu: { min: 0, max: 360 }
     };
@@ -498,6 +446,11 @@
     function updatePanels() {
         const { a, e, nu } = state;
         const values = orbitValues(a, e, nu);
+        // The radius and speeds shown come from the satellite's r and v.
+        const now = track.readout(state);
+        values.r = now.r;
+        values.v = now.v;
+        values.vc = circularSpeed(now.r);
         const nuShown = state.playing && state.sweep === 'nu' ? Math.round(nu) : Math.round(nu * 10) / 10;
 
         for (const key of Object.keys(inputs)) {
@@ -734,7 +687,9 @@
         state.spin = (state.spin + seconds * rate * EARTH_SPIN) % 360;
 
         if (state.sweep === 'nu') {
-            state.nu = advanceTrueAnomaly(state.nu, seconds * rate * TWO_PI / ORBIT_SECONDS, state.e);
+            // One orbit per ORBIT_SECONDS at speed 1: move r and v on by that share of a period.
+            const dt = seconds * rate * TWO_PI / ORBIT_SECONDS / meanMotion(state.a);
+            state.nu = track.move(state, dt).nu;
             return;
         }
         const limit = LIMITS[state.sweep];
@@ -791,5 +746,15 @@
         dirty = false;
         renderFrame();
         updatePanels();
+    });
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "The equations on this page are two-body. With Cowell, the satellite moves under the chosen forces and can drift off the drawn ellipse; r and v are read from its own motion.",
+        onSettingsChange() {
+            rebindMath();
+            dirty = true;
+        }
     });
 })();

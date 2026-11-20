@@ -2,9 +2,9 @@
 //  - forward: given a_target and chase's RIC position and velocity at epoch, find the six RMOEs and
 //    the drift rate (m/s and km/rev).
 //  - reverse: given the RMOEs with chase at a corner of the NMC, find its position and velocity.
-// The answer is picked first from round values; the givens are computed from it with RpoMath and
+// The answer is picked first from round values; the givens are computed from it with TestReviewMath.rpo and
 // rounded to 4 decimals (km) and 6 decimals (m/s), so the given numbers give back the round answer.
-// No DOM access. Load after rpo-math.js, practice-math.js, and test-2-common.js.
+// No DOM access. Load after test-review-math.js, practice-math.js, and test-2-common.js.
 (function (global) {
     'use strict';
 
@@ -33,7 +33,7 @@
     function nStep(a, n) {
         return { key: 'n', title: 'Mean motion of the target', result: '$n = ' + sci(n) + '$ rad/s',
             caption: 'n sets how fast every angle advances: one turn per target orbit.',
-            methods: [{ name: 'Formula', html: calc('n = \\sqrt{\\mu / a^3}', ['\\sqrt{398600.44 / ' + C2.plain(a, 2) + '^3}'], sci(n) + '\\ \\text{rad/s}') }] };
+            methods: [{ name: 'Formula', html: calc('n = \\sqrt{\\mu / a^3}', ['\\sqrt{' + M.MU + ' / ' + C2.plain(a, 2) + '^3}'], sci(n) + '\\ \\text{rad/s}') }] };
     }
 
     /* ---------- forward: state to RMOEs ---------- */

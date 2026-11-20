@@ -6,6 +6,13 @@
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
 
+    /* Orbital math. Every constant is in ../assets/orbit-constants.js and every formula in
+       ../assets/orbit-math.js (window.OrbitMath). Put neither in this file: take what the tool
+       needs from a section of OrbitMath, and take it again when the settings change, because the
+       sections follow the constants setting. Satellites are stored as r and v and moved with
+       OrbitMath.propagate (Kepler, or Cowell with the chosen forces). */
+    const OM = window.OrbitMath;
+
     /* REPLACE: the content and settings for this tool */
     const SPEEDS = [
         { rate: 15, label: 'Slow' },
@@ -133,5 +140,14 @@
         dirty = false;
         draw();
         updatePanels();
+    });
+
+    // The Model settings badge and panel (../assets/orbit-settings-panel.js). onSettingsChange:
+    // read OrbitMath again and redraw. A share link saves every input by default; add getShareState()
+    // and applyShareState(obj) when the tool's options live somewhere else.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        onSettingsChange() {
+            dirty = true;
+        }
     });
 })();

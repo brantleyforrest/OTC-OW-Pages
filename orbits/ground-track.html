@@ -437,6 +437,14 @@
                                 <button type="button" data-value="many" aria-pressed="false">Several orbits</button>
                             </div>
                         </div>
+                        <div class="ctl-track">
+                            <span id="earth-mode-label">Earth</span>
+                            <div class="segmented" id="earth-mode" role="group" aria-labelledby="earth-mode-label">
+                                <button type="button" data-value="node" aria-pressed="true" title="Earth starts with the Prime Meridian at the vernal equinox, so the ascending node is at longitude Ω">Node at Ω</button>
+                                <button type="button" data-value="date" aria-pressed="false" title="Earth turned as it was at the start date and time in the model settings">Start date</button>
+                            </div>
+                            <span id="earth-date" hidden></span>
+                        </div>
                         <div class="ctl-grow off" id="orbits-control">
                             <div class="control-label">
                                 <label for="orbits">Past orbits shown</label>
@@ -547,6 +555,9 @@
                 '../assets/tool-kit.js',
                 '../assets/earth-land.js',
                 '../assets/earth-scene.js',
+                '../assets/orbit-constants.js',
+                '../assets/orbit-math.js',
+                '../assets/orbit-settings-panel.js',
                 'ground-track.js'
             ].forEach(function (src) {
                 const s = document.createElement('script');

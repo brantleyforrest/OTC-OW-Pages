@@ -9,37 +9,15 @@
 
     /* ================================================================== */
     /* ORBIT GEOMETRY MATH                                                */
-    /* Coplanar paths in the equatorial plane, for a model solved by      */
-    /* rendezvous-math.js (which also gives each craft's state in time).  */
-    /* km, s, rad. Angles are measured from the chase's starting point.   */
+    /* In ../assets/orbit-math.js, section rendezvousGeometry.            */
+    /* Geometry only: no constants.                                       */
     /* ================================================================== */
-    const D2R = Math.PI / 180;
-    const R2D = 180 / Math.PI;
-    const TWO_PI = 2 * Math.PI;
-
-    const circularPeriod = (r, mu) => TWO_PI * Math.sqrt(r * r * r / mu);
-    const conicRadius = (a, e, nu) => a * (1 - e * e) / (1 + e * Math.cos(nu));
-    const pointAtAngle = (r, angle) => ({ x: r * Math.cos(angle), y: r * Math.sin(angle) });
-
-    // Coplanar: the chase waits WT on its circle, then departs.
-    const departureAngle = (m) => m.n_chase * m.WT;
-    const targetAngleAtDeparture = (m) => -m.phi0_rad + m.n_target * m.WT;
-
-    // Coplanar Hohmann transfer, `sweep` rad past the departure point. Departure is perigee
-    // when raising and apogee when lowering.
-    function transferPoint(m, sweep) {
-        const Rc = m.Rchase, Rt = m.Rtarget;
-        const e = Math.abs(Rc - Rt) / (Rc + Rt);
-        const nuDep = Rc <= Rt ? 0 : Math.PI;
-        return pointAtAngle(conicRadius(m.a_transfer, e, nuDep + sweep), departureAngle(m) + sweep);
-    }
-
-    // Co-orbital phasing orbit at angle theta from the burn point, which is its apogee when
-    // the chase is behind and its perigee when it is ahead.
-    function phasingPoint(m, theta) {
-        const e = Math.abs(m.a_phasing - m.Rchase) / m.a_phasing;
-        return pointAtAngle(conicRadius(m.a_phasing, e, m.isBehind ? theta + Math.PI : theta), theta);
-    }
+    // Test 1 Practice loads test-review-math.js instead of orbit-math.js.
+    const OM = window.TestReviewMath || window.OrbitMath;   // practice passes its own copy
+    const {
+        D2R, R2D, TWO_PI, circularPeriod, conicRadius, pointAtAngle, departureAngle,
+        targetAngleAtDeparture, transferPoint, phasingPoint
+    } = OM.rendezvousGeometry;
 
     /* ================================================================== */
     /* TIMELINE, SCENE, AND CAMERA                                        */
@@ -51,7 +29,7 @@
     function segments(model) {
         if (!model) return [{ key: 'overview', from: 0, to: 1, t0: 0, t1: 1 }];
 
-        const mu = (model.constants && model.constants.MU) || 398600.4418;
+        const mu = (model.constants && model.constants.MU) || window.OrbitConstants.SETS.course.mu;
         const T_target = circularPeriod(model.Rtarget || model.Rchase, mu);
         const t_together = 0.08 * T_target;
 
@@ -117,7 +95,7 @@
     /* 3D Scene Constructor                                               */
     /* ------------------------------------------------------------------ */
     function create(THREE, dom, constants = {}) {
-        const R_E = constants.R_EARTH || 6378.137;
+        const R_E = constants.R_EARTH || window.OrbitConstants.SETS.course.re;
         const FOV_DEG = 40;
         const TAN_HALF_FOV = Math.tan((FOV_DEG / 2) * D2R);
         const MIN_CAMERA_DISTANCE = 1.8;
@@ -912,7 +890,7 @@
             const tl = timelineTl;
             const p = phaseAt(m, tl);
             const t_phys = clockAt(m, tl);
-            const state = global.RendezvousMath.stateAt(m, t_phys);
+            const state = rendezvousMath().stateAt(m, t_phys);
 
             const rChaseKm = m.Rchase;
             const rTargetKm = m.Rtarget || m.Rchase;
@@ -1017,7 +995,7 @@
                     // in the direction of motion (the long way when over 180 degrees).
                     // A shaded wedge between its radial lines marks it as an angle.
                     const tAng = Math.atan2(anchors.targetPos.y, anchors.targetPos.x);
-                    const curPhiRad = global.RendezvousMath.wrap2Pi(Math.atan2(anchors.chasePos.y, anchors.chasePos.x) - tAng);
+                    const curPhiRad = rendezvousMath().wrap2Pi(Math.atan2(anchors.chasePos.y, anchors.chasePos.x) - tAng);
                     if (curPhiRad > 0.004 && p.key !== 'together' && grow.phi > 0.002) {
                         const key = `${mid}_phi_${curPhiRad.toFixed(3)}`;
                         drawTube(phiArc, grow.phi, 0.95, key, (t, out) => {
@@ -1157,7 +1135,7 @@
             if (framed && shown.angles && revealed('thetas') && tl <= 1e-6) {
                 const [rChaseArc, rTargetArc] = thetaRadii(m);
                 const start = -frameRad;
-                const thetaTarget = global.RendezvousMath.wrap2Pi(frameRad - m.phi0_rad);
+                const thetaTarget = rendezvousMath().wrap2Pi(frameRad - m.phi0_rad);
                 const arcs = [
                     { tube: thetaChaseArc, sweep: frameRad, r: rChaseArc, pos: anchors.chasePos, anchor: anchors.thetaChaseAnchor, text: 'thetaChaseText' },
                     { tube: thetaTargetArc, sweep: thetaTarget, r: rTargetArc, pos: anchors.targetPos, anchor: anchors.thetaTargetAnchor, text: 'thetaTargetText' }
@@ -1487,7 +1465,16 @@
     /* ------------------------------------------------------------------ */
     /* Export                                                             */
     /* ------------------------------------------------------------------ */
+    // The rendezvous math this scene uses: the page passes its own (orbit-math.js on the tool,
+    // test-review-math.js on Test 1 Practice) through useMath.
+    let sceneMath = null;
+    function rendezvousMath() {
+        return sceneMath || (global.OrbitMath && global.OrbitMath.rendezvous) || (global.TestReviewMath && global.TestReviewMath.rendezvous);
+    }
+    function useMath(m) { sceneMath = m; }
+
     global.RendezvousScene = {
+        useMath,
         create,
         segments,
         phaseAt,

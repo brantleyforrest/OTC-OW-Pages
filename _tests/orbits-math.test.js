@@ -3,23 +3,26 @@
 // Perturbations, Sun-Synchronous, Ground Track, Reference Frame Observatory, Solar vs. Sidereal
 // Day) against published values and against the same physics worked again here by another
 // route (bisection for Kepler's equation, velocity vectors for plane changes, flying a plan to
-// see that the spacecraft meet). A function that lives inside a page script is read out of that
-// file and run as written, so the test checks the page's own code, not a copy of it.
+// see that the spacecraft meet). The page math lives in assets/orbit-math.js and is checked there,
+// bound to the constants each page uses.
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 globalThis.window = globalThis;
 const ROOT = path.join(__dirname, '..');
-require('../practice/answer-check.js');
-require('../practice/practice-math.js');
-require('../practice/maneuvers-problems.js');
-const RM = require('../orbits/rendezvous-math.js');
-require('../orbits/perturbations-model.js');
-require('../frames/frame-math.js');
-const Rpo = require('../rpo/rpo-math.js');
-const MP = globalThis.ManeuversProblems;
-const PM = globalThis.PerturbationModel;
-const FM = globalThis.FrameMath;
+const OM = require('../assets/orbit-math.js');
+// Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
+const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
+if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);
+const TRM = require('../practice/test-review-math.js');
+const OC = globalThis.OrbitConstants;
+// Each section bound to the constants its page uses until the constants setting arrives.
+const OMW = OM.bind(TEST_SET);
+const RM = OMW.rendezvous;
+const Rpo = OM.bind(TEST_SET).rpo;
+const MP = OMW.maneuver;
+const PM = OM.bind(TEST_SET).perturbation;
+const FM = OMW.frames;
 
 let passed = 0;
 let failed = 0;
@@ -43,35 +46,7 @@ function rnd(lo, hi) {
     return lo + (hi - lo) * seed / 4294967296;
 }
 
-/* ------------------------------------------------------------------ */
-/* Reading code out of page scripts                                   */
-/* ------------------------------------------------------------------ */
 const source = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
-
-// The text of `function name(...) { ... }` in a file, found by matching braces.
-function functionText(file, name) {
-    const src = source(file);
-    const start = src.indexOf(`function ${name}(`);
-    assert.ok(start >= 0, `${file} has no function ${name}`);
-    let depth = 0;
-    for (let k = src.indexOf('{', start); k < src.length; k++) {
-        if (src[k] === '{') depth++;
-        else if (src[k] === '}' && --depth === 0) return src.slice(start, k + 1);
-    }
-    throw new Error(`unbalanced braces in ${name}`);
-}
-// The one-line `const NAME = ...;` definition of each name, in the file's order.
-function constText(file, name) {
-    const match = source(file).match(new RegExp(`^\\s*const ${name} = (.*?);\\s*(//.*)?$`, 'm'));
-    assert.ok(match, `${file} has no one-line const ${name}`);
-    return `const ${name} = ${match[1]};`;
-}
-// Runs the named consts and functions of a page script together and returns them.
-function pageCode(file, consts, functions) {
-    const body = consts.map((c) => constText(file, c)).concat((functions || []).map((f) => functionText(file, f)));
-    const names = consts.concat(functions || []);
-    return new Function(`${body.join('\n')}\nreturn { ${names.join(', ')} };`)();
-}
 
 /* ------------------------------------------------------------------ */
 /* Independent math, written here                                     */
@@ -141,38 +116,33 @@ function keplerPropagate(r0, v0, dt, mu) {
 /* ------------------------------------------------------------------ */
 /* Constants                                                          */
 /* ------------------------------------------------------------------ */
-check('constants: every mu, Earth radius, J2, and Earth rotation rate is the WGS-84 or the course value', () => {
-    const allowed = {
-        mu: [398600.4418, 398600.44],
-        re: [6378.137, 6378.14, 6378],
-        j2: [1.08262668e-3, 1.08263e-3],
-        omega: [7.292115e-5]
-    };
-    const kind = { MU: 'mu', LESSON_MU: 'mu', RE: 're', R_E: 're', R_EARTH: 're', LESSON_R_EARTH: 're', J2: 'j2', OMEGA_E: 'omega' };
-    const pattern = /const (MU|LESSON_MU|RE|R_E|R_EARTH|LESSON_R_EARTH|J2|OMEGA_E)\s*=\s*([0-9.]+(?:e-?\d+)?)\s*;/g;
-    let count = 0;
+check('constants: no orbital constant is written anywhere but assets/orbit-constants.js', () => {
+    // Named constants given a number, and the numbers themselves, wherever they appear in code.
+    const named = /const (MU|LESSON_MU|RE|R_E|R_EARTH|LESSON_R_EARTH|J2|J22|LON22|OMEGA_E|G0|GEO_A|R_GEO)\s*=\s*-?[0-9.]+(?:e-?\d+)?\s*[;,]/g;
+    const literal = /(?<![\w.])(398600\.4\d*|6378(?:\.\d+)?|1\.0826\d*e-3|7\.2921\d*e-5|9\.81|9\.80665|42164(?:\.\d+)?)(?![\w.])/g;
+    const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/.*$/gm, '$1');
+    const problems = [];
     for (const dir of ['orbits', 'frames', 'time', 'rpo', 'practice', 'assets']) {
         for (const file of fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith('.js'))) {
-            for (const m of source(`${dir}/${file}`).matchAll(pattern)) {
-                count++;
-                assert.ok(allowed[kind[m[1]]].includes(Number(m[2])), `${dir}/${file}: ${m[1]} = ${m[2]} is not one of ${allowed[kind[m[1]]].join(', ')}`);
-            }
+            if (dir === 'assets' && (file === 'orbit-constants.js' || file === 'vendor.js' || file.startsWith('earth-land'))) continue;
+            const code = stripComments(source(`${dir}/${file}`));
+            for (const m of code.matchAll(named)) problems.push(`${dir}/${file}: ${m[0]}`);
+            for (const m of code.matchAll(literal)) problems.push(`${dir}/${file}: ${m[1]}`);
         }
     }
-    assert.ok(count >= 20, `found only ${count} constants`);
+    assert.deepStrictEqual(problems, [], 'constants written outside orbit-constants.js');
 });
 
 /* ------------------------------------------------------------------ */
 /* Kepler's equation                                                  */
 /* ------------------------------------------------------------------ */
 check("Kepler's equation: every solver agrees with bisection for e up to 0.9", () => {
-    const groundTrackPage = pageCode('orbits/ground-track.js', [], ['solveKepler']);
-    const groundTrackPractice = pageCode('practice/test-1-ground-track-problems.js', [], ['solveKepler']);
     const solvers = {
-        'rpo/rpo-math.js keplerE': Rpo.keplerE,
-        'orbits/perturbations-model.js solveKepler': PM.solveKepler,
-        'orbits/ground-track.js solveKepler': groundTrackPage.solveKepler,
-        'practice/test-1-ground-track-problems.js solveKepler': groundTrackPractice.solveKepler
+        'assets/orbit-math.js kepler.solve': OM.kepler.solve,
+        'assets/orbit-math.js rpo.keplerE': Rpo.keplerE,
+        'assets/orbit-math.js perturbation.solveKepler': PM.solveKepler,
+        'practice/test-review-math.js groundTrack.solveKepler': TRM.groundTrack.solveKepler,
+        'practice/test-review-math.js kepler.solve': TRM.kepler.solve
     };
     for (const [name, solve] of Object.entries(solvers)) {
         for (const e of [0, 0.01, 0.3, 0.6, 0.75, 0.8, 0.85, 0.9]) {
@@ -198,7 +168,7 @@ check("Kepler's equation: every solver agrees with bisection for e up to 0.9", (
 });
 
 /* ------------------------------------------------------------------ */
-/* Propagation and Lambert                                            */
+/* Propagation                                                         */
 /* ------------------------------------------------------------------ */
 check('universal-variable propagation (Inertial Rendezvous) matches Kepler propagation, 300 orbits', () => {
     const mu = RM.constants.MU;
@@ -216,28 +186,6 @@ check('universal-variable propagation (Inertial Rendezvous) matches Kepler propa
     }
 });
 
-check('Lambert solver (in the code, not on any page): it returns the velocity that flew the arc', () => {
-    const mu = RM.constants.MU;
-    let tried = 0;
-    for (let k = 0; tried < 100 && k < 1000; k++) {
-        const a = rnd(7000, 40000), e = rnd(0, 0.7);
-        if (a * (1 - e) < 6700) continue;
-        const s = coeToRv(a, e, rnd(0, 90), rnd(0, 360), rnd(0, 360), rnd(0, 360), mu);
-        const dt = rnd(0.05, 0.9) * TWO_PI * Math.sqrt(a * a * a / mu);
-        const end = keplerPropagate(s.r, s.v, dt, mu);
-        const h = cross(s.r, s.v);
-        let dnu = Math.atan2(dot(cross(s.r, end.r), unit(h)), dot(s.r, end.r));
-        if (dnu < 0) dnu += TWO_PI;
-        if (Math.abs(dnu - Math.PI) < 0.05 || dnu < 0.05 || dnu > TWO_PI - 0.05) continue;   // singular near 0 and 180 deg
-        tried++;
-        const sol = RM.lambert(s.r, end.r, dt, dnu, mu);
-        assert.ok(sol.converged, `case ${k}: did not converge`);
-        nearVec(sol.v1, s.v, 1e-5, `v1 ${k}`);
-        nearVec(sol.v2, end.v, 1e-5, `v2 ${k}`);
-    }
-    assert.ok(tried >= 100, 'enough cases');
-});
-
 /* ------------------------------------------------------------------ */
 /* Orbital Maneuvers                                                  */
 /* ------------------------------------------------------------------ */
@@ -250,7 +198,7 @@ check('Hohmann transfer, 300 km LEO to GEO: the published values', () => {
 });
 
 check('plane changes and combined maneuvers equal the velocity-vector difference, 200 each', () => {
-    const mu = MP.constants.MU, RE = MP.constants.R_EARTH;
+    const mu = MP.MU, RE = MP.R_EARTH;
     for (let k = 0; k < 200; k++) {
         // Inclination change at a node: both orbits share the node line, so the burn point is the same.
         const r = rnd(6700, 45000), i1 = rnd(0, 170), i2 = rnd(0, 170), raan = rnd(0, 360);
@@ -436,7 +384,7 @@ check('third-body gravity at GEO: exact on the body line and at right angles, an
 /* Page scripts                                                       */
 /* ------------------------------------------------------------------ */
 check('Sun-Synchronous page: 98.6 deg at 800 km, and its node keeps pace with the mean sun', () => {
-    const P = pageCode('orbits/sun-synchronous.js', ['MU', 'RE', 'J2', 'YEAR_DAYS', 'DAY_S', 'SUN_RATE', 'meanMotion', 'j2Factor', 'nodalRate', 'sunSyncCos']);
+    const P = OMW.sunSync;
     const a = P.RE + 800;
     const i = Math.acos(P.sunSyncCos(a));
     near(i * R2D, 98.6, 0.05, 'inclination');
@@ -445,16 +393,21 @@ check('Sun-Synchronous page: 98.6 deg at 800 km, and its node keeps pace with th
 });
 
 check('Solar vs. Sidereal Day page: the sidereal day is 86,164.09 s', () => {
-    const P = pageCode('time/solar-sidereal-day.js', ['SOLAR_DAY', 'TROPICAL_YEAR', 'REAL_ORBIT_RATE', 'SIDEREAL_DAY']);
+    const P = OMW.earthRotation;
     near(P.SIDEREAL_DAY, 86164.0905, 0.01, 'seconds');
 });
 
 check('Ground Track page: equal-time motion along the orbit, and Earth turning at 15.04 deg/h', () => {
-    const P = pageCode('orbits/ground-track.js', ['D2R', 'R2D', 'TWO_PI', 'OMEGA_E', 'EARTH_DEG_PER_HOUR'], ['eccentricAnomaly', 'meanAnomaly', 'solveKepler', 'advanceTrueAnomaly']);
+    const P = OMW.groundTrack;
     near(P.EARTH_DEG_PER_HOUR, 360 / (86164.0905 / 3600), 1e-3, 'deg/h');
+    // The page's satellite moves with OrbitMath.propagate (Kepler by default).
+    const PR = OM.propagate, EL = OM.elements;
     for (let k = 0; k < 300; k++) {
         const e = rnd(0, 0.85), nu0 = rnd(0, 360), f = rnd(0, 1);
-        const nu1 = P.advanceTrueAnomaly(nu0, e, f);
+        const el = { a: 8000 + rnd(0, 30000), e, i: rnd(0, 120), raan: rnd(0, 360), argp: rnd(0, 360), nu: nu0 };
+        const sat = PR.fromElements(el);
+        const s = PR.stateAt(sat, f * 2 * Math.PI * Math.sqrt(el.a ** 3 / TEST_SET.mu));
+        const nu1 = EL.elementsFromRv(s.r, s.v, el).nu;
         // Mean anomaly, worked here by the half-angle formula, must grow by exactly f of a turn.
         const M = (nu) => {
             const E = 2 * Math.atan(Math.sqrt((1 - e) / (1 + e)) * Math.tan(nu * D2R / 2));
@@ -465,9 +418,13 @@ check('Ground Track page: equal-time motion along the orbit, and Earth turning a
 });
 
 check('Reference Frame Observatory: GEO radius, sidereal day, RIC axes, ECEF, sun direction', () => {
-    near(FM.GEO_RADIUS, 42164.17, 0.01, 'GEO radius km');
-    // WGS-84's rounded rate 7.292115e-5 rad/s gives 86,164.1006 s, 0.01 s over the true 86,164.0905 s.
-    near(FM.SIDEREAL_DAY, 86164.0905, 0.02, 'sidereal day s');
+    // GEO radius from the set's mu and omegaE, and close to the true 42,164.2 km in either set.
+    near(FM.GEO_RADIUS, Math.cbrt(TEST_SET.mu / TEST_SET.omegaE ** 2), 1e-6, 'GEO radius km');
+    near(FM.GEO_RADIUS, 42164.2, 0.1, 'GEO radius near the true value');
+    // One turn at the set's rate: 86,164.10 s for WGS-84 (7.292115e-5 rad/s), 86,164.28 s for the
+    // course's rounded 7.2921e-5 rad/s; the true sidereal day is 86,164.0905 s.
+    near(FM.SIDEREAL_DAY, 2 * Math.PI / TEST_SET.omegaE, 1e-6, 'sidereal day s');
+    near(FM.SIDEREAL_DAY, 86164.0905, 0.2, 'sidereal day near the true value');
     const s = FM.makeScenario({ radius: 7000, inclination: 51.6 * D2R, raan: 0.5, startAngle: 1, separation: 5, tiltOffset: 0.001, siteLongitude: 0.3 });
     for (let k = 0; k < 50; k++) {
         const t = rnd(0, 20000);

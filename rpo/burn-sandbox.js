@@ -1,91 +1,33 @@
 // RIC Burn Sandbox. Chase starts at rest at the target, on a perch, or on an NMC; each burn adds
 // a velocity change in R, I, or C at the current time, and the motion after it is the course
-// model (the CW closed form, RpoMath.cwPropagate) from the state just after the burn. The page
+// model (the CW closed form, OrbitMath.rpo.cwPropagate) from the state just after the burn. The page
 // shows the RMOEs just before and after the last burn, the rule of thumb that applies with its
 // numbers, four basic burns side by side, and natural against forced motion with real costs
-// (RpoMath.transferVelocity).
+// (OrbitMath.rpo.transferVelocity).
 (async function () {
     'use strict';
 
     const $ = id => document.getElementById(id);
-    const Kit = window.ToolKit, M = window.RpoMath, V = window.RpoViews;
+    // Relative-motion math from ../assets/orbit-math.js (section rpo), on the constants the site's
+    // settings choose. RpoViews reads OrbitMath.rpo itself.
+    const Kit = window.ToolKit, V = window.RpoViews;
+    let M = window.OrbitMath.rpo;
 
     /* ================================================================== */
     /* RELATIVE MOTION MATH                                               */
-    /* Course model (CW equations, from rpo-math.js) about a circular     */
-    /* target with mean motion n. RIC state [x, y, z, vx, vy, vz] in km   */
-    /* and km/s; times in s; angles in degrees.                           */
+    /* In ../assets/orbit-math.js, section burns.                         */
+    /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
-
-    // Chase's state at t = 0: at rest at the target, on a perch 10 km behind, or on an NMC
-    // with C = 5 km starting at the given corner (M0).
-    function initialState(start, corner, n) {
-        if (start === 'perch') return [0, -10, 0, 0, 0, 0];
-        if (start === 'nmc') return M.stateFromRmoe({ xc: 0, yc0: 0, C: 5, M0: corner, zmax: 0, dM0: null }, n, 0);
-        return [0, 0, 0, 0, 0, 0];
-    }
-
-    // State at time t: the CW coast from the last burn at or before t. Each burn is
-    // { t, after } with `after` the state just after it.
-    function chaseStateAt(t, start, corner, burns, n) {
-        let base = initialState(start, corner, n), tb = 0;
-        for (const b of burns) { if (b.t <= t + 1e-9) { base = b.after; tb = b.t; } }
-        return M.cwPropagate(base, n, t - tb);
-    }
-
-    // Time to coast until the next corner (M = stop) or, for stop = 'pc', the next plane
-    // crossing (dM = 0 or 180). null when that angle is undefined. Never less than a sliver.
-    function timeToCoastStop(rmoe, stop, n) {
-        const P = 2 * Math.PI / n;
-        const next = (now, ang) => { let dt = M.timeToAngle(now, ang, n); if (dt < 1e-4 * P) dt += P; return dt; };
-        if (stop === 'pc') return rmoe.dM0 === null ? null : Math.min(next(rmoe.dM0, 0), next(rmoe.dM0, 180));
-        return rmoe.M0 === null ? null : next(rmoe.M0, Number(stop));
-    }
-
-    // Positions along a CW coast from s0 for time T, count + 1 samples, pushed onto out.
-    function coastPath(s0, n, T, count, out) {
-        for (let k = 0; k <= count; k++) { const s = M.cwPropagate(s0, n, T * k / count); out.push([s[0], s[1], s[2]]); }
-        return out;
-    }
-
-    // Natural motion: an NMC with C = 5 km, entered from a perch 10 km behind with one
-    // radial burn, dV = -(n/2) dy_C.
-    function naturalNmc(n) {
-        const rmoe = { xc: 0, yc0: 0, C: 5, M0: 270, zmax: 0, dM0: null };
-        return {
-            path: coastPath(M.stateFromRmoe(rmoe, n, 0), n, 2 * Math.PI / n, 120, []),
-            from: [0, -10, 0],
-            dv: [M.rule.recenter(n, 10), 0, 0]
-        };
-    }
-
-    // Forced motion: a circle of the given radius in the R-I plane, flown as `count` CW legs
-    // between waypoints, one lap in lapTime. Each burn turns the arrival velocity into the
-    // next leg's departure velocity.
-    function forcedCircle(n, radius, count, lapTime) {
-        const Tc = lapTime / count, pts = [];
-        for (let k = 0; k < count; k++) { const f = 2 * Math.PI * k / count; pts.push([-radius * Math.cos(f), radius * Math.sin(f), 0]); }
-        const path = [], burns = [];
-        let lapDv = 0;
-        for (let k = 0; k < count; k++) {
-            const prev = pts[(k + count - 1) % count], cur = pts[k], next = pts[(k + 1) % count];
-            const vin = M.transferVelocity(prev, cur, n, Tc);
-            const arrive = M.cwPropagate([...prev, ...vin], n, Tc);
-            const vout = M.transferVelocity(cur, next, n, Tc);
-            const dv = [vout[0] - arrive[3], vout[1] - arrive[4], vout[2] - arrive[5]];
-            lapDv += Math.hypot(dv[0], dv[1], dv[2]);
-            burns.push({ at: cur, dv });
-            coastPath([...cur, ...vout], n, Tc, 20, path);
-        }
-        return { path, burns, lapDv };
-    }
-
-    // Forced motion: a teardrop hold at r0, back at r0 after each cycle by one burn there.
-    function teardropHold(n, r0, cycle) {
-        const v0 = M.transferVelocity(r0, r0, n, cycle);
-        const end = M.cwPropagate([...r0, ...v0], n, cycle);
-        const dv = [v0[0] - end[3], v0[1] - end[4], v0[2] - end[5]];
-        return { path: coastPath([...r0, ...v0], n, cycle, 90, []), dv, cost: Math.hypot(dv[0], dv[1], dv[2]) };
+    const OM = window.OrbitMath;   // its sections follow the constants setting
+    let {
+        initialState, chaseStateAt, timeToCoastStop, coastPath, naturalNmc, forcedCircle, teardropHold
+    } = OM.burns;
+    // Read the math again after the constants setting changes.
+    function rebindMath() {
+        M = OM.rpo;
+        ({
+            initialState, chaseStateAt, timeToCoastStop, coastPath, naturalNmc, forcedCircle, teardropHold
+        } = OM.burns);
     }
 
     /* ================================================================== */
@@ -141,7 +83,53 @@
     });
 
     /* ---------- The motion ---------- */
-    function chaseState(t) { return chaseStateAt(t, state.start, state.corner, state.burns, n); }
+    // The RIC model setting (site settings): CW, the course model (default), or the exact model:
+    // target and chase stored as r and v and propagated on their own (with the settings'
+    // propagator); each burn adds its Δv, turned from RIC into ECI, to the chase's velocity.
+    const model = () => window.OrbitConstants.Settings.get();
+    const isExact = () => model().ricModel === 'exact';
+    const chains = new Map();
+    function exactChain(upTo) {
+        const s = model();
+        const burns = state.burns.slice(0, upTo);
+        const key = JSON.stringify([state.orbit, state.start, state.corner, s.ricAxes, s.propagator, s.forces, s.solver, s.constants, s.startMs, burns.map(b => [b.t, b.dv])]);
+        let ch = chains.get(key);
+        if (ch) return ch;
+        const P = OM.propagate;
+        const tSat = M.targetSat(coe);
+        let sat = M.chaseSatFromRic(initialState(state.start, state.corner, n), tSat, 0, s.ricAxes);
+        const legs = [{ t: -Infinity, sat }];
+        for (const b of burns) {
+            const c = P.stateAt(sat, b.t);
+            const dv = M.ricToEci(b.dv, M.basisFromRv(P.stateAt(tSat, b.t)));
+            sat = P.satellite(c.r, c.v.map((x, k) => x + dv[k]), b.t);
+            legs.push({ t: b.t, sat });
+        }
+        ch = { tSat, legs, axes: s.ricAxes };
+        if (chains.size > 8) chains.clear();
+        chains.set(key, ch);
+        return ch;
+    }
+    // The exact relative state at t (with the first upTo burns; all by default).
+    function exactRel(t, upTo = state.burns.length) {
+        const ch = exactChain(upTo);
+        let leg = ch.legs[0];
+        for (const l of ch.legs) if (l.t <= t + 1e-9) leg = l;
+        return M.relativeStateSats(ch.tSat, leg.sat, t, ch.axes);
+    }
+    const cwState = (t) => chaseStateAt(t, state.start, state.corner, state.burns, n);
+    function chaseState(t) {
+        if (!isExact()) return cwState(t);
+        const rel = exactRel(t);
+        return [...rel.rho, ...rel.rhoDot];
+    }
+    // The rectilinear offset, for the ECI view (the same as chaseState unless the axes are curvilinear).
+    function chaseRect(t) {
+        if (!isExact()) return cwState(t);
+        const rel = exactRel(t);
+        return [...rel.rect.rho, ...rel.rect.rhoDot];
+    }
+    const overlayOn = () => isExact() && model().cwOverlay;
     function lastBurn() { return state.burns.length ? state.burns[state.burns.length - 1] : null; }
 
     // The sampled path: from two revs before now to WINDOW_AHEAD revs after, rebuilt when the
@@ -150,11 +138,19 @@
         const t0 = Math.max(0, state.t - TRAIL_REVS * P), t1 = state.t + WINDOW_AHEAD * P;
         const count = Math.round(PER_REV * (t1 - t0) / P) + 1;
         const times = new Float64Array(count), path = new Float64Array(3 * count);
+        const rect = isExact() ? new Float64Array(3 * count) : path;
+        const cw = overlayOn() ? new Float64Array(3 * count) : null;
         for (let k = 0; k < count; k++) {
             const t = t0 + (t1 - t0) * k / (count - 1);
             times[k] = t;
-            const s = chaseState(t);
-            path[3 * k] = s[0]; path[3 * k + 1] = s[1]; path[3 * k + 2] = s[2];
+            if (isExact()) {
+                const rel = exactRel(t);
+                for (let a = 0; a < 3; a++) { path[3 * k + a] = rel.rho[a]; rect[3 * k + a] = rel.rect.rho[a]; }
+            } else {
+                const s = chaseState(t);
+                path[3 * k] = s[0]; path[3 * k + 1] = s[1]; path[3 * k + 2] = s[2];
+            }
+            if (cw) { const s = cwState(t); cw[3 * k] = s[0]; cw[3 * k + 1] = s[1]; cw[3 * k + 2] = s[2]; }
         }
         // The old path: where chase would have gone without the last burn, two revs from it.
         let ghost = null;
@@ -163,11 +159,12 @@
             const gc = Math.round(PER_REV * AHEAD_REVS) + 1;
             ghost = new Float64Array(3 * gc);
             for (let k = 0; k < gc; k++) {
-                const s = M.cwPropagate(b.before, n, AHEAD_REVS * P * k / (gc - 1));
+                const dt = AHEAD_REVS * P * k / (gc - 1);
+                const s = isExact() ? exactRel(b.t + dt, state.burns.length - 1).rho : M.cwPropagate(b.before, n, dt);
                 ghost[3 * k] = s[0]; ghost[3 * k + 1] = s[1]; ghost[3 * k + 2] = s[2];
             }
         }
-        win = { t0, t1, count, times, path, ghost, frame: V.framePath(coe, times, path) };
+        win = { t0, t1, count, times, path, ghost, cw, frame: V.framePath(coe, times, rect) };
         if (stage.inertial) { stage.inertial.setOrbit(coe); stage.inertial.setPath(win.frame); }
         updateMagRead();
     }
@@ -215,20 +212,23 @@
         const nmcLoop = state.nmcTrace && rNow.C > 1e-6 ? M.nmcLoop(rNow) : null;
         const inWindow = state.burns.filter(b => b.t >= win.t0 - 1e-9 && b.t <= t + 1e-9);
         const ghosts = win.ghost && state.ghost ? [win.ghost] : [];
+        // The CW overlay: the course model's path, drawn faintly beside the exact one.
+        if (win.cw) ghosts.push(win.cw.subarray(3 * kTrail, 3 * (kAhead + 1)));
         const data = {
             chase: now, trail, predicted, ghosts, nmcLoop, rmoe: rNow,
             burns: inWindow.map(b => ({ at: b.after, dv: b.dv }))
         };
         stage.visiblePlanes().forEach(p => p.draw(data));
         const basis = M.ricBasis(coe, t);
+        const rectNow = chaseRect(t);
         if (stage.box && stage.second() === 'box') {
-            const chaseRv = M.chaseRvFromRic(now, basis);
+            const chaseRv = M.chaseRvFromRic(rectNow, basis);
             stage.box.update({ chase: now, trail, nmcLoop, ghost: win.path, basis, rT: basis.r, t, targetCoe: coe, chaseRv });
         }
         if (stage.inertial) {
             stage.inertial.update({
-                t, rho: now, basis, rT: basis.r, from: kTrail, to: k, ghost: true,
-                burns: inWindow.map(b => ({ t: b.t, rho: b.after, dv: b.dv, basis: M.ricBasis(coe, b.t) }))
+                t, rho: rectNow, basis, rT: basis.r, from: kTrail, to: k, ghost: true,
+                burns: inWindow.map(b => ({ t: b.t, rho: isExact() ? chaseRect(b.t) : b.after, dv: b.dv, basis: M.ricBasis(coe, b.t) }))
             });
         }
         updateLive(now, rNow);
@@ -253,7 +253,17 @@
     /* ---------- Panels ---------- */
     function updateLive(now, rNow) {
         $('time-read').textContent = timeText(state.t);
-        $('motion').textContent = 'Now: ' + M.classifyMotion(rNow).label;
+        $('motion').textContent = 'Now: ' + M.classifyMotion(rNow).label + (isExact() ? ' (instantaneous RMOEs, exact model)' : '');
+        // With the CW overlay: how far the exact chase is from where CW puts it.
+        const gapEl = $('cw-gap');
+        if (gapEl) {
+            gapEl.hidden = !overlayOn();
+            if (overlayOn()) {
+                const c = cwState(state.t);
+                const g = Math.hypot(now[0] - c[0], now[1] - c[1], now[2] - c[2]);
+                gapEl.textContent = 'Exact minus CW now: ' + (g < 1 ? fmt(g * 1000, 1) + ' m' : fmt(g, 3) + ' km');
+            }
+        }
         // Coast To: a corner needs an NMC (C > 0); a plane crossing needs cross-track motion.
         const hasC = rNow.M0 !== null, hasZ = rNow.dM0 !== null;
         $('coast').querySelectorAll('button').forEach(b => { b.disabled = b.dataset.value === 'pc' ? !hasZ : !hasC; });
@@ -302,7 +312,8 @@
         }).join('');
         $('ba-body').innerHTML =
             '<div class="table-wrap"><table class="rpo-table"><tr><th>RMOE</th><th>Before</th><th>After</th><th>Change</th></tr>' + body + '</table></div>' +
-            '<p class="rule-note">y<sub>C</sub>, M, and ΔM are at the instant of the burn, ' + (b.t / P).toFixed(3) + ' rev.</p>' +
+            '<p class="rule-note">y<sub>C</sub>, M, and ΔM are at the instant of the burn, ' + (b.t / P).toFixed(3) + ' rev.' +
+            (isExact() ? ' With the exact model these are instantaneous RMOEs, fitted to the exact relative state.' : '') + '</p>' +
             '<div class="rule-box">' + ruleHtml(b, r0, r1) + '</div>';
     }
 
@@ -365,7 +376,13 @@
         const dv = [0, 0, 0];
         dv[d.axis] = d.sign * mag / 1000;
         const after = M.applyBurn(before, dv);
-        state.burns.push({ t: state.t, dir: dirKey, mag, dv, before, after });
+        // The chase as r and v in ECI: the burn changes only its velocity, by the RIC Δv turned into
+        // ECI. (In the CW model this is the same as adding Δv to the relative velocity.)
+        const basis = M.ricBasis(coe, state.t);
+        const chaseBefore = M.chaseRvFromRic(before, basis);
+        const dvEci = M.ricToEci(dv, basis);
+        const chaseAfter = { r: chaseBefore.r, v: chaseBefore.v.map((x, k) => x + dvEci[k]) };
+        state.burns.push({ t: state.t, dir: dirKey, mag, dv, before, after, chaseBefore, chaseAfter });
         restartWindow();
         updateBurnPanel();
         return true;
@@ -497,8 +514,10 @@
     Kit.observeSize($('compare'), () => drawCompare());
 
     /* ---------- Natural vs. forced motion, at GEO ---------- */
-    const geoN = M.meanMotion(M.GEO_A), geoP = M.period(M.GEO_A);
-    function buildForced() {
+    let geoN, geoP;
+    function forcedData() {
+        geoN = M.meanMotion(M.GEO_A);
+        geoP = M.period(M.GEO_A);
         const nmc = naturalNmc(geoN);
         const nmcPath = nmc.path, nmcDv = nmc.dv[0];
         // A circle of radius 5 km, eight burns, one lap per half rev, clockwise in the view
@@ -517,11 +536,19 @@
             { canvas: $('nf-nmc'), path: nmcPath, cycle: geoP, burns: [{ at: [0, -10, 0], dv: [nmcDv, 0, 0] }] },
             { canvas: $('nf-circle'), path: circlePath, cycle: 0.5 * geoP, burns: circleBurns },
             { canvas: $('nf-tear'), path: tearPath, cycle: Tt, burns: [{ at: r0, dv: tearDv }] }
-        ].map(f => Object.assign(f, { pane: V.createRicPlane(f.canvas, { plane: 'left', compact: true }), fit: false }));
+        ];
     }
     let forcedClock = 0;
-    const forced = buildForced();
-    forced.forEach(f => Kit.observeSize(f.canvas.parentElement, (w, h) => { f.pane.resize(w, h); V.fitPanes([f.pane], [f.path.concat(f.burns.map(b => b.at))], true); f.fit = true; drawForced(f); }));
+    const forced = forcedData().map(f => Object.assign(f, { pane: V.createRicPlane(f.canvas, { plane: 'left', compact: true }), fit: false }));
+    const fitForced = f => V.fitPanes([f.pane], [f.path.concat(f.burns.map(b => b.at))], true);
+    forced.forEach(f => Kit.observeSize(f.canvas.parentElement, (w, h) => { f.pane.resize(w, h); fitForced(f); f.fit = true; drawForced(f); }));
+    // After a constants change: the same three examples, worked out again.
+    function refreshForced() {
+        forcedData().forEach((d, k) => {
+            Object.assign(forced[k], { path: d.path, cycle: d.cycle, burns: d.burns });
+            if (forced[k].fit) { fitForced(forced[k]); drawForced(forced[k]); }
+        });
+    }
     function drawForced(f) {
         if (!f.fit) return;
         const frac = ((forcedClock * 0.1 * geoP) % f.cycle) / f.cycle;
@@ -559,4 +586,19 @@
         setTime(t) { state.t = t; state.coastEnd = null; setPlaying(false); restartWindow(); },
         forced
     };
+
+    // The model settings panel (../assets/orbit-settings-panel.js): redraw on a settings change.
+    if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
+        // Shown in the settings panel when Cowell is chosen.
+        modelNote: "With Cowell, the target moves under the chosen forces. With the exact RIC model the chase does too, and its burns are flown; with CW the relative motion is the CW model.",
+        onSettingsChange() {
+            rebindMath();
+            chains.clear();
+            setTarget(state.orbit);
+            restartWindow();
+            updateBurnPanel();
+            drawCompare();
+            refreshForced();
+        }
+    });
 })();
