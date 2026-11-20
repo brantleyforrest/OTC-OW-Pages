@@ -52,15 +52,68 @@
             refit();
         }
 
-        function refit() {
-            if (!sim || !stage) return;
-            const planes = [stage.left, stage.secondPlane()].filter(Boolean);
+        /* ---------- zoom ----------
+         * Fitting the panes to the whole motion would give the answer away (its size sets the
+         * zoom). Until the motion or the solution shows, the panes fit only what the problem gives:
+         * the target, chase's start, and any path that is part of the question, never closer than
+         * DEFAULT_HALF_KM around the target. When the answer shows, the zoom eases out (or in) to
+         * the whole motion over ZOOM_SECONDS. */
+        const DEFAULT_HALF_KM = 5;
+        const ZOOM_SECONDS = 0.9;
+        let tween = null;
+        const planesNow = () => [stage.left, stage.secondPlane()].filter(Boolean);
+
+        // What the panes may fit before the answer shows.
+        function givenPaths() {
+            const d = DEFAULT_HALF_KM;
+            const pts = [0, 0, 0, d, 0, 0, -d, 0, 0, 0, d, 0, 0, -d, 0, 0, 0, d, 0, 0, -d];
+            if (sim.rel && (sim.model.showStart || sim.model.before)) pts.push(sim.start[0], sim.start[1], sim.start[2]);
+            return [new Float64Array(pts)].concat(sim.rel && sim.before ? [sim.before] : []);
+        }
+        // The whole motion, shown with the answer or the solution steps. While a step before the
+        // motion draws the course (the walkthrough's middle steps), it is part of the solution too.
+        function revealed() {
+            if (motionShown()) return true;
+            if (!sim.rel || stageKey === 'given') return false;
+            return !(sim.model.before && stageKey === 'burn');
+        }
+        const fitPathsNow = () => (revealed() ? sim.fitPaths || [sim.course] : givenPaths());
+
+        function applyFit(paths) {
+            const planes = planesNow();
             // Share one scale among the panes on screen only: a pane hidden by the small-stage
             // switch has no size, and its scale would zoom the visible pane far out.
             const visible = stage.visiblePlanes().filter(p => planes.indexOf(p) >= 0);
-            const paths = sim.fitPaths || [sim.course];
             V.fitPanes(visible.length ? visible : planes, paths, true);
             planes.filter(p => visible.indexOf(p) < 0).forEach(p => V.fitPanes([p], paths, true));
+        }
+        // Jump to the fit for what is shown now (a new problem, a resize).
+        function refit() {
+            if (!sim || !stage) return;
+            tween = null;
+            applyFit(fitPathsNow());
+        }
+        // Ease from the current zoom to the fit for what is shown now.
+        function refitSmooth() {
+            if (!sim || !stage) return;
+            if (Kit.prefersReducedMotion()) { refit(); return; }
+            const planes = planesNow();
+            const from = planes.map(p => ({ s: 1 / p.kmPerPx(), c: p.center().slice() }));
+            applyFit(fitPathsNow());
+            const to = planes.map(p => ({ s: 1 / p.kmPerPx(), c: p.center().slice() }));
+            planes.forEach((p, k) => p.setScale(from[k].s, from[k].c));
+            const moves = to.some((q, k) => Math.abs(Math.log(q.s / from[k].s)) > 1e-3 || q.c.some((v, j) => Math.abs(v - from[k].c[j]) * q.s > 0.5));
+            tween = moves ? { planes, from, to, time: 0 } : null;
+        }
+        function stepTween(dt) {
+            tween.time += dt;
+            const u = Math.min(1, tween.time / ZOOM_SECONDS);
+            const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;   // ease in and out
+            tween.planes.forEach((p, k) => {
+                const a = tween.from[k], b = tween.to[k];
+                p.setScale(a.s * Math.pow(b.s / a.s, e), [a.c[0] + (b.c[0] - a.c[0]) * e, a.c[1] + (b.c[1] - a.c[1]) * e]);
+            });
+            if (u >= 1) tween = null;
         }
 
         /* ---------- rel: course-model motion from RMOEs alone ----------
@@ -146,7 +199,9 @@
 
         // Playback: only while the motion is shown, looping over the revs in the model.
         Kit.startLoop(dt => {
-            if ((kind !== 'motion' && kind !== 'rel') || !sim || !motionShown()) return;
+            if ((kind !== 'motion' && kind !== 'rel') || !sim) return;
+            if (tween) { stepTween(dt); if (!motionShown()) draw(); }
+            if (!motionShown()) return;
             if (Kit.prefersReducedMotion()) {
                 if (t !== sim.spanT) { t = sim.spanT; draw(); }
                 return;
@@ -169,11 +224,11 @@
             },
             setStage(key) {
                 stageKey = key || 'given';
-                if (kind === 'motion' || kind === 'rel') { if (!motionShown()) t = 0; draw(); }
+                if (kind === 'motion' || kind === 'rel') { if (!motionShown()) t = 0; refitSmooth(); draw(); }
             },
             setAnswersShown(value) {
                 answersShown = Boolean(value);
-                if (kind === 'motion' || kind === 'rel') draw();
+                if (kind === 'motion' || kind === 'rel') { refitSmooth(); draw(); }
             },
             resize() {
                 if (kind === 'motion' || kind === 'rel') { refit(); draw(); }

@@ -1,6 +1,7 @@
-// Test 2 Practice, the two Visualize sections: picture the motion before calculating anything.
+// Test 2 Practice, the Visualize sections: picture the motion before calculating anything.
 //  - #vis-state: given chase's RIC position and velocity at epoch.
 //  - #vis-rmoe: given chase's six RMOEs.
+//  - #vis-coe: given the COEs of the target and of chase (load after test-2-coeric-problems.js).
 // The student draws the motion on paper (from the left and from behind, over two revs), then shows
 // the answer and checks the drawing against it; nothing is graded. The RMOEs are picked first from round values for a chosen
 // motion; for #vis-state the given state is worked from them and rounded as #rmoe does.
@@ -120,7 +121,7 @@
             methods: [{ name: 'Result', html: rule('Put the parts together: ' + VZ.LABEL[key] + '.', VZ.LABEL[key]) + note(C2.reading(truth, n, a)) }] });
         return finish(truth, n, a, type, key, {
             model: { kind: 'rel', a, n, rmoe: truth, revs: VZ.REVS, showStart: true, given: s },
-            title: 'Visualize from Position and Velocity',
+            title: 'Visualize from $\\bar\\rho$, $\\dot{\\bar\\rho}$',
             prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s position and velocity in the RIC frame at epoch are given. Before calculating anything, picture the motion and draw it.'),
             statement: C2.givenState(s),
             steps
@@ -155,7 +156,31 @@
         });
     }
 
+    /* ---------- from two sets of COEs ----------
+     * The element pair comes from COE to RIC Signs (test-2-coeric-problems.js, loaded first), with
+     * its walkthrough up to the RMOEs; the student draws the motion instead of giving the signs.
+     * Topic types as there: 'random', 'in-plane', 'cross', 'both'. */
+    function fromCoes(type) {
+        const base = global.Test2CoericProblems.generate(type);
+        const m = base.model;
+        const r = m.rmoe, n = m.n, a = m.target.a;
+        const key = M.classifyMotion(r).key;
+        const steps = base.steps.filter(s => ['n', 'xc', 'zmax'].includes(s.key));
+        steps.push({ key: 'answer', title: 'The picture', result: VZ.LABEL[key],
+            caption: 'Chase’s motion relative to the target over two revs, from the left and from behind.',
+            methods: [{ name: 'Result', html: rule('Put the parts together: ' + VZ.LABEL[key] + '.', VZ.LABEL[key]) + note(C2.reading(r, n, a)) }] });
+        return finish(r, n, a, base.type, key, {
+            model: m,
+            title: 'Visualize from COEs',
+            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit. Chase is on the orbit given beside it, at the same moment. Draw chase’s motion relative to the target over time.'),
+            statement: base.statement,
+            overviewCaption: 'The target (green square) and chase (gold triangle), each on its own orbit. The answer fills in the RIC views.',
+            steps
+        });
+    }
+
     global.Test2VisStateProblems = { generate: fromState, grade: C2.grade, pickRmoe };
     global.Test2VisRmoeProblems = { generate: fromRmoe, grade: C2.grade, pickRmoe };
+    global.Test2VisCoeProblems = { generate: fromCoes, grade: C2.grade };
 })(typeof window !== 'undefined' ? window : globalThis);
-if (typeof module !== 'undefined') module.exports = { state: globalThis.Test2VisStateProblems, rmoe: globalThis.Test2VisRmoeProblems };
+if (typeof module !== 'undefined') module.exports = { state: globalThis.Test2VisStateProblems, rmoe: globalThis.Test2VisRmoeProblems, coe: globalThis.Test2VisCoeProblems };

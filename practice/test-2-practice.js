@@ -24,16 +24,21 @@
     const SECTIONS = [
         { key: 'coeric', label: 'COE to RIC Signs', module: window.Test2CoericProblems,
           types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'Cross-Track'], ['both', 'Both']] },
-        { key: 'vis-state', label: 'Visualize from Position and Velocity', module: window.Test2VisStateProblems,
+        { key: 'vis-state', label: 'Visualize from $\\bar\\rho$, $\\dot{\\bar\\rho}$', module: window.Test2VisStateProblems,
           types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'With Cross-Track']] },
         { key: 'vis-rmoe', label: 'Visualize from RMOEs', module: window.Test2VisRmoeProblems,
           types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'With Cross-Track']] },
-        { key: 'rmoe', label: 'Position and Velocity to RMOEs', module: Rmoe && { generate: () => Rmoe.generate('forward'), grade: Rmoe.grade },
+        { key: 'rmoe', label: '$\\bar\\rho$, $\\dot{\\bar\\rho}$ to RMOEs', module: Rmoe && { generate: () => Rmoe.generate('forward'), grade: Rmoe.grade },
           types: [['forward', 'State to RMOEs']] },
-        { key: 'state', label: 'RMOEs to Position and Velocity', module: Rmoe && { generate: () => Rmoe.generate('reverse'), grade: Rmoe.grade },
+        { key: 'state', label: 'RMOEs to $\\bar\\rho$, $\\dot{\\bar\\rho}$', module: Rmoe && { generate: () => Rmoe.generate('reverse'), grade: Rmoe.grade },
           types: [['reverse', 'RMOEs to State']] },
         { key: 'burns', label: 'Burn Trajectories', module: window.Test2BurnsProblems,
-          types: [['random', 'Random'], ['+R', '+R'], ['-R', '−R'], ['+I', '+I'], ['-I', '−I']] }
+          types: [['random', 'Random'], ['+R', '+R'], ['-R', '−R'], ['+I', '+I'], ['-I', '−I']] },
+        // Extra practice beyond the six test topics, kept at the end of the list.
+        { key: 'vis-coe', label: 'Visualize from COEs', extra: true, module: window.Test2VisCoeProblems,
+          types: [['random', 'Random'], ['in-plane', 'In-Plane'], ['cross', 'Cross-Track'], ['both', 'Both']] },
+        { key: 'later', label: 'RMOEs Later', extra: true, module: Rmoe && { generate: () => Rmoe.generate('later'), grade: Rmoe.grade },
+          types: [['later', 'RMOEs Later']] }
     ].filter(s => s.module && (DEV || PUBLISHED.includes(s.key)));
     const byKey = Object.fromEntries(SECTIONS.map(s => [s.key, s]));
 
@@ -48,10 +53,6 @@
         return;
     }
 
-    const MODE_CAPTIONS = {
-        practice: 'The view starts with the problem as given, and the walkthrough builds the solution step by step.',
-        test: 'Enter your answers and submit. The view and the walkthrough open after grading.'
-    };
 
     const hash = location.hash.slice(1);
     const state = {
@@ -426,7 +427,6 @@
     /* ------------------------------------------------------------------ */
     function applyLayout() {
         document.body.classList.toggle('no-view', Boolean(state.problem) && !state.problem.view);
-        $('mode-caption').textContent = MODE_CAPTIONS[state.mode];
         const ungraded = state.mode === 'test' && !state.submitted;
         const answersOnly = ungraded && !state.problem.viewIsGiven;
         document.body.classList.toggle('answers-only', answersOnly);
@@ -442,7 +442,7 @@
         state.blankWarned = false;
         state.active = -1;
         state.visited = new Set();
-        $('problem-title').textContent = state.problem.title;
+        $('problem-title').innerHTML = prose(state.problem.title);   // titles and labels may hold TeX
         $('problem-prompt').innerHTML = state.problem.prompt;
         $('given').innerHTML = state.problem.statement;
         $('given').hidden = !state.problem.statement;
@@ -461,11 +461,16 @@
             const b = document.createElement('button');
             b.type = 'button';
             b.dataset.value = s.key;
-            b.textContent = s.label;
+            // extra: a kind of problem beyond the six test topics, tagged on its button.
+            b.innerHTML = prose(s.label) + (s.extra ? '<span class="extra-tag">Extra</span>' : '');
+            if (s.extra) b.classList.add('extra');
+            const notes = [];
+            if (s.extra) notes.push('Extra practice beyond the six test topics');
             if (!PUBLISHED.includes(s.key)) {
                 b.classList.add('unpublished');
-                b.title = 'Not published: shows only in the dev version';
+                notes.push('Not published: shows only in the dev version');
             }
+            if (notes.length) b.title = notes.join('. ');
             b.setAttribute('aria-pressed', String(s.key === state.section));
             sectionGroup.appendChild(b);
         });

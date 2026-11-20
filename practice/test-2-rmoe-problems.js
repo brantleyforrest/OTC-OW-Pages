@@ -1,7 +1,9 @@
-// Test 2 Practice, Position and Velocity to RMOEs (#rmoe).
+// Test 2 Practice, ρ̄, ρ̄̇ to RMOEs (#rmoe), RMOEs to ρ̄, ρ̄̇ (#state), and RMOEs Later (#later).
 //  - forward: given a_target and chase's RIC position and velocity at epoch, find the six RMOEs and
 //    the drift rate (m/s and km/rev).
 //  - reverse: given the RMOEs with chase at a corner of the NMC, find its position and velocity.
+//  - later (#later): given the RMOEs at epoch, find the RMOEs, drift rate, position and velocity
+//    1/4, 1/2, or 1 period later.
 // The answer is picked first from round values; the givens are computed from it with TestReviewMath.rpo and
 // rounded to 4 decimals (km) and 6 decimals (m/s), so the given numbers give back the round answer.
 // No DOM access. Load after test-review-math.js, practice-math.js, and test-2-common.js.
@@ -102,7 +104,7 @@
         return {
             type: 'forward',
             model: { kind: 'rel', a, n, rmoe: truth, revs: 2, showStart: true, given: s },
-            title: 'Position and Velocity to RMOEs',
+            title: '$\\bar\\rho$, $\\dot{\\bar\\rho}$ to RMOEs',
             prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s position and velocity in the RIC frame at epoch are given. Find the six RMOEs and the drift rate.'),
             statement: C2.givenState(s),
             overviewCaption: 'Chase (gold triangle) at its given position. The walkthrough adds the NMC it is on.',
@@ -111,24 +113,16 @@
         };
     }
 
-    /* ---------- reverse: RMOEs to state ---------- */
-    function reverse() {
-        const a = C2.pickTargetA();
-        const n = M.meanMotion(a);
-        let truth = pickRmoe(a, true);
-        if (truth.C === 0) truth = Object.assign(truth, { C: 1, M0: 90 * C2.randInt(0, 3) });
-        const s = M.stateFromRmoe(truth, n, 0);
-        const yd = -1.5 * n * truth.xc;
+    // The boundary-table steps: chase's position and velocity from RMOEs with M_0 and ΔM_0 at
+    // corners (multiples of 90°). s is stateFromRmoe(truth, n, 0).
+    function cornerSteps(truth, n, s) {
+        const steps = [];
         const corner = C2.cornerName(truth.M0);
         const cornerTeX = {
             bottom: ['x_C - C', 'y_{C0}', '0', '\\dot y_C + 2nC'], front: ['x_C', 'y_{C0} + 2C', 'nC', '\\dot y_C'],
             top: ['x_C + C', 'y_{C0}', '0', '\\dot y_C - 2nC'], back: ['x_C', 'y_{C0} - 2C', '-nC', '\\dot y_C']
         }[corner];
         const ms = v => C2.fixed(v * 1000, 4);
-        const steps = [nStep(a, n)];
-        steps.push({ key: 'drift', title: 'Drift rate', result: '$\\dot y_C = ' + C2.texNum(ms(yd)) + '$ m/s',
-            caption: 'The in-track rate at every corner includes the drift.',
-            methods: [{ name: 'Formula', html: calc('\\dot y_C = -\\tfrac{3}{2} n x_C', ['-1.5 \\times ' + sci(n) + ' \\times ' + p(truth.xc, 3) + '\\times 1000'], ms(yd) + '\\ \\text{m/s}') }] });
         steps.push({ key: 'M0', title: 'In the plane: the ' + corner, result: 'the ' + corner,
             caption: 'M<sub>0</sub> = ' + truth.M0 + '° puts chase at the ' + corner + ' of the NMC. Read its row of the boundary table.',
             methods: [{ name: 'Boundary table', html: rule('$M_0 = ' + truth.M0 + '°$: chase is at the ' + corner + '.') +
@@ -148,23 +142,102 @@
                 methods: [{ name: 'Boundary table', html: rule('$\\Delta M_0 = ' + truth.dM0 + '°$: chase is at its ' + sw + '.') +
                     calc('z_0 = ' + zT, [], C2.fixed(s[2], 3) + '\\ \\text{km}') + calc('\\dot z_0 = ' + vzT, [], ms(s[5]) + '\\ \\text{m/s}') }] });
         }
+        return steps;
+    }
+
+    /* ---------- reverse: RMOEs to state ---------- */
+    function reverse() {
+        const a = C2.pickTargetA();
+        const n = M.meanMotion(a);
+        let truth = pickRmoe(a, true);
+        if (truth.C === 0) truth = Object.assign(truth, { C: 1, M0: 90 * C2.randInt(0, 3) });
+        const s = M.stateFromRmoe(truth, n, 0);
+        const yd = -1.5 * n * truth.xc;
+        const ms = v => C2.fixed(v * 1000, 4);
+        const steps = [nStep(a, n)];
+        steps.push({ key: 'drift', title: 'Drift rate', result: '$\\dot y_C = ' + C2.texNum(ms(yd)) + '$ m/s',
+            caption: 'The in-track rate at every corner includes the drift.',
+            methods: [{ name: 'Formula', html: calc('\\dot y_C = -\\tfrac{3}{2} n x_C', ['-1.5 \\times ' + sci(n) + ' \\times ' + p(truth.xc, 3) + '\\times 1000'], ms(yd) + '\\ \\text{m/s}') }] });
+        steps.push(...cornerSteps(truth, n, s));
         steps.push({ key: 'answer', title: 'What the motion looks like', result: '', caption: 'The motion these RMOEs describe, over two revs.',
             methods: [{ name: 'Reading', html: note(C2.reading(truth, n, a)) }] });
         return {
             type: 'reverse',
             model: { kind: 'rel', a, n, rmoe: truth, revs: 2, showStart: false },
-            title: 'RMOEs to Position and Velocity',
+            title: 'RMOEs to $\\bar\\rho$, $\\dot{\\bar\\rho}$',
             prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s RMOEs at epoch are given. Find its position and velocity in the RIC frame at epoch.'),
             statement: C2.givenRmoe(truth),
             overviewCaption: 'The view adds chase’s motion as the walkthrough goes.',
             limitsHtml: C2.LIMITS.replace(/ Tick.*$/, ''),
-            fields: C2.STATE_FIELDS(),
+            // Two columns, filled row by row: rho bar (x, y, z) on the left, rho bar dot on the right.
+            fields: ['x', 'vx', 'y', 'vy', 'z', 'vz'].map(key => C2.STATE_FIELDS().find(f => f.key === key)),
+            gridHeads: ['\\bar\\rho', '\\dot{\\bar\\rho}'],
             answers: C2.stateAnswers(s),
             steps
         };
     }
 
+
+    /* ---------- later: RMOEs and state some time later ----------
+     * Given the RMOEs at epoch (chase at a corner, as in reverse) and the picture of the motion,
+     * find the RMOEs, the drift rate, and chase's position and velocity 1/4, 1/2, or 1 period later.
+     * Every angle moves by the same fraction of 360°, so chase is at a corner again. */
+    const LATER = [[0.25, '¼ period', '90°'], [0.5, '½ period', '180°'], [1, '1 period', '360°']];
+    function later() {
+        const a = C2.pickTargetA();
+        const n = M.meanMotion(a);
+        let truth = pickRmoe(a, true);
+        if (truth.C === 0) truth = Object.assign(truth, { C: 1, M0: 90 * C2.randInt(0, 3) });
+        const [frac, fracText, turnText] = C2.pick(LATER);
+        const t = frac * 2 * Math.PI / n;
+        // The angles land on corners again; round off the floating-point dust.
+        const r = M.rmoeAt(truth, n, t);
+        ['M0', 'dM0'].forEach(k => { if (r[k] !== null) r[k] = Math.round(r[k]) % 360; });
+        const s = M.stateFromRmoe(r, n, 0);
+        const drift = M.driftRate(truth, n, a);
+        const ms = v => C2.fixed(v * 1000, 4);
+        const angleAfter = v => (v === null ? 'undefined' : C2.fixed(v, 0) + '°');
+
+        const steps = [nStep(a, n)];
+        steps.push({ key: 'drift', title: 'Drift rate', result: '$' + C2.texNum(C2.fixed(drift.kmPerRev, 3)) + '$ km/rev',
+            caption: 'x<sub>C</sub>, C, and z<sub>max</sub> do not change in natural motion; the center drifts at this rate.',
+            methods: [{ name: 'Per second', html: calc('\\dot y_C = -\\tfrac{3}{2} n x_C', ['-1.5 \\times ' + sci(n) + ' \\times ' + p(truth.xc, 3) + '\\times 1000'], ms(drift.kmPerSec) + '\\ \\text{m/s}') },
+                { name: 'Per rev', html: calc('\\dot y_C = -3\\pi x_C', ['-3\\pi \\times ' + p(truth.xc, 3)], C2.fixed(drift.kmPerRev, 3) + '\\ \\text{km/rev}') }] });
+        steps.push({ key: 'advance', title: 'The RMOEs ' + fracText + ' later', result: '$y_{C0} = ' + C2.texNum(C2.fixed(r.yc0, 3)) + '$ km',
+            caption: 'In ' + fracText + ' the angles turn ' + turnText + ' and the center drifts ' + C2.plain(frac, 2) + ' rev’s worth.',
+            methods: [{ name: 'Advance', html:
+                rule('$x_C$, $C$, and $z_{max}$ stay the same: $x_C = ' + C2.texNum(C2.fixed(r.xc, 3)) + '$ km, $C = ' + C2.fixed(r.C, 3) + '$ km, $z_{max} = ' + C2.fixed(r.zmax, 3) + '$ km.') +
+                calc('y_{C0} = y_{C0} + \\dot y_C\\, t', [p(truth.yc0, 3) + ' + ' + p(drift.kmPerRev, 3) + ' \\times ' + C2.plain(frac, 2)], C2.fixed(r.yc0, 3) + '\\ \\text{km}') +
+                calc('M_0 = M_0 + ' + turnText.replace('°', '°'), [C2.fixed(truth.M0, 0) + '° + ' + turnText], angleAfter(r.M0)) +
+                (truth.dM0 === null ? rule('$z_{max} = 0$, so $\\Delta M_0$ stays undefined.')
+                    : calc('\\Delta M_0 = \\Delta M_0 + ' + turnText, [C2.fixed(truth.dM0, 0) + '° + ' + turnText], angleAfter(r.dM0))) }] });
+        steps.push(...cornerSteps(r, n, s));
+        steps.push({ key: 'answer', title: 'Where chase is now', result: '', caption: 'The motion over two revs; chase moves on from epoch.',
+            methods: [{ name: 'Reading', html: note(C2.reading(r, n, a)) }] });
+
+        const fields = C2.RMOE_FIELDS().concat([
+            { key: 'driftRev', tex: '\\dot y_C', name: 'Drift per rev', unit: 'km/rev', tolerance: C2.TOL.km, unitType: 'dist' },
+            C2.fMs('drift', '\\dot y_C', 'Drift rate')
+        ]).concat(['x', 'vx', 'y', 'vy', 'z', 'vz'].map(key => C2.STATE_FIELDS().find(f => f.key === key)));
+        const answers = Object.assign(C2.rmoeAnswers(r), C2.stateAnswers(s), {
+            drift: C2.ansMs(drift.kmPerSec),
+            driftRev: { value: drift.kmPerRev, text: C2.fixed(drift.kmPerRev, 3) + ' km/rev' }
+        });
+        return {
+            type: 'later',
+            model: { kind: 'rel', a, n, rmoe: truth, revs: 2, showStart: true, before: truth },
+            title: 'RMOEs Later',
+            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase’s RMOEs at epoch are given, and the view shows its natural motion. ' +
+                'Find the RMOEs, the drift rate, and chase’s position and velocity in the RIC frame <b>' + fracText + ' later</b>.'),
+            statement: C2.givenRmoe(truth),
+            overviewCaption: 'Chase (gold triangle) at epoch, on its natural motion (faint).',
+            limitsHtml: C2.LIMITS,
+            fields, answers, steps, later: frac, epochRmoe: truth
+        };
+    }
+
     function generate(type) {
+        if (type === 'later') return later();
         if (type === 'forward') return forward();
         if (type === 'reverse') return reverse();
         return C2.chance(0.6) ? forward() : reverse();

@@ -71,13 +71,14 @@
             raan: geo ? 0 : C2.stepIn(0, 355, 5),
             argp: 0, nu
         };
-        // Every difference is substantial: a by at least 50 km, e by at least 0.05, an angle by at
-        // least 1°. Chase's perigee must stay at least 200 km above Earth.
+        // Differences the size the homework uses (there: a by 10 km, e = 0.0015, i or Ω by 0.1°):
+        // a by 5 to 20 km, e from 0.001 to 0.002, an angle by 0.1° to 0.5°. Chase's perigee must
+        // stay at least 200 km above Earth.
         const chase = Object.assign({}, target);
-        if (diffs.includes('a')) chase.a = a + C2.sign() * C2.stepIn(50, geo ? 500 : a > 20000 ? 400 : 200, 10);
-        if (diffs.includes('e')) chase.e = Number(C2.stepIn(0.05, 0.1, 0.01).toFixed(2));
+        if (diffs.includes('a')) chase.a = a + C2.sign() * C2.stepIn(5, 20, 5);
+        if (diffs.includes('e')) chase.e = Number(C2.stepIn(0.001, 0.002, 0.0005).toFixed(4));
         if (chase.a * (1 - chase.e) < M.RE + 200) return generate(type);
-        const ang = C2.stepIn(1, 5, 1);
+        const ang = Number(C2.stepIn(0.1, 0.5, 0.1).toFixed(1));
         if (diffs.includes('i')) chase.i = target.i + (target.i > 0 ? C2.sign() : 1) * ang;
         if (node) chase.raan = M.wrap360(target.raan + C2.sign() * ang);
 
@@ -91,10 +92,13 @@
         const rel = M.relativeState(target, chase, 0);
         const exact = [...rel.rho, ...rel.rhoDot];
         if (SIGN_FIELDS.some(([key], k) => signs[key] !== '0' && Math.sign(exact[k]) !== (signs[key] === '+' ? 1 : -1))) return generate(type);
-        // A 0 must stay close to 0 in the exact orbits too: under 5 percent of the largest exact
-        // part of its kind (the same line a + or − must clear in the linear model).
-        const exactScale = [Math.max(...exact.slice(0, 3).map(Math.abs)), Math.max(...exact.slice(3).map(Math.abs))];
-        if (SIGN_FIELDS.some(([key], k) => signs[key] === '0' && Math.abs(exact[k]) >= 0.05 * exactScale[k < 3 ? 0 : 1])) return generate(type);
+        // A 0 must stay close to 0 in the exact orbits too: under 5 percent of the size of the
+        // motion (the same line a + or − must clear in the linear model). Size: the largest exact
+        // position, or velocity over n, whichever is larger, so a tiny second-order speed is not
+        // measured against itself when every other speed is zero.
+        const size = Math.max(...exact.slice(0, 3).map(Math.abs), ...exact.slice(3).map(v => Math.abs(v) / n));
+        const exactScale = [size, size * n];
+        if (SIGN_FIELDS.some(([key], k) => signs[key] === '0' && Math.abs(exact[k]) > 0.05 * exactScale[k < 3 ? 0 : 1])) return generate(type);
 
         // Steps: n; the RMOEs from the elements; where chase is; the boundary tables.
         const steps = [{ key: 'n', title: 'Mean motion of the target', result: '$n = ' + sci(n) + '$ rad/s',

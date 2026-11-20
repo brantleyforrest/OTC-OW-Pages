@@ -67,6 +67,8 @@ record('t2-coeric', (k) => T2('Test2CoericProblems').generate(['in-plane', 'cros
 record('t2-vis-state', (k) => T2('Test2VisStateProblems').generate(['in-plane', 'cross', 'random'][k % 3]));
 record('t2-vis-rmoe', (k) => T2('Test2VisRmoeProblems').generate(['in-plane', 'cross', 'random'][k % 3]));
 record('t2-rmoe', (k) => T2('Test2RmoeProblems').generate(k % 2 ? 'forward' : 'reverse'));
+record('t2-vis-coe', (k) => T2('Test2VisCoeProblems').generate(['in-plane', 'cross', 'both', 'random'][k % 4]));
+record('t2-later', (k) => T2('Test2RmoeProblems').generate('later'));
 record('t2-burns', (k) => T2('Test2BurnsProblems').generate(['+R', '-R', '+I', '-I'][k % 4]));
 
 fs.writeFileSync(out, JSON.stringify(snapshot));

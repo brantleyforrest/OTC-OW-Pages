@@ -1,5 +1,6 @@
-// Test 2 Practice, Burn Trajectories (#burns). Chase starts at the target (x_C = y_C0 = C = 0) and
-// makes one burn straight up (+R), down (−R), forward (+I), or back (−I). The motion is drawn over
+// Test 2 Practice, Burn Trajectories (#burns). Chase starts at rest relative to the target, either at
+// the target or perched ahead of or behind it (x_C = C = 0), picked at random, and makes one burn
+// straight up (+R), down (−R), forward (+I), or back (−I). The motion is drawn over
 // two revs in the view from the left. The student draws it on paper, then shows the answer (the
 // motion in the view and in words) and checks the drawing against it; nothing is graded.
 // Topic types: 'random' or one burn ('+R', '-R', '+I', '-I').
@@ -21,7 +22,7 @@
         { value: '-I', html: '−I (back)', axis: 1, sign: -1 }
     ];
     const NAME = Object.fromEntries(BURNS.map(b => [b.value, b.html]));
-    const AT_TARGET = { xc: 0, yc0: 0, C: 0, M0: null, zmax: 0, dM0: null };
+    const perchAt = y0 => ({ xc: 0, yc0: y0, C: 0, M0: null, zmax: 0, dM0: null });
 
     // Burn sizes in m/s that give motions a few km across.
     function dvChoices(a) {
@@ -31,14 +32,25 @@
     }
 
     const dvVector = (burn, dvKmS) => { const v = [0, 0, 0]; v[burn.axis] = burn.sign * dvKmS; return v; };
-    const rmoeAfter = (burn, dvKmS, n) => M.rmoeFromState(M.applyBurn([0, 0, 0, 0, 0, 0], dvVector(burn, dvKmS)), n);
+    const rmoeAfter = (burn, dvKmS, n, y0 = 0) => M.rmoeFromState(M.applyBurn([0, y0, 0, 0, 0, 0], dvVector(burn, dvKmS)), n);
 
-    // What each burn does, in words.
+    // Where chase starts: at the target, or perched a round distance ahead or behind.
+    function pickStart(a) {
+        const where = C2.pick(['target', 'ahead', 'behind']);
+        if (where === 'target') return 0;
+        return (where === 'ahead' ? 1 : -1) * C2.stepIn(5, C2.sizesFor(a).y, 5);
+    }
+    function startText(y0) {
+        if (y0 === 0) return 'Chase starts at the target ($x_C = y_{C0} = C = 0$)';
+        return 'Chase is perched ' + C2.plain(Math.abs(y0), 2) + ' km ' + (y0 > 0 ? 'ahead of' : 'behind') + ' the target ($x_C = C = 0$, $y_{C0} = ' + C2.texNum(C2.plain(y0, 2)) + '$ km)';
+    }
+
+    // What each burn does, in words, from the burn point.
     const LOOK = {
-        '+R': 'a closed ellipse entirely behind the target; chase goes up first, swings back, and returns to the target each rev. No drift.',
-        '-R': 'a closed ellipse entirely ahead of the target; chase goes down first, swings forward, and returns to the target each rev. No drift.',
-        '+I': 'loops above the target that drift backward; each loop touches the target’s altitude once per rev, farther behind each time.',
-        '-I': 'loops below the target that drift forward; each loop touches the target’s altitude once per rev, farther ahead each time.'
+        '+R': 'a closed ellipse entirely behind the burn point; chase goes up first, swings back, and returns to the burn point each rev. No drift.',
+        '-R': 'a closed ellipse entirely ahead of the burn point; chase goes down first, swings forward, and returns to the burn point each rev. No drift.',
+        '+I': 'loops above the target’s altitude that drift backward; each loop touches that altitude once per rev, farther behind each time.',
+        '-I': 'loops below the target’s altitude that drift forward; each loop touches that altitude once per rev, farther ahead each time.'
     };
 
     function generate(type) {
@@ -47,26 +59,28 @@
         const dvMs = C2.pick(dvChoices(a));
         const dv = dvMs / 1000;
         const burn = BURNS.find(b => b.value === type) || C2.pick(BURNS);
-        const r = rmoeAfter(burn, dv, n);
+        const y0 = pickStart(a);
+        const r = rmoeAfter(burn, dv, n, y0);
         const radial = burn.axis === 0;
 
         const ms = v => C2.fixed(v * 1000, 4);
         const ruleHtml = radial
             ? calc('x_C = 4x_0 + \\frac{2\\dot y_0}{n}', [], '0') +
-              calc('y_{C0} = y_0 - \\frac{2\\dot x_0}{n}', ['-\\frac{2 \\times (' + C2.texNum(C2.plain(burn.sign * dvMs, 3)) + '/1000)}{' + sci(n) + '}'], C2.texNum(C2.fixed(r.yc0, 3)) + '\\ \\text{km}') +
+              calc('y_{C0} = y_0 - \\frac{2\\dot x_0}{n}', [(y0 ? C2.texNum(C2.plain(y0, 2)) + ' ' : '') + '-\\frac{2 \\times (' + C2.texNum(C2.plain(burn.sign * dvMs, 3)) + '/1000)}{' + sci(n) + '}'], C2.texNum(C2.fixed(r.yc0, 3)) + '\\ \\text{km}') +
               calc('C = \\frac{|\\dot x_0|}{n}', ['\\frac{' + C2.plain(dvMs, 3) + '/1000}{' + sci(n) + '}'], C2.fixed(r.C, 3) + '\\ \\text{km}') +
               rule('A radial burn moves the center forward or back and makes an ellipse, but leaves $x_C = 0$: no drift. ' +
-                  (burn.sign > 0 ? 'Up puts the center behind the target.' : 'Down puts the center ahead of the target.'))
+                  (burn.sign > 0 ? 'Up puts the center behind the burn point.' : 'Down puts the center ahead of the burn point.'))
             : calc('x_C = 4x_0 + \\frac{2\\dot y_0}{n}', ['\\frac{2 \\times (' + C2.texNum(C2.plain(burn.sign * dvMs, 3)) + '/1000)}{' + sci(n) + '}'], C2.texNum(C2.fixed(r.xc, 3)) + '\\ \\text{km}') +
+              calc('y_{C0} = y_0 - \\frac{2\\dot x_0}{n}', [], C2.texNum(C2.fixed(r.yc0, 3)) + '\\ \\text{km}') +
               calc('C = |x_C - x_0|', [], C2.fixed(r.C, 3) + '\\ \\text{km}') +
               calc('\\dot y_C = -\\tfrac{3}{2} n x_C = -3\\dot y_0', [], C2.texNum(ms(-1.5 * n * r.xc)) + '\\ \\text{m/s}') +
               rule('An in-track burn moves the center up or down, so it starts a drift. ' +
                   (burn.sign > 0 ? 'Forward raises the orbit: higher is slower, so chase drifts backward.' : 'Back lowers the orbit: lower is faster, so chase drifts forward.'));
 
         const steps = [
-            { key: 'given', title: 'Before the burn', result: 'at the target',
-              caption: 'Chase sits on the target with no relative motion until the burn.',
-              methods: [{ name: 'Start', html: rule('$x_C = y_{C0} = C = 0$: chase starts at the target. Right after the burn its velocity is the burn, $\\dot\\rho_0 = \\Delta V$.') }] },
+            { key: 'given', title: 'Before the burn', result: y0 === 0 ? 'at the target' : 'perched ' + (y0 > 0 ? 'ahead' : 'behind'),
+              caption: 'Chase sits still relative to the target until the burn.',
+              methods: [{ name: 'Start', html: rule(startText(y0) + ': no relative motion. Right after the burn its velocity is the burn, $\\dot\\rho_0 = \\Delta V$.') }] },
             { key: 'burn', title: radial ? 'What a radial burn does' : 'What an in-track burn does', result: NAME[burn.value],
               caption: 'The burn arrow shows the direction of the ΔV.',
               methods: [{ name: 'Rule', html: ruleHtml }] },
@@ -77,13 +91,13 @@
 
         return {
             type: burn.value,
-            model: { kind: 'rel', a, n, rmoe: r, revs: VZ.REVS, showStart: true, start: [0, 0, 0, 0, 0, 0], before: AT_TARGET, dv: dvVector(burn, dv), dvGiven: true },
+            model: { kind: 'rel', a, n, rmoe: r, revs: VZ.REVS, showStart: true, start: [0, y0, 0, 0, 0, 0], before: perchAt(y0), dv: dvVector(burn, dv), dvGiven: true },
             title: 'Burn Trajectories',
-            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. Chase starts at the target ($x_C = y_{C0} = C = 0$) and burns ' +
+            prompt: prose('The target is in a circular ' + C2.orbitName(a) + ' orbit with $a = ' + C2.plain(a, 2) + '$ km. ' + startText(y0) + ' and burns ' +
                 C2.plain(dvMs, 3) + ' m/s straight ' + { '+R': 'up (+R)', '-R': 'down (−R)', '+I': 'forward (+I)', '-I': 'back (−I)' }[burn.value] + '. Draw its motion over the next two revs.'),
             statement: '',
             overviewCaption: 'Chase at the target, with the burn arrow.',
-            limitsHtml: 'On paper, draw the view from the left (+R up, +I to the left) over two revs. Mark the target, draw an arrow for the ΔV and arrows for the way chase moves. Then show the answer and check your drawing against it.',
+            limitsHtml: 'On paper, draw the view from the left (+R up, +I to the left) over two revs. Mark the target and where chase starts, draw an arrow for the ΔV and arrows for the way chase moves. Then show the answer and check your drawing against it.',
             selfCheck: true,
             revealHtml: prose('<b>' + NAME[burn.value] + ':</b> ' + LOOK[burn.value] + ' ' + C2.reading(r, n, a)),
             fields: [],

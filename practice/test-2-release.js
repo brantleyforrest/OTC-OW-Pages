@@ -5,7 +5,7 @@
 // that is built. The Test 2 Practice card on the index shows to everyone as soon as this list
 // has one section in it; while it is empty, the card shows only in dev mode.
 //
-// To publish a section, add its key: 'coeric', 'vis-state', 'vis-rmoe', 'rmoe', 'state' or 'burns'.
+// To publish a section, add its key: 'coeric', 'vis-coe', 'vis-state', 'vis-rmoe', 'rmoe', 'state', 'later' or 'burns'.
 window.Test2Release = {
     published: []
 };

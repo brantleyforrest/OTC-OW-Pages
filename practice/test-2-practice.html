@@ -105,24 +105,36 @@
         }
 
         .mode-row .segmented { flex: 1 1 12rem; }
-        .mode-caption { margin: 0.4rem 0 0.7rem; }
 
         /* Section: R-V, maneuver or rendezvous problems. Each has its own kinds of problem.
            On a phone, a long section name wraps to two lines instead of being cut off. */
-        .sections { margin: 0; }
+        /* Eight sections: two rows of four, or four rows of two on a phone. */
+        .sections {
+            margin: 0.8rem 0 0;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.3rem;
+        }
         .sections button {
-            flex: 1 1 0;
-            padding: 0.5rem 0.4rem;
-            font-size: 0.86rem;
+            padding: 0.6rem 0.6rem;
+            font-size: 0.88rem;
             font-weight: 600;
-            line-height: 1.25;
+            line-height: 1.3;
             white-space: normal;
         }
-
-        /* On a phone the six sections wrap into rows of three. */
         @media (max-width: 640px) {
-            .sections { flex-wrap: wrap; }
-            .sections button { flex: 1 1 30%; }
+            .sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        /* Extra sections (beyond the six test topics): a gold tag under the name and a gold edge. */
+        .sections button.extra { border-left: 3px solid var(--accent-gold); }
+        .extra-tag {
+            display: block;
+            margin-top: 0.2rem;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent-gold);
         }
 
         /* Dev version only: a section that is not published yet gets a dashed outline. */
@@ -507,8 +519,6 @@
                             </div>
                             <button type="button" class="btn" id="new-problem">New Problem</button>
                         </div>
-                        <p class="ctl-caption mode-caption" id="mode-caption"></p>
-                        <p class="ctl-caption course-note">Course material: course constants, two-body motion, and CW, whatever the model settings.</p>
                         <div class="segmented sections" id="section" role="group" aria-label="Choose a section"></div>
                         <div class="segmented topics" id="topic" role="group" aria-label="Choose a kind of problem"></div>
                     </div>

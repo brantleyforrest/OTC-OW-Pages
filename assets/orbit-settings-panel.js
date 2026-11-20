@@ -376,6 +376,7 @@
     function open() {
         lastFocus = document.activeElement;
         overlay.hidden = false;
+        document.documentElement.classList.add('orbit-settings-open');
         statusEl.textContent = '';
         q('.orbit-settings-link').hidden = true;
         render();
@@ -384,6 +385,7 @@
     }
     function close() {
         overlay.hidden = true;
+        document.documentElement.classList.remove('orbit-settings-open');
         if (lastFocus && lastFocus.focus) lastFocus.focus();
     }
 
