@@ -19,14 +19,15 @@
     const sci = v => { const [m, e] = v.toExponential(4).split('e'); return m + '\\times10^{' + Number(e) + '}'; };
     const deg1 = v => C2.fixed(v, 1) + '°';
 
-    // Round RMOEs. corners: M_0 and ΔM_0 at multiples of 90° (for boundary-table problems).
+    // Round RMOEs, as in the homework: whole or half km, and M_0 and ΔM_0 on a corner (0°, 90°,
+    // 180° or 270°). corners: almost always an NMC (for boundary-table problems).
     function pickRmoe(a, corners) {
         const s = C2.sizesFor(a);
         const xc = C2.chance(0.25) ? 0 : C2.sign() * C2.halfKm(0.5, s.xc);
         const yc0 = C2.chance(0.15) ? 0 : C2.halfKm(-s.y, s.y);
         const C = C2.chance(corners ? 0.05 : 0.12) ? 0 : C2.halfKm(0.5, s.C);
         const zmax = C2.chance(0.2) ? 0 : C2.halfKm(0.5, s.C);
-        const angle = () => (corners ? 90 * C2.randInt(0, 3) : C2.stepIn(0, 355, 5));
+        const angle = () => 90 * C2.randInt(0, 3);
         return { xc, yc0, C, M0: C > 0 ? angle() : null, zmax, dM0: zmax > 0 ? angle() : null };
     }
     // The given state, rounded the way it is shown.

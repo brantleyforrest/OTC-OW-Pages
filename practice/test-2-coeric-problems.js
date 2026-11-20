@@ -15,7 +15,8 @@
 
     const p = (v, d) => { const s = C2.fixed(v, d); return s.startsWith('-') ? '(' + s + ')' : s; };
     const sci = v => { const [m, e] = v.toExponential(4).split('e'); return m + '\\times10^{' + Number(e) + '}'; };
-    const LEO_I = [28.5, 45, 51.6, 63.4, 90];
+    const TARGET_A = 6900;
+    const TARGET_I = [90, 90, 45];
     const ROWS = [['a', 'a', 'km', v => C2.plain(v, 2)], ['e', 'e', '', v => C2.plain(v, 7)], ['i', 'i', '°', v => C2.plain(v, 4)],
         ['raan', '\\Omega', '°', v => C2.plain(v, 4)], ['argp', '\\omega', '°', v => C2.plain(v, 4)], ['nu', '\\nu', '°', v => C2.plain(v, 4)]];
 
@@ -28,14 +29,14 @@
         return '<div class="given-item given-wide"><table class="el-given"><thead><tr><th></th><th>Target</th><th>Chase</th></tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
-    // Which differences: in-plane (a and/or e), cross (i or Ω, sometimes with a), or both.
+    // Which differences, never more than two elements (as in the homework): in-plane (a, e, or
+    // both), cross (i or Ω alone), or both (a or e, with i or Ω).
     function pickDiffs(type) {
         const t = type === 'in-plane' || type === 'cross' || type === 'both' ? type : C2.pick(['in-plane', 'cross', 'both']);
-        const inPlane = () => C2.pick([['a'], ['e'], ['a', 'e'], ['a', 'e']]);
         const cross = () => [C2.chance(0.6) ? 'i' : 'raan'];
-        if (t === 'in-plane') return { type: t, diffs: inPlane() };
-        if (t === 'cross') return { type: t, diffs: cross().concat(C2.chance(0.4) ? ['a'] : []) };
-        return { type: t, diffs: inPlane().concat(cross()) };
+        if (t === 'in-plane') return { type: t, diffs: C2.pick([['a'], ['e'], ['a', 'e'], ['a', 'e']]) };
+        if (t === 'cross') return { type: t, diffs: cross() };
+        return { type: t, diffs: [C2.pick(['a', 'e'])].concat(cross()) };
     }
 
     // Where the exact difference of the two orbits falls outside a numeric tolerance of the linear
@@ -59,18 +60,12 @@
         const pick = pickDiffs(type);
         const diffs = pick.diffs;
         const node = diffs.includes('raan');
-        let a = C2.pickTargetA();
-        if (node && a > 40000) a = C2.pick([6517.16, 6750, 6900, 7000, 26562]);   // GEO is equatorial: Ω means nothing there
+        // The target the homework always uses: 6900 km, polar or 45°, Ω = 45°. A node difference
+        // needs the polar target, where it moves no point along the track.
+        const a = TARGET_A;
         const n = M.meanMotion(a);
-        const geo = a > 40000;
-        const s = C2.sizesFor(a);
         const nu = diffs.includes('e') ? C2.pick([0, 180]) : C2.pick([0, 90, 180, 270]);
-        const target = {
-            a, e: 0,
-            i: node ? 90 : geo ? 0 : a > 20000 ? 55 : C2.pick(LEO_I),
-            raan: geo ? 0 : C2.stepIn(0, 355, 5),
-            argp: 0, nu
-        };
+        const target = { a, e: 0, i: node ? 90 : C2.pick(TARGET_I), raan: 45, argp: 0, nu };
         // Differences the size the homework uses (there: a by 10 km, e = 0.0015, i or Ω by 0.1°):
         // a by 5 to 20 km, e from 0.001 to 0.002, an angle by 0.1° to 0.5°. Chase's perigee must
         // stay at least 200 km above Earth.

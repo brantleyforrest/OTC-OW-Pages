@@ -27,11 +27,11 @@
     }
 
     // Round RMOEs that give exactly the motion named. Angles sit on a corner of the NMC or the
-    // swing most of the time (as in the homework), otherwise on any 5° step.
+    // swing (0°, 90°, 180° or 270°), as in the homework.
     function pickRmoe(key, a) {
         const s = C2.sizesFor(a);
         const parts = VZ.PARTS[key];
-        const angle = () => (C2.chance(0.7) ? 90 * C2.randInt(0, 3) : C2.stepIn(0, 355, 5));
+        const angle = () => 90 * C2.randInt(0, 3);
         const xc = parts.includes('D') ? C2.sign() * C2.halfKm(0.5, s.xc) : 0;
         const C = parts.includes('E') ? C2.halfKm(1, s.C) : 0;
         const zmax = parts.includes('Z') ? C2.halfKm(1, s.C) : 0;
