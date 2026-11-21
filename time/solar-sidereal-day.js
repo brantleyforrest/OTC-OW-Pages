@@ -4,7 +4,7 @@
 
     /* ================================================================== */
     /* EARTH ROTATION MATH                                                */
-    /* In ../assets/orbit-math.js, section earthRotation.                 */
+    /* In ../math/orbit-math.js, section earthRotation.                 */
     /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
     const OM = window.OrbitMath;   // its sections follow the constants setting

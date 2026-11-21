@@ -4,7 +4,7 @@
 // the J2 secular node rate, drag lowering a, and the work budget for animation.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../assets/orbit-math.js');
+const OM = require('../math/orbit-math.js');
 const OC = globalThis.OrbitConstants;
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = OC.SETS[process.env.CONSTANTS || 'course'];
@@ -154,6 +154,20 @@ check('budget: 5 LEO orbits sampled with every force on in under 50 ms per satel
     times.sort((x, y) => x - y);
     console.log(`      median ${times[2].toFixed(1)} ms (runs: ${times.map((x) => x.toFixed(1)).join(', ')})`);
     assert.ok(times[2] < 50, `median ${times[2].toFixed(1)} ms`);
+});
+
+check('Frame Observatory: the RIC axes follow the drawn target with Cowell and J2 on', () => {
+    S.set({ propagator: 'cowell', forces: { j2: true } });
+    const Fr = OM.frames, D2R = Math.PI / 180;
+    const s = Fr.makeScenario({ radius: 7000, inclination: 51.6 * D2R, raan: 30 * D2R, startAngle: 0,
+        separation: 20, tiltOffset: 0.2 * D2R, siteLongitude: 0 });
+    for (const t of [0, 5400, 86400]) {
+        const r = Fr.positionEci(s.target, t), b = Fr.ricBasis(s, t);
+        const along = (r[0] * b.R[0] + r[1] * b.R[1] + r[2] * b.R[2]) / Math.hypot(...r);
+        assert.ok(1 - along < 1e-12, `R axis off the target by ${Math.acos(Math.min(1, along)) / D2R} deg at t = ${t} s`);
+        const own = Fr.coordinates('RIC', r, t, s);
+        assert.ok(Math.hypot(...own) < 1e-9, 'target not at the RIC origin');
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

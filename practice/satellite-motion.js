@@ -86,7 +86,7 @@
         };
     }
 
-    // Kepler's equation that keeps whole turns: practice/test-review-math.js, section motion.
+    // Kepler's equation that keeps whole turns: math/test-review-math.js, section motion.
     const { trueFromMean, meanFromTrue } = global.TestReviewMath.motion;
 
     // How far along a curve, by length, the curve's own parameter t is. A tube is drawn by

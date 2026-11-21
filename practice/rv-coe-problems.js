@@ -12,7 +12,7 @@
 
     const { math, prose, column, calc, note, rule } = global.PracticeMath;
 
-    // Solving a state vector is course math: practice/test-review-math.js, section rvCoe.
+    // Solving a state vector is course math: math/test-review-math.js, section rvCoe.
     const RV = global.TestReviewMath.rvCoe;
     const { MU, R_EARTH } = RV;
     const R2D = 180 / Math.PI;

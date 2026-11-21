@@ -4,7 +4,7 @@
 (async function () {
     'use strict';
 
-    // Math from ../assets/orbit-math.js (section frames), on the constants the site's settings choose.
+    // Math from ../math/orbit-math.js (section frames), on the constants the site's settings choose.
     let FM = window.OrbitMath.frames;
     // Read the math again after the constants setting changes.
     function rebindMath() { FM = window.OrbitMath.frames; ({ RE, D2R } = FM); }

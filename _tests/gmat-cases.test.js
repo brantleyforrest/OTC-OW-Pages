@@ -19,7 +19,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 globalThis.window = globalThis;
-const OM = require('../assets/orbit-math.js');
+const OM = require('../math/orbit-math.js');
 const OC = globalThis.OrbitConstants;
 const S = OC.Settings;
 const P = OM.propagate, EL = OM.elements;

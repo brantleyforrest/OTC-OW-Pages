@@ -8,13 +8,13 @@
 //     3rd Body   GEO inclination grows     GEO
 //     SRP        GEO eccentricity cycles   GEO
 //
-// All physics is in ../assets/orbit-math.js (section perturbation). This file only draws it.
+// All physics is in ../math/orbit-math.js (section perturbation). This file only draws it.
 (async function () {
     'use strict';
 
     const $ = (id) => document.getElementById(id);
     const Kit = window.ToolKit;
-    // Physics from ../assets/orbit-math.js (section perturbation), on the constants the site's
+    // Physics from ../math/orbit-math.js (section perturbation), on the constants the site's
     // settings choose.
     let M = window.OrbitMath.perturbation;
     // Read the math again after the constants setting changes.

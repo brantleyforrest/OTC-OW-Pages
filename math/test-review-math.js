@@ -1,7 +1,7 @@
 // test-review-math.js
 // The math behind Test 1 and Test 2 Practice, written as the course teaches it. Numbers come from
-// assets/orbit-constants.js. This file has its own copy of every equation and never calls
-// assets/orbit-math.js, so the tests can check the two against each other; the practice pages
+// math/orbit-constants.js. This file has its own copy of every equation and never calls
+// math/orbit-math.js, so the tests can check the two against each other; the practice pages
 // ignore the site's settings (constants, propagator, RIC model) and always use the course material.
 //
 // Sections
@@ -22,9 +22,9 @@
     'use strict';
 
     const OC = (typeof module !== 'undefined' && module.exports)
-        ? require('../assets/orbit-constants.js')
+        ? require('./orbit-constants.js')
         : global.OrbitConstants;
-    if (!OC) throw new Error('test-review-math.js: load assets/orbit-constants.js first');
+    if (!OC) throw new Error('test-review-math.js: load math/orbit-constants.js first');
 
     function build(constants) {
         const C = Object.freeze({ ...OC.SETS.course, ...constants });

@@ -1,7 +1,7 @@
 // orbit-math.js
-// Every orbital formula the site's tools use. Numbers come from assets/orbit-constants.js; nothing
+// Every orbital formula the site's tools use. Numbers come from math/orbit-constants.js; nothing
 // here declares a physical constant of its own. Test 1 and Test 2 Practice use their own copy of the
-// course equations (practice/test-review-math.js), and tests check the two files against each other.
+// course equations (math/test-review-math.js), and tests check the two files against each other.
 //
 // build(C) returns every section bound to one constant set C (course or WGS-84, see orbit-constants
 // section 1). bind(C) does the same but keeps one copy per set. The sections on OrbitMath itself
@@ -39,7 +39,7 @@
     const OC = (typeof module !== 'undefined' && module.exports)
         ? require('./orbit-constants.js')
         : global.OrbitConstants;
-    if (!OC) throw new Error('orbit-math.js: load assets/orbit-constants.js first');
+    if (!OC) throw new Error('orbit-math.js: load math/orbit-constants.js first');
 
     // The start time pages use when none is set: the computer clock, read once when this file loads.
     const LOAD_TIME_MS = Date.now();
@@ -1579,7 +1579,7 @@
         // Radius at which one orbit takes exactly one Earth rotation.
         const GEO_RADIUS = Math.cbrt(MU / (OMEGA_E * OMEGA_E));
 
-        const { dot, cross } = V;
+        const { dot, cross, unit } = V;
 
         function earthAngle(t) {
             return OMEGA_E * t;
@@ -1644,15 +1644,13 @@
             ];
         }
 
-        // RIC unit vectors, in ECI, at time t.
+        // RIC unit vectors, in ECI, at time t, from the target's own r and v (so they follow it with
+        // either propagator): R along r, C along r x v, I = C x R.
         function ricBasis(s, t) {
-            const el = s.target;
-            const u = el.M0 + el.n * t;
-            const cu = Math.cos(u), su = Math.sin(u);
-            const R = [cu * el.P[0] + su * el.Q[0], cu * el.P[1] + su * el.Q[1], cu * el.P[2] + su * el.Q[2]];
-            const I = [-su * el.P[0] + cu * el.Q[0], -su * el.P[1] + cu * el.Q[1], -su * el.P[2] + cu * el.Q[2]];
-            const C = cross(R, I);
-            return { R, I, C };
+            const st = PR.stateAt(s.target.sat, t);
+            const R = unit(st.r);
+            const C = unit(cross(st.r, st.v));
+            return { R, I: cross(C, R), C };
         }
 
         // Coordinates of an ECI position in a frame, in the order the frame names them:

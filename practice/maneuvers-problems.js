@@ -14,7 +14,7 @@
 
     const { math, prose, column, calc, note, rule } = global.PracticeMath;
 
-    // The solvers are course math: practice/test-review-math.js, section maneuver.
+    // The solvers are course math: math/test-review-math.js, section maneuver.
     const MAN = global.TestReviewMath.maneuver;
     const { MU, R_EARTH, solveHohmann, solveInclinationChange, solvePolarRaanChange, solveCombined } = MAN;
     const GEO = global.OrbitConstants.LESSON.rGeo;

@@ -9,7 +9,7 @@
 
     /* ================================================================== */
     /* MANEUVER MATH                                                      */
-    /* In ../assets/orbit-math.js, section maneuver.                      */
+    /* In ../math/orbit-math.js, section maneuver.                      */
     /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
     const OM = window.OrbitMath;   // its sections follow the constants setting

@@ -3,18 +3,18 @@
 // Perturbations, Sun-Synchronous, Ground Track, Reference Frame Observatory, Solar vs. Sidereal
 // Day) against published values and against the same physics worked again here by another
 // route (bisection for Kepler's equation, velocity vectors for plane changes, flying a plan to
-// see that the spacecraft meet). The page math lives in assets/orbit-math.js and is checked there,
+// see that the spacecraft meet). The page math lives in math/orbit-math.js and is checked there,
 // bound to the constants each page uses.
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 globalThis.window = globalThis;
 const ROOT = path.join(__dirname, '..');
-const OM = require('../assets/orbit-math.js');
+const OM = require('../math/orbit-math.js');
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
 if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);
-const TRM = require('../practice/test-review-math.js');
+const TRM = require('../math/test-review-math.js');
 const OC = globalThis.OrbitConstants;
 // Each section bound to the constants its page uses until the constants setting arrives.
 const OMW = OM.bind(TEST_SET);
@@ -116,15 +116,16 @@ function keplerPropagate(r0, v0, dt, mu) {
 /* ------------------------------------------------------------------ */
 /* Constants                                                          */
 /* ------------------------------------------------------------------ */
-check('constants: no orbital constant is written anywhere but assets/orbit-constants.js', () => {
+check('constants: no orbital constant is written anywhere but math/orbit-constants.js', () => {
     // Named constants given a number, and the numbers themselves, wherever they appear in code.
     const named = /const (MU|LESSON_MU|RE|R_E|R_EARTH|LESSON_R_EARTH|J2|J22|LON22|OMEGA_E|G0|GEO_A|R_GEO)\s*=\s*-?[0-9.]+(?:e-?\d+)?\s*[;,]/g;
     const literal = /(?<![\w.])(398600\.4\d*|6378(?:\.\d+)?|1\.0826\d*e-3|7\.2921\d*e-5|9\.81|9\.80665|42164(?:\.\d+)?)(?![\w.])/g;
     const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/.*$/gm, '$1');
     const problems = [];
-    for (const dir of ['orbits', 'frames', 'time', 'rpo', 'practice', 'assets']) {
+    for (const dir of ['orbits', 'frames', 'time', 'rpo', 'practice', 'assets', 'math']) {
         for (const file of fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith('.js'))) {
-            if (dir === 'assets' && (file === 'orbit-constants.js' || file === 'vendor.js' || file.startsWith('earth-land'))) continue;
+            if (dir === 'math' && file === 'orbit-constants.js') continue;
+            if (dir === 'assets' && (file === 'vendor.js' || file.startsWith('earth-land'))) continue;
             const code = stripComments(source(`${dir}/${file}`));
             for (const m of code.matchAll(named)) problems.push(`${dir}/${file}: ${m[0]}`);
             for (const m of code.matchAll(literal)) problems.push(`${dir}/${file}: ${m[1]}`);
@@ -138,11 +139,11 @@ check('constants: no orbital constant is written anywhere but assets/orbit-const
 /* ------------------------------------------------------------------ */
 check("Kepler's equation: every solver agrees with bisection for e up to 0.9", () => {
     const solvers = {
-        'assets/orbit-math.js kepler.solve': OM.kepler.solve,
-        'assets/orbit-math.js rpo.keplerE': Rpo.keplerE,
-        'assets/orbit-math.js perturbation.solveKepler': PM.solveKepler,
-        'practice/test-review-math.js groundTrack.solveKepler': TRM.groundTrack.solveKepler,
-        'practice/test-review-math.js kepler.solve': TRM.kepler.solve
+        'math/orbit-math.js kepler.solve': OM.kepler.solve,
+        'math/orbit-math.js rpo.keplerE': Rpo.keplerE,
+        'math/orbit-math.js perturbation.solveKepler': PM.solveKepler,
+        'math/test-review-math.js groundTrack.solveKepler': TRM.groundTrack.solveKepler,
+        'math/test-review-math.js kepler.solve': TRM.kepler.solve
     };
     for (const [name, solve] of Object.entries(solvers)) {
         for (const e of [0, 0.01, 0.3, 0.6, 0.75, 0.8, 0.85, 0.9]) {

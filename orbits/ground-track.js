@@ -8,7 +8,7 @@
 
     /* ================================================================== */
     /* ORBIT MATH                                                         */
-    /* In ../assets/orbit-math.js, section groundTrack.                   */
+    /* In ../math/orbit-math.js, section groundTrack.                   */
     /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
     const OM = window.OrbitMath;   // its sections follow the constants setting

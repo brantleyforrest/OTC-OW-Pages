@@ -1,3 +1,6 @@
+# Local Claude Code settings (never commit)
+.claude/
+
 # Ignore all Markdown files except README.md
 *.md
 !README.md

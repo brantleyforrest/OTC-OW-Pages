@@ -8,14 +8,14 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
-    // Relative-motion math from ../assets/orbit-math.js (section rpo), on the constants the site's
+    // Relative-motion math from ../math/orbit-math.js (section rpo), on the constants the site's
     // settings choose. RpoViews reads OrbitMath.rpo itself.
     const Kit = window.ToolKit, V = window.RpoViews;
     let M = window.OrbitMath.rpo;
 
     /* ================================================================== */
     /* RELATIVE MOTION MATH                                               */
-    /* In ../assets/orbit-math.js, section burns.                         */
+    /* In ../math/orbit-math.js, section burns.                         */
     /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
     const OM = window.OrbitMath;   // its sections follow the constants setting

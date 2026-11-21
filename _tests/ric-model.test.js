@@ -4,7 +4,7 @@
 // separations, geometry (a co-orbital chase keeps a fixed arc), and the axis round trip.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../assets/orbit-math.js');
+const OM = require('../math/orbit-math.js');
 const OC = globalThis.OrbitConstants;
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = OC.SETS[process.env.CONSTANTS || 'course'];

@@ -19,7 +19,7 @@
     const Rendezvous = global.Test1RendezvousProblems;
     const { math, prose, calc, note, rule } = global.PracticeMath;
 
-    // Ground-track math is course math: practice/test-review-math.js, section groundTrack.
+    // Ground-track math is course math: math/test-review-math.js, section groundTrack.
     const GT = global.TestReviewMath.groundTrack;
     const { MU, R_EARTH, EARTH_DEG_PER_HOUR, eccentricityFor, solveKepler, meanFromTrue, trackPoint, timeAtU } = GT;
     const D2R = Math.PI / 180;

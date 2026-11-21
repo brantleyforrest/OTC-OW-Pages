@@ -9,7 +9,7 @@
 
     /* ================================================================== */
     /* ORBIT MATH                                                         */
-    /* In ../assets/orbit-math.js, section coe.                           */
+    /* In ../math/orbit-math.js, section coe.                           */
     /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
     const OM = window.OrbitMath;   // its sections follow the constants setting

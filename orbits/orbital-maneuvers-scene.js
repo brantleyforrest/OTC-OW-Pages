@@ -11,7 +11,7 @@
 
     /* ================================================================== */
     /* ORBIT GEOMETRY MATH                                                */
-    /* In ../assets/orbit-math.js, section maneuverGeometry.              */
+    /* In ../math/orbit-math.js, section maneuverGeometry.              */
     /* Geometry only: no constants.                                       */
     /* ================================================================== */
     const OM = window.OrbitMath;

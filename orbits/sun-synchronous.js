@@ -5,7 +5,7 @@
 
     /* ================================================================== */
     /* ORBIT MATH                                                         */
-    /* In ../assets/orbit-math.js, section sunSync.                       */
+    /* In ../math/orbit-math.js, section sunSync.                       */
     /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
     const OM = window.OrbitMath;   // its sections follow the constants setting

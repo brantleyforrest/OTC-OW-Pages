@@ -1,5 +1,5 @@
 // Run with: node _tests/settings.test.js
-// The settings store (assets/orbit-constants.js), OrbitMath following it, and the share-link
+// The settings store (math/orbit-constants.js), OrbitMath following it, and the share-link
 // encoding (assets/orbit-settings-panel.js).
 const assert = require('node:assert');
 
@@ -15,8 +15,8 @@ Object.defineProperty(globalThis, 'localStorage', {
         removeItem: (k) => stored.delete(k)
     }
 });
-const OC = require('../assets/orbit-constants.js');
-const OM = require('../assets/orbit-math.js');
+const OC = require('../math/orbit-constants.js');
+const OM = require('../math/orbit-math.js');
 delete globalThis.document;   // the panel file loads its encoding only, as in Node
 const Panel = require('../assets/orbit-settings-panel.js');
 globalThis.document = { createElement() { return {}; } };

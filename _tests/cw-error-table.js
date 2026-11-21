@@ -7,7 +7,7 @@
 // chase gets from the target, as a share of the target's semi-major axis.
 // Not a test (no pass or fail); the numbers come from OrbitMath, the same code the pages run.
 globalThis.window = globalThis;
-const OM = require('../assets/orbit-math.js');
+const OM = require('../math/orbit-math.js');
 const OC = globalThis.OrbitConstants;
 const SET = OC.SETS[process.env.CONSTANTS || 'course'];
 if (!SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);

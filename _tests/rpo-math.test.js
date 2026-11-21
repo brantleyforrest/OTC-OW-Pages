@@ -2,7 +2,7 @@
 // Checks the relative-motion math (orbit-math.js, section rpo) against values that were worked out and verified separately.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../assets/orbit-math.js');
+const OM = require('../math/orbit-math.js');
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
 if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);

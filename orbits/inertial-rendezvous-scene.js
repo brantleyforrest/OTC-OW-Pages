@@ -9,7 +9,7 @@
 
     /* ================================================================== */
     /* ORBIT GEOMETRY MATH                                                */
-    /* In ../assets/orbit-math.js, section rendezvousGeometry.            */
+    /* In ../math/orbit-math.js, section rendezvousGeometry.            */
     /* Geometry only: no constants.                                       */
     /* ================================================================== */
     // Test 1 Practice loads test-review-math.js instead of orbit-math.js.

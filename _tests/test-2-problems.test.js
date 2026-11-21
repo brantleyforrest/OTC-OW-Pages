@@ -2,7 +2,7 @@
 // Generates 200 problems per Test 2 Practice section and checks each answer independently.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const M = require('../practice/test-review-math.js').rpo;
+const M = require('../math/test-review-math.js').rpo;
 // PracticeMath runs without KaTeX: math is shown as its TeX source.
 require('../practice/practice-math.js');
 require('../practice/test-2-common.js');
@@ -139,7 +139,7 @@ check(`COE to RIC Signs: ${COUNT} problems, signs from the linear mapping by han
 // (OrbitMath, course set): every value the exact answer would put outside the numeric tolerance
 // must be explained in the solution. Reports how often and by how much.
 check('COE to RIC Signs: the exact answer departs beyond tolerance only where the solution says so', () => {
-    const OM = require('../assets/orbit-math.js');
+    const OM = require('../math/orbit-math.js');
     const O = OM.bind(globalThis.OrbitConstants.SETS.course).rpo;
     const C2 = globalThis.Test2Common;
     let off = 0, total = 0, worst = 0, flips = 0;

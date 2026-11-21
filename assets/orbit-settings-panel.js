@@ -52,7 +52,7 @@
     if (typeof document === 'undefined') return;   // Node: the encoding only
 
     const OC = global.OrbitConstants;
-    if (!OC) throw new Error('orbit-settings-panel.js: load assets/orbit-constants.js first');
+    if (!OC) throw new Error('orbit-settings-panel.js: load math/orbit-constants.js first');
     const S = OC.Settings;
     // The home page's Settings button. With it, the panel sets the site's settings with no tool open.
     const SITE_BUTTON = document.querySelector('[data-orbit-settings]');

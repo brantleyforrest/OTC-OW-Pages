@@ -7,8 +7,8 @@
 // equations. Every answer must also grade right as given and as shown, and wrong when off.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-require('../assets/orbit-constants.js');
-require('../practice/test-review-math.js');
+require('../math/orbit-constants.js');
+require('../math/test-review-math.js');
 require('../practice/answer-check.js');
 require('../practice/practice-math.js');
 require('../practice/rv-coe-problems.js');
@@ -36,7 +36,7 @@ Math.random = () => {
 };
 
 const COUNT = 200;
-// The course constants, which Test 1 Practice always uses (assets/orbit-constants.js).
+// The course constants, which Test 1 Practice always uses (math/orbit-constants.js).
 const { mu: MU, re: R_EARTH } = globalThis.OrbitConstants.SETS.course;
 const G0 = 9.81;
 const D2R = Math.PI / 180;

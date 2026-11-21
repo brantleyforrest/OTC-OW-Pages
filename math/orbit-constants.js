@@ -1,6 +1,6 @@
 // orbit-constants.js
 // Every number the site's orbital math uses, in one place, each with its source.
-// Formulas live in assets/orbit-math.js (tools) and practice/test-review-math.js (Test 1 and Test 2
+// Formulas live in math/orbit-math.js (tools) and math/test-review-math.js (Test 1 and Test 2
 // Practice). Neither file declares a physical constant of its own.
 //
 // Contents

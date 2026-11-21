@@ -4,7 +4,7 @@
 // solution, energy and angular momentum conservation with J2, and the J2 secular node rate.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../assets/orbit-math.js');
+const OM = require('../math/orbit-math.js');
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
 if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);

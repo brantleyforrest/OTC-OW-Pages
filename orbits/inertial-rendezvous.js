@@ -10,7 +10,7 @@
 
     /* ================================================================== */
     /* RENDEZVOUS MATH                                                    */
-    /* In ../assets/orbit-math.js, section rendezvousPlan.                */
+    /* In ../math/orbit-math.js, section rendezvousPlan.                */
     /* Constants follow the site settings (orbit-settings-panel.js).      */
     /* ================================================================== */
     const OM = window.OrbitMath;   // its sections follow the constants setting
