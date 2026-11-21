@@ -445,21 +445,30 @@
     earthPivot.add(planes.ECEF.group);
     ricGroup.add(planes.RIC.group);
 
-    /* A faint ring for the target's orbit, shown in the RIC inset */
+    /* A faint ring for the target's orbit, shown in the RIC view and its inset */
+    const RING_POINTS = 360;
     const orbitRing = new THREE.LineLoop(
-        new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(180 * 3), 3)),
+        new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(RING_POINTS * 3), 3)),
         new THREE.LineBasicMaterial({ color: TARGET_COLOR, transparent: true, opacity: 0 })
     );
     orbitRing.frustumCulled = false;
     root.add(orbitRing);
 
-    function updateOrbitRing() {
+    // The ring is sampled from the target's current position, one period ahead, and stored
+    // relative to the target. A corner of the polygon therefore always sits on the target, so
+    // the line through the target holds still in the close RIC view instead of wobbling as the
+    // target passes between fixed corners.
+    function updateOrbitRing(t = state.t) {
         const arr = orbitRing.geometry.attributes.position.array;
-        const n = scenario.target.n;
-        for (let i = 0; i < 180; i++) {
-            const p = FM.positionEci(scenario.target, (i / 180) * 2 * Math.PI / n);
-            arr.set([p[0] / RE, p[1] / RE, p[2] / RE], i * 3);
+        const period = 2 * Math.PI / scenario.target.n;
+        const o = FM.positionEci(scenario.target, t);
+        for (let i = 0; i < RING_POINTS; i++) {
+            const p = i === 0 ? o : FM.positionEci(scenario.target, t + (i / RING_POINTS) * period);
+            arr[i * 3] = (p[0] - o[0]) / RE;
+            arr[i * 3 + 1] = (p[1] - o[1]) / RE;
+            arr[i * 3 + 2] = (p[2] - o[2]) / RE;
         }
+        orbitRing.position.set(o[0] / RE, o[1] / RE, o[2] / RE);
         orbitRing.geometry.attributes.position.needsUpdate = true;
     }
 
@@ -584,20 +593,34 @@
         }
     }
 
-    // The path during a change between ECI and ECEF. Each sample turns about the spin axis
-    // by a share of Earth's rotation since that sample, then with the scene. The newest point
-    // therefore stays on the spacecraft, and every point keeps its distance from Earth.
-    function computeSpinMorph(elementsObj, t, share, sceneQuaternion, out) {
+    // The path during a change of frame. A path drawn in a rotating frame is the inertial path
+    // with each sample turned back by the frame's rotation since that sample was taken.
+    // spin: share of Earth's rotation (about the spin axis), 0 for ECI and 1 for ECEF.
+    // wind: share of the target's orbital motion (about the RIC cross-track axis), 0 for an
+    // inertial picture and 1 for RIC. For a circular target this turns the target's own
+    // samples onto the target, and the other spacecraft's samples onto its RIC path.
+    // The result is then placed with the scene's current transform, so the newest point always
+    // stays on the spacecraft.
+    const ricAxis = new THREE.Vector3();
+    const ricTurn = new THREE.Quaternion();
+    function computeFrameMorph(elementsObj, t, spin, wind, out) {
         const win = currentTrailWindow();
         const n = TRAIL_POINTS;
         const now = FM.earthAngle(t);
+        const C = FM.ricBasis(scenario, t).C;
+        ricAxis.set(C[0], C[1], C[2]);
+        const rate = scenario.target.n;
         for (let i = 0; i < n; i++) {
             const tk = t - win * (1 - i / (n - 1));
             const p = FM.positionEci(elementsObj, tk);
-            const angle = share * (now - FM.earthAngle(tk));
+            const angle = spin * (now - FM.earthAngle(tk));
             const c = Math.cos(angle), s = Math.sin(angle);
             morphPoint.set((c * p[0] - s * p[1]) / RE, (s * p[0] + c * p[1]) / RE, p[2] / RE);
-            morphPoint.applyQuaternion(sceneQuaternion);
+            if (wind > 0) {
+                ricTurn.setFromAxisAngle(ricAxis, wind * rate * (t - tk));
+                morphPoint.applyQuaternion(ricTurn);
+            }
+            morphPoint.applyQuaternion(root.quaternion).add(root.position);
             out[i * 3] = morphPoint.x;
             out[i * 3 + 1] = morphPoint.y;
             out[i * 3 + 2] = morphPoint.z;
@@ -637,10 +660,14 @@
     /* ------------------------------------------------------------------ */
 
     const TRANSITION = 1.5; // seconds
+    const RIC_TRANSITION = 2.4; // seconds, for a change into or out of RIC
     const FRAME_KEYS = ['ECI', 'ECEF', 'RIC'];
 
     const blend = {
         s: 1,
+        duration: TRANSITION,
+        staged: false,
+        fromFrame: 'ECI',
         fromQ: new THREE.Quaternion(),
         fromP: new THREE.Vector3(),
         weights: { ECI: 1, ECEF: 0, RIC: 0 },
@@ -690,15 +717,25 @@
         camFrom.el = cam.el;
         camFrom.logDist = cam.logDist;
         blend.s = 0;
-        blend.spinMorph = false;
+        blend.duration = TRANSITION;
+        blend.staged = false;
         for (const item of labels) item.width = 0;
     }
 
+    // A change of frame from a settled view is choreographed:
+    //   into RIC:  center on the target, then zoom in, while the scene turns and the paths
+    //              wind up into relative motion;
+    //   out of RIC: zoom out, then let the center go, while the scene turns and the paths
+    //              unwind back to the Earth-centered picture.
+    //   ECI <-> ECEF: the paths spin with Earth as the scene turns.
+    // A change that interrupts another one blends from wherever the view is.
     function selectFrame(frame) {
         if (frame === state.frame) return;
         const settled = blend.s >= 1;
         beginTransition();
-        blend.spinMorph = settled && frame !== 'RIC' && state.frame !== 'RIC';
+        blend.staged = settled;
+        blend.fromFrame = state.frame;
+        if (settled && (frame === 'RIC' || state.frame === 'RIC')) blend.duration = RIC_TRANSITION;
         state.frame = frame;
         updateFrameUi();
         dirty = true;
@@ -706,6 +743,30 @@
 
     const smoothstep = (x) => x * x * (3 - 2 * x);
     const lerp = (a, b, x) => a + (b - a) * x;
+    const clamp01 = (x) => Math.min(1, Math.max(0, x));
+
+    // Progress of each part of a staged change, each 0..1 (see selectFrame).
+    //   turn: scene orientation; center: the point the view centers on; zoom: camera;
+    //   spin and wind: the path shares passed to computeFrameMorph.
+    function stagePlan(raw, from, to) {
+        const spinOf = (f) => (f === 'ECEF' ? 1 : 0);
+        if (to === 'RIC' || from === 'RIC') {
+            const into = to === 'RIC';
+            const move = raw;
+            // The paths wind (or unwind) together with the view's turn.
+            const wind = into ? smoothstep(raw) : 1 - smoothstep(raw);
+            // Into RIC, center on the target before zooming in; out of RIC, zoom out before
+            // letting the center go, so the target never leaves the view.
+            const center = into ? smoothstep(clamp01(move / 0.6)) : smoothstep(clamp01((move - 0.4) / 0.6));
+            const turn = smoothstep(move);
+            return {
+                turn, center, zoom: smoothstep(move), wind,
+                spin: into ? lerp(spinOf(from), 0, turn) : lerp(0, spinOf(to), turn)
+            };
+        }
+        const x = smoothstep(raw);
+        return { turn: x, center: x, zoom: x, wind: 0, spin: lerp(spinOf(from), spinOf(to), x) };
+    }
 
     function angleLerp(a, b, x) {
         const d = ((b - a + 540) % 360) - 180;
@@ -731,21 +792,38 @@
         const t = state.t;
 
         if (blend.s < 1) {
-            blend.s = Math.min(1, blend.s + dt / TRANSITION);
+            blend.s = Math.min(1, blend.s + dt / blend.duration);
             dirty = true;
         }
         const s = smoothstep(blend.s);
+        const staged = blend.staged && blend.s < 1;
+        const plan = staged ? stagePlan(blend.s, blend.fromFrame, state.frame) : null;
 
+        // Axes, planes, labels and sizes change with the camera.
+        const wx = staged ? plan.zoom : s;
         for (const key of FRAME_KEYS) {
             const goal = key === state.frame ? 1 : 0;
-            blend.weights[key] = lerp(blend.fromWeights[key], goal, s);
+            blend.weights[key] = lerp(blend.fromWeights[key], goal, wx);
         }
         const w = blend.weights;
 
         /* Root transform: the single change that defines each frame */
         frameTransform(state.frame, t, tmpQ, tmpP);
-        root.quaternion.copy(blend.fromQ).slerp(tmpQ, s);
-        root.position.copy(blend.fromP).lerp(tmpP, s);
+        if (staged) {
+            // Both ends follow the clock, so a frame that rotates keeps rotating during the change.
+            frameTransform(blend.fromFrame, t, root.quaternion, root.position);
+            root.quaternion.slerp(tmpQ, plan.turn);
+            const oA = FM.displayTransform(blend.fromFrame, t, scenario).origin;
+            const oB = FM.displayTransform(state.frame, t, scenario).origin;
+            root.position.set(
+                -lerp(oA[0], oB[0], plan.center) / RE,
+                -lerp(oA[1], oB[1], plan.center) / RE,
+                -lerp(oA[2], oB[2], plan.center) / RE
+            ).applyQuaternion(root.quaternion);
+        } else {
+            root.quaternion.copy(blend.fromQ).slerp(tmpQ, s);
+            root.position.copy(blend.fromP).lerp(tmpP, s);
+        }
         starGroup.quaternion.copy(root.quaternion);
 
         /* Earth and everything fixed to it */
@@ -807,6 +885,7 @@
 
         orbitRing.material.opacity = 0.5 * w.RIC;
         orbitRing.visible = w.RIC > 0.01;
+        if (orbitRing.visible) updateOrbitRing(t);
 
         /* Paths: the same orbit evaluated in the selected frame, morphing during a change */
         const trailOn = state.show.trails ? 1 : 0;
@@ -817,8 +896,8 @@
         for (const name of ['target', 'second']) {
             const ribbon = trails[name];
             if (!ribbon.mesh.visible && blend.s >= 1) continue;
-            if (name === 'target' && blend.spinMorph && blend.s < 1) {
-                computeSpinMorph(scenario.target, t, w.ECEF, root.quaternion, ribbon.points);
+            if (staged) {
+                computeFrameMorph(name === 'second' ? scenario.second : scenario.target, t, plan.spin, plan.wind, ribbon.points);
                 ribbon.commit();
                 continue;
             }
@@ -839,7 +918,7 @@
                 earthTurn.setFromAxisAngle(spinAxis, FM.earthAngle(t)).premultiply(root.quaternion);
                 const pts = trails.track.points;
                 for (let i = 0; i < pts.length; i += 3) {
-                    morphPoint.set(pts[i], pts[i + 1], pts[i + 2]).applyQuaternion(earthTurn);
+                    morphPoint.set(pts[i], pts[i + 1], pts[i + 2]).applyQuaternion(earthTurn).add(root.position);
                     pts[i] = morphPoint.x;
                     pts[i + 1] = morphPoint.y;
                     pts[i + 2] = morphPoint.z;
@@ -860,9 +939,10 @@
         const fit = Math.min(1, aspect * 0.85); // Pulls back on narrow screens.
         const goalLog = Math.log(view.dist / fit);
         if (blend.s < 1) {
-            cam.az = angleLerp(camFrom.az, view.az, s);
-            cam.el = lerp(camFrom.el, view.el, s);
-            cam.logDist = lerp(camFrom.logDist, goalLog, s);
+            const z = staged ? plan.zoom : s;
+            cam.az = angleLerp(camFrom.az, view.az, z);
+            cam.el = lerp(camFrom.el, view.el, z);
+            cam.logDist = lerp(camFrom.logDist, goalLog, z);
         } else {
             cam.az = view.az;
             cam.el = view.el;
