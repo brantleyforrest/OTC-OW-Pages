@@ -19,8 +19,9 @@
     cursor: pointer;
 }
 .orbit-settings .btn[hidden] { display: none; }
-.orbit-settings .btn:hover { border-color: var(--border-accent); background: #18304f; }
-.orbit-settings .btn.primary { background: linear-gradient(135deg, #184c8c 0%, #2563eb 100%); border-color: transparent; color: #ffffff; }
+.orbit-settings .btn:hover { border-color: #55575e; background: #232429; }
+.orbit-settings .btn.primary { background: var(--accent-red); border-color: var(--accent-red); color: #ffffff; }
+.orbit-settings .btn.primary:hover { background: var(--accent-red-hi); border-color: var(--accent-red-hi); }
 .orbit-settings .btn:disabled { background: var(--surface-hover); border-color: var(--border-subtle); color: var(--text-muted); opacity: 0.6; cursor: default; }
 .orbit-settings-note.site { border-color: var(--border-accent); }
 
@@ -67,7 +68,7 @@
     align-items: flex-start;
     justify-content: center;
     padding: calc(var(--nav-h, 52px) + 0.75rem) 16px 16px;
-    background: rgba(2, 6, 14, 0.6);
+    background: rgba(0, 0, 0, 0.62);
     overflow: hidden;
     overscroll-behavior: contain;
 }
@@ -137,8 +138,8 @@ html.orbit-settings-open, html.orbit-settings-open body { overflow: hidden; }
     cursor: pointer;
 }
 .orbit-settings-group:disabled .orbit-settings-choice { cursor: default; }
-.orbit-settings-choice:has(input:checked) { border-color: var(--border-accent); background: rgba(36, 76, 140, 0.2); }
-.orbit-settings-choice input { margin-top: 0.2rem; accent-color: var(--accent-gold); }
+.orbit-settings-choice:has(input:checked) { border-color: var(--accent-red); background: var(--red-glow); }
+.orbit-settings-choice input { margin-top: 0.2rem; accent-color: var(--accent-red); }
 .orbit-settings-choice-name { display: block; font-size: 0.86rem; font-weight: 600; }
 .orbit-settings-choice-detail { display: block; font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.5; color: var(--text-muted); }
 .orbit-settings-foot { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
@@ -146,7 +147,7 @@ html.orbit-settings-open, html.orbit-settings-open body { overflow: hidden; }
 .orbit-settings-sub[hidden] { display: none; }
 .orbit-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
 .orbit-settings-sub select, .orbit-settings-sub input[type="datetime-local"], .orbit-settings-sub input[type="number"] {
-    background: var(--surface-input, rgba(6, 11, 20, 0.6));
+    background: var(--surface-input, rgba(0, 0, 0, 0.45));
     color: var(--text-main);
     border: 1px solid var(--border-subtle);
     border-radius: 6px;
@@ -158,7 +159,7 @@ html.orbit-settings-open, html.orbit-settings-open body { overflow: hidden; }
 .orbit-settings-sub :disabled { opacity: 0.55; }
 .orbit-settings-forces { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.8rem; margin-top: 0.55rem; }
 .orbit-settings-check { display: flex; gap: 0.4rem; align-items: flex-start; line-height: 1.3; cursor: pointer; }
-.orbit-settings-check input { margin-top: 0.15rem; accent-color: var(--accent-gold); }
+.orbit-settings-check input { margin-top: 0.15rem; accent-color: var(--accent-red); }
 .orbit-settings-check b { font-weight: 600; }
 .orbit-settings-muted { color: var(--text-muted); font-size: 0.74rem; }
 .orbit-settings-why { margin: 0.4rem 0 0; font-size: 0.74rem; color: var(--text-muted); }

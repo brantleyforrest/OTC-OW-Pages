@@ -152,7 +152,7 @@
         }
 
         .param:hover { background: rgba(255, 255, 255, 0.03); }
-        .param.selected { background: rgba(58, 130, 247, 0.16); }
+        .param.selected { background: var(--red-glow); }
 
         .param[data-param="a"] { --row-color: var(--param-a); }
         .param[data-param="e"] { --row-color: var(--param-e); }
@@ -214,7 +214,7 @@
 
         .param-value input[type="number"]:focus {
             outline: none;
-            background: #060b14;
+            background: var(--deep-space);
             border-color: var(--accent-blue);
         }
 

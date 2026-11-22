@@ -1710,7 +1710,7 @@
             g.fillStyle = e.color;
             g.textAlign = 'right';
             g.textBaseline = 'bottom';
-            g.strokeStyle = '#0d1726'; // a halo in the panel color keeps labels readable over the curves
+            g.strokeStyle = '#111215'; // a halo in the panel color keeps labels readable over the curves
             g.lineWidth = 3;
             g.lineJoin = 'round';
             g.strokeText(e.name, e.x - 2, e.y - 1);
