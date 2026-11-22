@@ -195,18 +195,21 @@
         return [OC.SETS[s.constants].name, s.propagator === 'cowell' ? 'Cowell' : 'Kepler', s.ricModel === 'exact' ? 'Exact RIC' : 'CW'].join(' · ');
     }
 
-    const badge = SITE_BUTTON || document.createElement('button');
+    // Every page has the badge in its own top bar, so the bar is drawn whole before any script
+    // runs. Its label stays "Settings" so the badge keeps one size on every page; the current
+    // settings show in its tooltip and in the panel. A page without one gets one made here.
+    const STATIC_BADGE = SITE_BUTTON || document.querySelector('.nav-inner > .model-badge');
+    const badge = STATIC_BADGE || document.createElement('button');
     badge.setAttribute('aria-haspopup', 'dialog');
-    if (SITE_BUTTON) {
+    if (STATIC_BADGE) {
         badge.insertAdjacentHTML('beforeend', '<span class="model-badge-dot" hidden></span>');
     } else {
     badge.type = 'button';
     badge.className = 'model-badge';
     badge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
         '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>' +
-        '<span class="model-badge-text"></span><span class="model-badge-dot" hidden></span>';
+        '<span class="model-badge-text">Settings</span><span class="model-badge-dot" hidden></span>';
     }
-    const badgeText = badge.querySelector('.model-badge-text');
     const badgeDot = badge.querySelector('.model-badge-dot');
 
     const overlay = document.createElement('div');
@@ -317,7 +320,6 @@
 
     function render() {
         const s = S.get();
-        if (badgeText) badgeText.textContent = summary(s);
         badge.title = PRACTICE ? PRACTICE_NOTE : `Settings: ${summary(s)}`;
         badge.classList.toggle('practice', PRACTICE);
         badgeDot.hidden = PRACTICE || !(S.isShared() || !S.isDefault());
@@ -486,9 +488,9 @@
     });
 
     // In the top bar, between the page title and the links (which phones hide), so it shows everywhere.
-    // The home page's own button is already in its nav bar.
+    // The home page's own button is already in its nav bar, in the same place and style.
     const navLinks = document.querySelector('.nav-inner > .nav-links');
-    if (SITE_BUTTON) { /* in place */ }
+    if (STATIC_BADGE) { /* in place */ }
     else if (navLinks) navLinks.parentNode.insertBefore(badge, navLinks);
     else (document.querySelector('.nav-inner') || document.body).appendChild(badge);
     document.body.appendChild(overlay);

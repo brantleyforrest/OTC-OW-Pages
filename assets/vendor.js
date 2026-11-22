@@ -1,6 +1,6 @@
-/* Loads third-party libraries from vendor/ when present, otherwise from the CDN.
- * Run scripts/fetch_vendor.py to download the local copies.
- * Keep versions in sync with that script and with the <head> links on each page.
+/* Loads third-party libraries from vendor/. KaTeX is committed there. Three.js is not: run
+ * scripts/fetch_vendor.py to download it, and without it Three.js loads from the CDN.
+ * Keep versions in sync with that script.
  *
  *   const THREE = await Vendor.three();   // ES module, local first
  *   Vendor.script('katex').then(...);     // classic script, local first
@@ -18,9 +18,7 @@
             cdn: 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js'
         },
         katex: {
-            local: VENDOR + 'katex/katex.min.js',
-            cdn: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js',
-            integrity: 'sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg'
+            local: VENDOR + 'katex/katex.min.js'
         }
     };
 
@@ -44,14 +42,14 @@
         });
     }
 
-    // Always resolves, so pages carry on (with their plain-text fallbacks) when offline.
+    // Always resolves, so pages carry on (with their plain-text fallbacks) if a file is missing.
     const scripts = {};
     function script(name) {
         const lib = LIBS[name];
         if (!scripts[name]) {
-            scripts[name] = addScript(lib.local)
-                .catch(function () { return addScript(lib.cdn, lib.integrity); })
-                .catch(function () { console.warn('Could not load ' + name + ' locally or from the CDN.'); });
+            let loading = addScript(lib.local);
+            if (lib.cdn) loading = loading.catch(function () { return addScript(lib.cdn, lib.integrity); });
+            scripts[name] = loading.catch(function () { console.warn('Could not load ' + name + '.'); });
         }
         return scripts[name];
     }

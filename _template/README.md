@@ -14,7 +14,7 @@ A starting point for new interactive tools. It runs as is, using a placeholder m
    - Remove the `robots` line.
    - Replace the title, description, tool name, and all placeholder text.
    - Keep the `<script>` lines for your script, and delete the others. A 3D tool also keeps the two Earth scripts.
-   - Keep `../assets/vendor.js` first in the script list. It loads Three.js and KaTeX from `vendor/` when present and from the CDN otherwise. Never link a CDN file directly.
+   - Keep `../assets/vendor.js` first in the script list. It loads KaTeX from `vendor/`, and Three.js from `vendor/three/` when present and from the CDN otherwise. Never link a CDN file or Google Fonts directly.
 4. In the script, replace the sections marked `REPLACE`.
 5. Remove controls and panels the tool does not need. Add only what the user asked for.
 6. Register the tool as described in `AGENTS.md` section 6.

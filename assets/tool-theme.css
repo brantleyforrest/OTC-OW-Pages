@@ -1,7 +1,6 @@
 /* The Settings badge and panel styles are in orbit-settings-panel.css, shared with the home page. */
 @import url('orbit-settings-panel.css');
-/* Condensed face for headings, the navigation and labels. Without it, the fallbacks are used. */
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@500;600;700&display=swap');
+/* Roboto Condensed (headings, the navigation and labels) is in vendor/fonts/fonts.css with the other fonts. */
 
 /* Shared theme for tool pages. Matches the portal styling in index.html: near-black surfaces,
    red for the controls and frame, amber for highlighted values. */

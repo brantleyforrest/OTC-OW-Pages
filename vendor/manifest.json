@@ -1,0 +1,8 @@
+{
+  "katex": "0.16.11",
+  "fonts": [
+    "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap",
+    "https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@500;600;700&display=block"
+  ],
+  "downloaded": "2026-11-21 22:42:46"
+}

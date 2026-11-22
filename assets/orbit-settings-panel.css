@@ -47,7 +47,11 @@
 .model-badge:hover { color: #ffffff; border-color: var(--border-accent); }
 .model-badge.practice { color: var(--text-dim); }
 .model-badge-text { overflow: hidden; text-overflow: ellipsis; }
+/* The dot sits on the badge's corner, so showing it does not change the badge's size. */
 .model-badge-dot {
+    position: absolute;
+    top: -0.15rem;
+    right: -0.15rem;
     width: 0.45rem;
     height: 0.45rem;
     border-radius: 50%;
@@ -205,6 +209,3 @@ html.orbit-settings-open, html.orbit-settings-open body { overflow: hidden; }
     box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
 }
 
-/* The home page's Settings button: a nav link with a dot when the settings differ from the defaults. */
-.nav-settings { font-family: inherit; background: transparent; border: 1px solid transparent; }
-.nav-settings .model-badge-dot { position: absolute; top: 0.35rem; right: 0.35rem; }
