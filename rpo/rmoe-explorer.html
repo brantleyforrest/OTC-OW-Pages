@@ -6,11 +6,19 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>RMOE Explorer | OTC OW</title>
+    <title>Relative Motion Explorer | OTC OW</title>
     <meta name="robots" content="noindex">
-    <!-- RMOE Explorer is now part of the Relative Motion Explorer. This page only sends old links there. -->
-    <meta http-equiv="refresh" content="0; url=relative-motion-explorer.html">
-    <link rel="canonical" href="relative-motion-explorer.html">
+    <!-- TEMPORARY: this page moved. This file only sends old links to the new address, keeping
+         the query and hash. Listed in REDIRECTS.md; delete it with the others. -->
+    <script>
+        (function () {
+            var to = '../tools/relative-frame/relative-motion-explorer/';
+            var hash = to.indexOf('#') >= 0 ? '' : location.hash;
+            location.replace(to.split('#')[0] + location.search + (hash || (to.indexOf('#') >= 0 ? '#' + to.split('#')[1] : '')));
+        })();
+    </script>
+    <meta http-equiv="refresh" content="0; url=../tools/relative-frame/relative-motion-explorer/">
+    <link rel="canonical" href="../tools/relative-frame/relative-motion-explorer/">
     <style>
         body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
                background: #060b14; color: #e8edf5; font-family: Inter, system-ui, sans-serif; text-align: center; }
@@ -18,6 +26,6 @@
     </style>
 </head>
 <body>
-    <p>RMOE Explorer is now part of the <a href="relative-motion-explorer.html">Relative Motion Explorer</a>.</p>
+    <p>This page has moved to <a href="../tools/relative-frame/relative-motion-explorer/">Relative Motion Explorer</a>.</p>
 </body>
 </html>

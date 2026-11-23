@@ -1,5 +1,5 @@
 // Shared helpers for tool pages. Load as a classic script, so that tools run from a local file.
-// _template/README.md explains how to use them.
+// tools/_template/README.md explains how to use them.
 (function (global) {
     'use strict';
 

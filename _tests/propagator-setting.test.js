@@ -1,10 +1,10 @@
 // Run with: node _tests/propagator-setting.test.js
-// The propagator setting (orbit-math.js, section propagate): Kepler by default; Cowell with the
+// The propagator setting (math/motion/propagate.js): Kepler by default; Cowell with the
 // settings' solver and forces, read through cached samples. References: Kepler for two-body motion,
 // the J2 secular node rate, drag lowering a, and the work budget for animation.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../math/orbit-math.js');
+const OM = require('./load-math.js');
 const OC = globalThis.OrbitConstants;
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = OC.SETS[process.env.CONSTANTS || 'course'];

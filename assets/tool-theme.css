@@ -302,7 +302,7 @@ body {
     .tool-heading { padding-left: 12px; margin-left: 0; }
 }
 
-/* Tool view: new tools use these. See _template/README.md. */
+/* Tool view: new tools use these. See tools/_template/README.md. */
 .tool-view {
     position: relative;
     flex: 1 1 auto;
@@ -729,7 +729,7 @@ footer.site-footer {
 /* Phones: the view stays on screen and only the other content scrolls. The navigation
    becomes the back button and the tool name. An upright phone puts the view on top, and a
    rotated phone puts it on the left. The touch conditions keep laptops and desktops out,
-   however small the window. See _template/README.md. */
+   however small the window. See tools/_template/README.md. */
 @media (max-width: 640px) and (orientation: portrait),
        (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
     :root { --nav-h: 44px; }

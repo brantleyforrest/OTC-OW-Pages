@@ -2,16 +2,17 @@
 // Generates 200 problems per Test 2 Practice section and checks each answer independently.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const M = require('../math/test-review-math.js').rpo;
+require('./load-math.js');
+const M = globalThis.TestReviewMath.rpo;
 // PracticeMath runs without KaTeX: math is shown as its TeX source.
-require('../practice/practice-math.js');
-require('../practice/test-2-common.js');
-require('../practice/answer-check.js');
-const Visual = require('../practice/test-2-visual.js');
-const Rmoe = require('../practice/test-2-rmoe-problems.js');
-const Coeric = require('../practice/test-2-coeric-problems.js');
-const Vis = require('../practice/test-2-visual-problems.js');
-const Burns = require('../practice/test-2-burns-problems.js');
+require('../assets/tex-render.js');
+require('../study/test-2-practice/test-2-common.js');
+require('../study/answer-check.js');
+const Visual = require('../study/test-2-practice/test-2-visual.js');
+const Rmoe = require('../study/test-2-practice/test-2-rmoe-problems.js');
+const Coeric = require('../study/test-2-practice/test-2-coeric-problems.js');
+const Vis = require('../study/test-2-practice/test-2-visual-problems.js');
+const Burns = require('../study/test-2-practice/test-2-burns-problems.js');
 
 const COUNT = 200;
 let passed = 0;
@@ -63,7 +64,7 @@ function checkNumeric(module, p) {
 }
 const near = (a, b, tol, what) => assert.ok(Math.abs(a - b) <= tol, `${what}: ${a} vs ${b}`);
 const angleGap = (a, b) => { const g = Math.abs(a - b) % 360; return Math.min(g, 360 - g); };
-// The equation-sheet forms (acos and asin with the quadrant rules), not the atan2 forms in test-review-math.js.
+// The equation-sheet forms (acos and asin with the quadrant rules), not the atan2 forms in test-2-practice-math.js.
 function sheetRmoe(s, n) {
     const [x0, y0, z0, vx, vy, vz] = s;
     const xc = 4 * x0 + 2 * vy / n, yc0 = y0 - 2 * vx / n;
@@ -139,7 +140,7 @@ check(`COE to RIC Signs: ${COUNT} problems, signs from the linear mapping by han
 // (OrbitMath, course set): every value the exact answer would put outside the numeric tolerance
 // must be explained in the solution. Reports how often and by how much.
 check('COE to RIC Signs: the exact answer departs beyond tolerance only where the solution says so', () => {
-    const OM = require('../math/orbit-math.js');
+    const OM = require('./load-math.js');
     const O = OM.bind(globalThis.OrbitConstants.SETS.course).rpo;
     const C2 = globalThis.Test2Common;
     let off = 0, total = 0, worst = 0, flips = 0;

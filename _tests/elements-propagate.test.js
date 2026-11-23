@@ -1,9 +1,9 @@
 // Run with: node _tests/elements-propagate.test.js
-// Classical elements to r and v and back (orbit-math.js, section elements), and satellites stored as
+// Classical elements to r and v and back (math/elements.js), and satellites stored as
 // r and v moved by the Kepler propagator (section propagate).
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../math/orbit-math.js');
+const OM = require('./load-math.js');
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
 if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Solar vs. Sidereal Day | OTC OW</title>
+    <meta name="description" content="A view from above the North Pole showing why a solar day is about four minutes longer than a sidereal day.">
+    <link href="../../../vendor/fonts/fonts.css" rel="stylesheet">
+    <link rel="stylesheet" href="../../../assets/tool-theme.css">
+    <style>
+        :root {
+            --sidereal: #60a5fa;
+            --solar: #fb923c;
+            --extra: #f87171;
+        }
+
+        .scale-note { min-height: 2.7em; }
+
+        .scale-badge strong { color: var(--text-main); font-weight: 600; }
+
+        /* Live values */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.4rem 0.8rem;
+        }
+
+        .stat .label {
+            display: block;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+
+        .stat .value {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: #ffffff;
+            white-space: nowrap;
+        }
+
+        /* Comparison table */
+        table.compare {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        table.compare th {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+            text-align: right;
+            padding: 0 0.3rem 0.3rem;
+        }
+
+        table.compare th:first-child { text-align: left; }
+
+        table.compare td {
+            padding: 0.2rem 0 0.2rem 0.5rem;
+            border-top: 1px solid var(--border-subtle);
+            text-align: right;
+            font-family: var(--font-mono);
+            font-size: 0.69rem;
+            white-space: nowrap;
+        }
+
+        table.compare td:first-child {
+            text-align: left;
+            font-family: var(--font-sans);
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            padding-left: 0;
+        }
+
+        .tool-side .panel { padding: 0.65rem 0.85rem; }
+        .tool-side .panel-title { margin-bottom: 0.35rem; }
+        .tool-side > .col > .panel { flex-grow: 0; }
+
+        /* Tablets: panels layout across the full width. */
+        @media (min-width: 700px) and (max-width: 1080px) {
+            .tool-side { grid-template-columns: minmax(0, 1fr); }
+            .tool-side > .col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .tool-side > .col > .eq-panel { grid-column: 1 / -1; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav" aria-label="Main Navigation">
+        <div class="nav-inner">
+            <a href="../../../index.html" class="nav-brand">
+                <div class="nav-brand-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>OTC OW</span>
+            </a>
+            <div class="tool-heading">
+                <a class="back-link" href="../../../index.html" title="Back to Interactive Tools" aria-label="Back to Interactive Tools">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <h1>Solar vs. Sidereal Day Visualizer</h1>
+            </div>
+            <button type="button" class="model-badge">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span class="model-badge-text">Settings</span>
+            </button>
+            <div class="nav-links">
+                <a href="../../../index.html" class="nav-link active">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="3.6" y1="9" x2="20.4" y2="9"></line>
+                        <line x1="3.6" y1="15" x2="20.4" y2="15"></line>
+                        <path d="M11.5 3a17 17 0 0 0 0 18"></path>
+                        <path d="M12.5 3a17 17 0 0 1 0 18"></path>
+                    </svg>
+                    <span class="nav-text-full">Interactive Tools</span>
+                    <span class="nav-text-short">Tools</span>
+                </a>
+                <a href="../../../index.html#study" class="nav-link">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    <span class="nav-text-full">Study</span>
+                    <span class="nav-text-short">Study</span>
+                </a>
+                <a href="https://github.com/brantleyforrest/OTC-OW-Pages" target="_blank" rel="noopener" class="nav-link nav-link-ext" title="GitHub Repository">
+                    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="tool-main">
+        <div class="tool-layout">
+            <div class="col tool-stage-col">
+                <div class="tool-canvas-box" id="stage">
+                    <canvas id="view" aria-label="Animated view of Earth rotating as it moves along its orbit around the Sun"></canvas>
+                </div>
+
+                <div class="panel controls">
+                    <div class="ctl-row">
+                        <div class="buttons">
+                            <button class="btn primary" id="play">Play</button>
+                            <button class="btn" id="restart">Restart</button>
+                        </div>
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="speed">Speed</label>
+                                <span class="control-value" id="speed-value"></span>
+                            </div>
+                            <input type="range" id="speed" min="0" max="3" step="1" value="1">
+                        </div>
+                        <label class="check"><input type="checkbox" id="pause-milestones" checked>Slow down and pause at each milestone</label>
+                    </div>
+                    <div class="ctl-row">
+                        <div class="ctl-grow">
+                            <div class="control-label">
+                                <label for="rotations">Number of rotations</label>
+                                <span class="control-value" id="rotations-value"></span>
+                            </div>
+                            <input type="range" id="rotations" min="1" max="30" step="1" value="10">
+                        </div>
+                    </div>
+                    <p class="ctl-caption scale-note"><span class="scale-badge" id="scale-badge"></span> <span id="rotations-help"></span></p>
+                </div>
+            </div>
+
+            <aside class="tool-side">
+                <div class="col">
+                    <div class="panel">
+                        <div class="panel-title">Live Values</div>
+                        <div class="stats">
+                            <div class="stat"><span class="label">Time elapsed</span><span class="value" id="clock">00 h 00 m 00 s</span></div>
+                            <div class="stat"><span class="label">Earth's rotation so far</span><span class="value" id="rotation">0.000°</span></div>
+                            <div class="stat"><span class="label">Earth's travel along its orbit</span><span class="value" id="orbit-travel">0.000°</span></div>
+                            <div class="stat"><span class="label">Rotation needed to face the Sun</span><span class="value" id="needed">360.000°</span></div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Daily vs. Accumulated Values</div>
+                        <table class="compare">
+                            <thead><tr><th></th><th>Single Day</th><th id="th-accumulated">Total (10 Days)</th></tr></thead>
+                            <tbody>
+                                <tr><td>Sidereal period</td><td id="single-sidereal"></td><td id="total-sidereal"></td></tr>
+                                <tr><td>Solar period</td><td id="single-solar"></td><td id="total-solar"></td></tr>
+                                <tr><td>Difference</td><td id="single-diff"></td><td id="total-diff"></td></tr>
+                                <tr><td>Extra rotation</td><td id="single-extra"></td><td id="total-extra"></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="panel eq-panel">
+                        <div class="panel-title">Calculating the Daily Time Difference</div>
+                        <div class="eq-list">
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Daily orbital motion</b></span><span class="eq-result">≈ 0.986° / day</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span>Δθ =</span><span class="fraction"><span>360°</span><span>365.24 d</span></span></span>
+                                    <span class="eq-val">≈ 0.9856° ≈ 0.986°</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Rotation per solar day</b></span><span class="eq-result">360.986°</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">θ<sub>solar</sub> = 360° + Δθ</span>
+                                    <span class="eq-val">= 360° + 0.986° = 360.986°</span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Daily time difference</b></span><span class="eq-result">236 s (3m 56s)</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym"><span>Δt =</span><span class="fraction"><span>Δθ</span><span>θ<sub>solar</sub></span></span><span>× 86,400 s</span></span>
+                                    <span class="eq-val"><span>=</span><span class="fraction"><span>0.986°</span><span>360.986°</span></span><span>× 86,400 s ≈ 236 s</span></span>
+                                </div>
+                            </div>
+                            <div class="eq-row">
+                                <div class="eq-head"><span class="eq-name"><b>Sidereal day duration</b></span><span class="eq-result">23h 56m 04s</span></div>
+                                <div class="eq-work">
+                                    <span class="eq-sym">T<sub>sidereal</sub> = 86,400 s − Δt</span>
+                                    <span class="eq-val">= 86,400 s − 236 s = 86,164 s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+    </main>
+
+
+    <script>
+        (function () {
+            const t = Date.now();
+            [
+                '../../../assets/earth-land.js',
+                '../../../math/constants/shared.js',
+                '../../../math/constants/course.js',
+                '../../../math/constants/wgs84.js',
+                '../../../math/motion/solvers.js',
+                '../../../math/settings.js',
+                '../../../math/common.js',
+                '../../../math/time.js',
+                '../../../math/elements.js',
+                '../../../math/motion/kepler.js',
+                '../../../math/motion/forces.js',
+                '../../../math/motion/cowell.js',
+                '../../../math/motion/propagate.js',
+                '../../../math/relative/cw.js',
+                '../../../math/relative/exact.js',
+                '../../../math/relative/rpo.js',
+                'solar-sidereal-day-math.js',
+                '../../../assets/orbit-settings-panel.js',
+                'solar-sidereal-day.js'
+            ].forEach(function (src) {
+                const s = document.createElement('script');
+                s.src = src + '?t=' + t;
+                s.async = false;
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
+</body>
+</html>

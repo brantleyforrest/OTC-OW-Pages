@@ -46,7 +46,11 @@ function record(name, make) {
     snapshot[name] = list;
 }
 
-for (const html of ['practice/test-1-practice.html', 'practice/test-2-practice.html']) {
+// Older copies kept each practice page at practice/test-N-practice/index.html, and before that
+// at practice/test-N-practice.html.
+const pages = ['test-1-practice', 'test-2-practice'].map((n) =>
+    [`study/${n}/index.html`, `practice/${n}/index.html`, `practice/${n}.html`].find((p) => fs.existsSync(path.join(root, p))));
+for (const html of pages) {
     for (const file of pageScripts(html)) require(file);
 }
 const G = globalThis;

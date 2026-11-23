@@ -1,6 +1,6 @@
 // Shared 3D Earth and star field for Three.js tools. Load as a classic script after earth-land.js.
 // Earth has a radius of 1 and is centered on the origin of its parent. Z points north.
-// _template/tool-template-3d.js shows how to use it.
+// tools/_template/tool-template/tool-template-3d.js shows how to use it.
 (function (global) {
     'use strict';
 

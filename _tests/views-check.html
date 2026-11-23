@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="robots" content="noindex">
+    <title>RIC Views Check | OTC OW</title>
+    <style>
+        body { margin: 0; padding: 16px; background: #060b14; color: #f0f4fa; font-family: Inter, system-ui, sans-serif; }
+        h1 { font-size: 1.1rem; margin: 0 0 4px; }
+        p, li { color: #94a3b8; font-size: 0.88rem; line-height: 1.5; }
+        .row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; height: 46vh; min-height: 240px; }
+        .pane { position: relative; border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 8px; overflow: hidden; background: #0d1726; }
+        .pane canvas { position: absolute; inset: 0; }
+        button, select { font: inherit; padding: 4px 10px; margin: 8px 6px 8px 0; }
+        @media (max-width: 640px) { .row { grid-template-columns: 1fr; height: auto; } .pane { height: 220px; } }
+    </style>
+</head>
+<body>
+    <h1>RIC views check</h1>
+    <p>A page for checking the shared drawing code by eye. It is not a tool and nothing links to it.</p>
+    <select id="case"></select>
+    <button id="play" type="button">Pause</button>
+    <span id="readout" style="font-family: monospace; font-size: 0.8rem; color: #94a3b8;"></span>
+    <span id="boxbuttons"></span>
+    <div class="pane" id="box" style="height: 38vh; min-height: 220px; margin-bottom: 8px;"><canvas></canvas></div>
+    <div class="row">
+        <div class="pane" id="left"><canvas></canvas></div>
+        <div class="pane" id="behind"><canvas></canvas></div>
+        <div class="pane" id="above"><canvas></canvas></div>
+    </div>
+    <p>What a correct picture shows:</p>
+    <ul id="expect"></ul>
+
+    <script>
+        document.write('<script src="../assets/vendor.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/constants/shared.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/constants/course.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/constants/wgs84.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/motion/solvers.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/settings.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/common.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/time.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/elements.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/motion/kepler.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/motion/forces.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/motion/cowell.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/motion/propagate.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/relative/cw.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/relative/exact.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../math/relative/rpo.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="../assets/rpo-views.js?t=' + Date.now() + '"><\/script>');
+    </script>
+    <script>
+        (function () {
+            const M = window.OrbitMath.rpo, V = window.RpoViews;
+            const n = M.meanMotion(M.GEO_A), P = M.period(M.GEO_A);
+            const CASES = [
+                { name: 'Stationary NMC with cross-track', revs: 1,
+                  rmoe: { xc: 0, yc0: 0, C: 10, M0: 0, zmax: 6, dM0: 90 },
+                  expect: ['From the left: a 2-by-1 ellipse, twice as wide as tall, around the green square.',
+                           'Chase starts at the bottom and goes clockwise: bottom, left (front), top, right (back).',
+                           'From behind: chase starts on the left side (far left, +C).',
+                           'From above: the path is an ellipse; chase starts at the left edge.'] },
+                { name: 'Chase below: drifts forward', revs: 3,
+                  rmoe: { xc: -2, yc0: 0, C: 6, M0: 0, zmax: 0, dM0: null },
+                  expect: ['From the left: loops that walk toward the LEFT (forward), because chase is below the target.',
+                           'The small cross (the NMC center) sits below the middle line; its arrow points left.',
+                           'From behind: a straight up-and-down line. From above: a straight up-and-down line.'] },
+                { name: 'Chase above: drifts backward', revs: 3,
+                  rmoe: { xc: 2, yc0: 0, C: 0, M0: null, zmax: 4, dM0: 0 },
+                  expect: ['From the left: a straight line moving to the RIGHT (backward), above the middle line.',
+                           'From behind: a side-to-side line above the target; chase first moves LEFT (a positive plane crossing).',
+                           'From above: a wave that moves down the screen (backward).'] },
+                { name: 'Perch 20 km ahead', revs: 1,
+                  rmoe: { xc: 0, yc0: 20, C: 0, M0: null, zmax: 0, dM0: null },
+                  expect: ['From the left: the triangle sits still to the LEFT of the square.',
+                           'From above: the triangle sits still ABOVE the square.',
+                           'From behind: the triangle is on top of the square.'] }
+            ];
+            const panes = ['left', 'behind', 'above'].map(name => {
+                const box = document.getElementById(name);
+                const pane = V.createRicPlane(box.querySelector('canvas'), { plane: name });
+                return { box, pane };
+            });
+            let current = CASES[0], path = null, t = 0, playing = true, last = null;
+
+            // The 3D box. Its Left, Behind, and Above buttons must match the three flat panes below.
+            let box3d = null;
+            const boxEl = document.getElementById('box');
+            ['3d', 'left', 'behind', 'above'].forEach(name => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.textContent = name === '3d' ? '3D' : name[0].toUpperCase() + name.slice(1);
+                b.addEventListener('click', () => box3d && box3d.setView(name));
+                document.getElementById('boxbuttons').appendChild(b);
+            });
+            Vendor.three().then(THREE => {
+                box3d = V.createRicBox(THREE, boxEl.querySelector('canvas'));
+                window.viewsCheck.box = box3d;
+                refit();
+            }).catch(() => { boxEl.textContent = '3D view unavailable (Three.js did not load).'; });
+
+            function refit() {
+                panes.forEach(p => p.pane.resize(p.box.clientWidth, p.box.clientHeight));
+                const fit = V.fitPanes(panes.map(p => p.pane), [path]);
+                if (box3d) {
+                    box3d.resize(boxEl.clientWidth, boxEl.clientHeight);
+                    box3d.setExtent(Math.max(...fit.box.max.map((v, k) => Math.max(Math.abs(v), Math.abs(fit.box.min[k])))));
+                }
+            }
+            function choose(k) {
+                current = CASES[k]; t = 0;
+                path = M.sampleTrajectory(current.rmoe, n, 0, current.revs * P, 360 * current.revs);
+                document.getElementById('expect').innerHTML = current.expect.map(s => '<li>' + s + '</li>').join('');
+                refit();
+            }
+            function frame(now) {
+                if (last !== null && playing) t = (t + (now - last) / 1000 * P / 12) % (current.revs * P);
+                last = now;
+                const s = M.stateFromRmoe(current.rmoe, n, t);
+                const count = Math.max(2, Math.round(t / (current.revs * P) * path.length / 3));
+                const data = { chase: s, trail: path.subarray(0, count * 3), predicted: path, rmoe: M.rmoeAt(current.rmoe, n, t), n, showNmc: true };
+                panes.forEach(p => p.pane.draw(data));
+                if (box3d) box3d.update({ chase: s, trail: data.trail, model: null });
+                document.getElementById('readout').textContent =
+                    'R ' + M.fmt.km(s[0]) + '  I ' + M.fmt.km(s[1]) + '  C ' + M.fmt.km(s[2]) + ' km   ' + M.classifyMotion(current.rmoe).label;
+                requestAnimationFrame(frame);
+            }
+            const select = document.getElementById('case');
+            CASES.forEach((c, k) => select.add(new Option(c.name, k)));
+            select.addEventListener('change', () => choose(Number(select.value)));
+            document.getElementById('play').addEventListener('click', e => { playing = !playing; e.target.textContent = playing ? 'Pause' : 'Play'; });
+            window.addEventListener('resize', refit);
+            window.viewsCheck = { setTime(v) { t = v; }, pause() { playing = false; }, P };
+            choose(0);
+            requestAnimationFrame(frame);
+        })();
+    </script>
+</body>
+</html>

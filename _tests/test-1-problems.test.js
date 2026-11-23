@@ -7,19 +7,18 @@
 // equations. Every answer must also grade right as given and as shown, and wrong when off.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-require('../math/orbit-constants.js');
-require('../math/test-review-math.js');
-require('../practice/answer-check.js');
-require('../practice/practice-math.js');
-require('../practice/rv-coe-problems.js');
-require('../practice/maneuvers-problems.js');
-require('../practice/test-1-maneuver-problems.js');
-require('../practice/test-1-rendezvous-problems.js');
-require('../practice/test-1-tof-problems.js');
-require('../practice/test-1-ground-track-problems.js');
-require('../practice/test-1-coe-box-problems.js');
-require('../practice/test-1-propulsion-problems.js');
-require('../practice/test-1-law-matching.js');
+require('./load-math.js');
+require('../study/answer-check.js');
+require('../assets/tex-render.js');
+require('../study/test-1-practice/rv-coe-problems.js');
+require('../study/test-1-practice/maneuvers-problems.js');
+require('../study/test-1-practice/test-1-maneuver-problems.js');
+require('../study/test-1-practice/test-1-rendezvous-problems.js');
+require('../study/test-1-practice/test-1-tof-problems.js');
+require('../study/test-1-practice/test-1-ground-track-problems.js');
+require('../study/test-1-practice/test-1-coe-box-problems.js');
+require('../study/test-1-practice/test-1-propulsion-problems.js');
+require('../study/test-1-practice/test-1-law-matching.js');
 const {
     AnswerCheck: Check, RvCoeProblems: Rv, Test1ManeuverProblems: Man, Test1RendezvousProblems: Rz,
     Test1TofProblems: Tof, Test1GroundTrackProblems: Gt, Test1CoeBoxProblems: Box,
@@ -36,7 +35,7 @@ Math.random = () => {
 };
 
 const COUNT = 200;
-// The course constants, which Test 1 Practice always uses (math/orbit-constants.js).
+// The course constants, which Test 1 Practice always uses (math/constants/course.js).
 const { mu: MU, re: R_EARTH } = globalThis.OrbitConstants.SETS.course;
 const G0 = 9.81;
 const D2R = Math.PI / 180;

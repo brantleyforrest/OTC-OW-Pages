@@ -1,10 +1,10 @@
 // Run with: node _tests/cowell.test.js
-// Checks Cowell's method (orbit-math.js) and every solver tableau in orbit-constants.js against references that do not
+// Checks Cowell's method (math/motion/cowell.js) and every solver tableau in math/motion/solvers.js against references that do not
 // share its code: the site's universal-variable Kepler (section rendezvous), an own Kepler-equation
 // solution, energy and angular momentum conservation with J2, and the J2 secular node rate.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../math/orbit-math.js');
+const OM = require('./load-math.js');
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
 if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);
@@ -52,7 +52,7 @@ function rvFromCoe(mu, a, e, iDeg, raanDeg, argpDeg, nuDeg) {
     return { r: rot(rp), v: rot(vp) };
 }
 
-// Own Kepler-equation solution in the orbit plane (independent of orbit-math.js).
+// Own Kepler-equation solution in the orbit plane (independent of the site math).
 function keplerInPlane(mu, a, e, t) {
     const M = Math.sqrt(mu / a ** 3) * t;
     let E = M;

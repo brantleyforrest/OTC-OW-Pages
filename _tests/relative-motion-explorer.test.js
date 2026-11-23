@@ -165,7 +165,7 @@ globalThis.Option = class { constructor(text, value) { this.text = text; this.va
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.MutationObserver = class { observe() {} disconnect() {} };
 
-const OM = require('../math/orbit-math.js');
+const OM = require('./load-math.js');
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
 if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);
@@ -274,7 +274,7 @@ const spSpeed = getOrCreate('sp-speed');
 });
 
 async function runTests() {
-    const code = fs.readFileSync(path.join(__dirname, '../rpo/relative-motion-explorer.js'), 'utf8');
+    const code = fs.readFileSync(path.join(__dirname, '../tools/relative-frame/relative-motion-explorer/relative-motion-explorer.js'), 'utf8');
     eval(code);
     await new Promise(r => setTimeout(r, 150));
 

@@ -1,11 +1,11 @@
 // Run with: node _tests/review-math-cross-check.test.js
-// math/test-review-math.js keeps its own copy of the course equations and never calls
-// math/orbit-math.js. This test runs both files on the same random inputs under the same constant
+// The practice math (math/practice-common.js and each practice page's <page>-math.js) keeps its
+// own copy of the course equations and never calls OrbitMath. This test runs both files on the same random inputs under the same constant
 // set and checks that they agree, so a fix made in one file and not the other shows up here.
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../math/orbit-math.js');
-const TRM = require('../math/test-review-math.js');
+const OM = require('./load-math.js');
+const TRM = globalThis.TestReviewMath;
 const OC = globalThis.OrbitConstants;
 
 let passed = 0;

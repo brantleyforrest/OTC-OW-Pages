@@ -19,17 +19,17 @@ echo Launching Image and History Management Console...
 echo.
 
 if "%1"=="" (
-    %PY_CMD% scripts\backend\image_tools_backend.py
+    %PY_CMD% scripts\image_tools_backend.py
 ) else if "%1"=="audit" (
-    %PY_CMD% scripts\backend\image_tools_backend.py --audit
+    %PY_CMD% scripts\image_tools_backend.py --audit
 ) else if "%1"=="optimize" (
-    %PY_CMD% scripts\backend\image_tools_backend.py --optimize
+    %PY_CMD% scripts\image_tools_backend.py --optimize
 ) else if "%1"=="prune" (
-    %PY_CMD% scripts\backend\image_tools_backend.py --prune %2
+    %PY_CMD% scripts\image_tools_backend.py --prune %2
 ) else if "%1"=="guide" (
-    %PY_CMD% scripts\backend\image_tools_backend.py --guide
+    %PY_CMD% scripts\image_tools_backend.py --guide
 ) else (
-    %PY_CMD% scripts\backend\image_tools_backend.py %*
+    %PY_CMD% scripts\image_tools_backend.py %*
 )
 goto :eof
 

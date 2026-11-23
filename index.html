@@ -1152,7 +1152,7 @@
                 document.documentElement.classList.add('dev-mode');
             }
         } catch (e) { /* storage is blocked: dev mode starts off */ }
-        document.write('<script src="practice/test-2-release.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="study/test-2-practice/test-2-release.js?t=' + Date.now() + '"><\/script>');
     </script>
 </head>
 <body>
@@ -1287,7 +1287,7 @@
                             </div>
                             <h2 class="card-title">Relative Motion Explorer</h2>
                             <p class="card-desc"><span class="dev-only">Set one relative motion three ways: the two orbits' elements, the six RMOEs, or chase's position and velocity. Switch between them and see how each set of numbers describes the same motion.</span><span class="public-only">Set one relative motion two ways: the six RMOEs, or chase's position and velocity. Switch between them and see how each set of numbers describes the same motion.</span></p>
-                            <a href="rpo/relative-motion-explorer.html" data-dev-href="rpo/relative-motion-explorer.html?dev" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/relative-frame/relative-motion-explorer/" data-dev-href="tools/relative-frame/relative-motion-explorer/?dev" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card dev-only" data-tags="ric burn delta v radial in-track cross-track nmc drift maneuver relative motion rpo chase target">
                             <div class="card-top">
@@ -1303,7 +1303,7 @@
                             </div>
                             <h2 class="card-title">RIC Burn Sandbox</h2>
                             <p class="card-desc">A burn does not send you where it points. Fire radial, in-track, and cross-track burns and watch what each one does to the relative motion.</p>
-                            <a href="rpo/burn-sandbox.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/relative-frame/burn-sandbox/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card dev-only" data-tags="maneuver planner burn plan delta v rmoe ric perch nmc relative motion rpo passive safety chase target">
                             <div class="card-top">
@@ -1345,7 +1345,7 @@
                             </div>
                             <h2 class="card-title">Orbital Elements Visualizer</h2>
                             <p class="card-desc">An interactive 3D visualizer of the six Classical Orbital Elements (COEs) in the Earth-Centered Inertial (ECI) frame. Adjust each element to see how it shapes, tilts, and aligns an orbit in space.</p>
-                            <a href="orbits/orbital-elements.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/orbital-elements/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="ground track subsatellite point map latitude longitude earth rotation westward shift phase differential perigee apogee ascending descending node period inclination orbital elements coe 3d orbit">
                             <div class="card-top">
@@ -1358,7 +1358,7 @@
                             </div>
                             <h2 class="card-title">Ground Track Visualizer</h2>
                             <p class="card-desc">A split view of an orbit in 3D and its ground track on a world map. Adjust the orbital elements to see how each one changes the path traced across Earth's surface.</p>
-                            <a href="orbits/ground-track.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/ground-track/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="sun synchronous sso j2 nodal precession node drift raan ltan local time ascending node dawn dusk polar inclination altitude sun 3d orbit">
                             <div class="card-top">
@@ -1372,7 +1372,7 @@
                             </div>
                             <h2 class="card-title">Sun-Synchronous Orbit</h2>
                             <p class="card-desc">A 3D view of a year of orbit motion. Watch a sun-synchronous orbit turn with the Sun while a polar orbit stays fixed in space, and see how altitude sets the required inclination.</p>
-                            <a href="orbits/sun-synchronous.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/sun-synchronous/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="perturbations drag decay ballistic coefficient solar cycle j2 oblateness nodal precession raan argument of perigee critical inclination molniya j22 geo longitude drift libration station-keeping third body sun moon inclination srp solar radiation pressure eccentricity 3d orbit">
                             <div class="card-top">
@@ -1386,7 +1386,7 @@
                             </div>
                             <h2 class="card-title">Perturbations Explorer</h2>
                             <p class="card-desc">Watch drag, J₂, J₂,₂, the Sun and Moon, and sunlight change an orbit, each compared with the two-body orbit it started from.</p>
-                            <a href="orbits/perturbations.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/perturbations/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="orbit equation two-body 2-body kepler ellipse eccentricity semi-major axis true anomaly perigee apogee 3d inertial">
                             <div class="card-top">
@@ -1401,7 +1401,7 @@
                             </div>
                             <h2 class="card-title">Orbital Equation Explorer</h2>
                             <p class="card-desc">A 3D view of an orbit around Earth. Enter values for the parameters of the orbit equation, or animate each one through its range, to see how each one changes the orbit.</p>
-                            <a href="orbits/orbit-equation.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/orbit-equation/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="mechanical energy specific energy kinetic potential ske spe epsilon vis-viva speed perigee apogee semi-major axis conservation two-body 2-body ellipse 2d">
                             <div class="card-top">
@@ -1416,7 +1416,7 @@
                             </div>
                             <h2 class="card-title">Mechanical Energy</h2>
                             <p class="card-desc">Watch a spacecraft trade kinetic and potential energy between perigee and apogee. Set the apogee and perigee altitudes and see the energy bars swing while their sum stays fixed.</p>
-                            <a href="orbits/mechanical-energy.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/mechanical-energy/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="orbital maneuvers hohmann transfer simple plane change inclination polar raan combined plane change delta v impulse 3d orbit">
                             <div class="card-top">
@@ -1431,7 +1431,7 @@
                             </div>
                             <h2 class="card-title">Orbital Maneuvers</h2>
                             <p class="card-desc">Move sliders to change a Hohmann transfer, a simple plane change, or a combined plane change. Step through each burn and coast in 3D while the velocity vectors and equations update.</p>
-                            <a href="orbits/orbital-maneuvers.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/orbital-maneuvers/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="rendezvous chase target coplanar co-orbital coorbital phasing orbit wait time synodic period phase angle desired phase angle nu travel delta v trade 3d orbit">
                             <div class="card-top">
@@ -1447,7 +1447,7 @@
                             </div>
                             <h2 class="card-title">Inertial Rendezvous</h2>
                             <p class="card-desc">Bring a chase satellite to its target. Wait for the desired phase angle in coplanar transfer or fly a co-orbital phasing orbit, and watch time trade against delta-V.</p>
-                            <a href="orbits/inertial-rendezvous.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/inertial-frame/inertial-rendezvous/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         </div>
                     </div>
@@ -1473,7 +1473,7 @@
                             </div>
                             <h2 class="card-title">Reference Frame Observatory</h2>
                             <p class="card-desc">An animated 3D view of one Earth and two spacecraft. Switch among the ECI, ECEF, and RIC frames to see what each one holds still, and how each one describes the same motion.</p>
-                            <a href="frames/frame-observatory.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/frames-and-time/frame-observatory/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         <div class="tool-card" data-tags="time solar sidereal day rotation earth sun stars orbit">
                             <div class="card-top">
@@ -1486,7 +1486,7 @@
                             </div>
                             <h2 class="card-title">Solar vs. Sidereal Day Visualizer</h2>
                             <p class="card-desc">A view from above the North Pole. Follow one day step by step to see why Earth must turn a little more than 360° before the Sun returns to the same place in the sky.</p>
-                            <a href="time/solar-sidereal-day.html" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+                            <a href="tools/frames-and-time/solar-sidereal-day/" class="btn-launch">Launch Tool <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
                         </div>
                         </div>
                     </div>
@@ -1516,7 +1516,7 @@
                 </p>
 
                 <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
-                    <a href="practice/test-1-practice.html" class="btn-launch">
+                    <a href="study/test-1-practice/" class="btn-launch">
                         Launch Tool
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -1526,7 +1526,7 @@
             </div>
 
             <!-- Still being built. The dev-only class hides the card unless dev mode is on; the script
-                 at the bottom removes it once practice/test-2-release.js publishes a section. In dev
+                 at the bottom removes it once study/test-2-practice/test-2-release.js publishes a section. In dev
                  mode the Launch link opens the dev version (data-dev-href), which shows every section. -->
             <div class="portal-card dev-only" id="card-test-2">
                 <div class="portal-card-icon gold">
@@ -1542,7 +1542,7 @@
                 </p>
 
                 <div style="margin-top: 1.75rem; display: flex; justify-content: center;">
-                    <a href="practice/test-2-practice.html" data-dev-href="practice/test-2-practice.html?dev" class="btn-launch">
+                    <a href="study/test-2-practice/" data-dev-href="study/test-2-practice/?dev" class="btn-launch">
                         Launch Tool
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -1819,7 +1819,11 @@
     </script>
     <script>
         // The Settings button in the nav bar opens the same settings popup as the tools' Model badge.
-        document.write('<script src="math/orbit-constants.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="math/constants/shared.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="math/constants/course.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="math/constants/wgs84.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="math/motion/solvers.js?t=' + Date.now() + '"><\/script>');
+        document.write('<script src="math/settings.js?t=' + Date.now() + '"><\/script>');
         document.write('<script src="assets/orbit-settings-panel.js?t=' + Date.now() + '"><\/script>');
     </script>
 </body>

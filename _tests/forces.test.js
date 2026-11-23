@@ -1,11 +1,11 @@
 // Run with: node _tests/forces.test.js
-// Checks the forces section of orbit-math.js (the perturbation forces for Cowell's method) against references that do
+// Checks math/motion/forces.js (the perturbation forces for Cowell's method) against references that do
 // not share its code: gradients of the textbook potentials, Meeus's worked examples for sidereal time,
 // the Sun and the Moon, closed-form third-body values, the Perturbations Explorer's J2,2 and drag
 // formulas, and long-run behaviour (energy, GEO inclination growth, drag decay).
 const assert = require('node:assert');
 globalThis.window = globalThis;
-const OM = require('../math/orbit-math.js');
+const OM = require('./load-math.js');
 // Tool math runs on the set named by CONSTANTS (course by default): CONSTANTS=wgs84 node <test>.
 const TEST_SET = globalThis.OrbitConstants.SETS[process.env.CONSTANTS || 'course'];
 if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS);
