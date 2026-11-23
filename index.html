@@ -862,9 +862,9 @@
                 padding: 2rem 2.5rem 4rem;
             }
 
-            /* auto-fill keeps a lesson with one or two tools at the normal card width. */
+            /* auto-fit: a lesson with fewer tools than fill a row stretches them across it. */
             .tool-grid {
-                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             }
 
             #view-guides main.content {

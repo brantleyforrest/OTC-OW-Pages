@@ -337,10 +337,10 @@
         const k = sampleIndex(t);
         const trail = sim.path.subarray(0, 3 * (k + 1));
         const nmcLoop = state.nmcTrace && rDraw ? M.nmcLoop(rDraw) : null;   // the whole NMC chase is on now, dotted
-        // The CW overlay: the course model's path, drawn faintly beside the exact one.
-        const ghosts = sim.cwPath ? [sim.path, sim.cwPath] : [sim.path];
+        // The CW overlay: the course model's path and chase, in their own color beside the exact ones.
         const data = {
-            chase: now, trail, ghosts, nmcLoop,
+            chase: now, trail, ghosts: [sim.path], nmcLoop,
+            cw: sim.cwPath, cwChase: sim.cwPath ? M.stateFromRmoe(sim.rmoe, sim.n, t) : null,
             rmoe: rDraw && (state.annot.center || state.hot === 'xc' || state.hot === 'yc0') ? rDraw : null,
             showNmc: state.annot.size || state.annot.corners
         };
@@ -769,7 +769,7 @@
         if (sim.cwPath) {
             const c = M.stateFromRmoe(sim.rmoe, sim.n, t);
             const g = Math.hypot(now[0] - c[0], now[1] - c[1], now[2] - c[2]);
-            gapEl.textContent = 'Exact minus CW now: ' + (g < 1 ? fmt(g * 1000, 1) + ' m' : fmt(g, 3) + ' km') + ' (faint path: CW)';
+            gapEl.textContent = 'Exact minus CW now: ' + (g < 1 ? fmt(g * 1000, 1) + ' m' : fmt(g, 3) + ' km');
         }
     }
 
@@ -1050,7 +1050,8 @@
     // The model settings panel (../../assets/orbit-settings-panel.js): redraw on a settings change.
     if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
         // Shown in the settings panel when Cowell is chosen.
-        modelNote: "With Cowell, the target and chase move under the chosen forces. The RMOE mode follows the RIC model setting (CW, or the exact difference); the COE mode always subtracts the two propagated orbits.",
+        // The COE mode (developer only) is always exact, so it uses Cowell whatever the RIC setting.
+        modelNote: "Cowell changes this page only when Relative motion is set to Exact difference: then both spacecraft fly under these forces. With CW, the path comes from the CW equations, so these settings do not change it.",
         onSettingsChange() {
             rebindMath();
             rebuild();

@@ -1,8 +1,8 @@
 // cowell.js
 // Cowell's method, the propagator setting's alternative to Kepler: r and v integrated with the
-// forces that are on (forces.js) by the Runge-Kutta solver the settings choose (tableaus in
+// forces that are on (perturbations.js) by the Runge-Kutta solver the settings choose (tableaus in
 // solvers.js), one adaptive stepper for all four.
-// No DOM. Load after math/motion/forces.js.
+// No DOM. Load after math/motion/perturbations.js.
 (function (global) {
     'use strict';
 

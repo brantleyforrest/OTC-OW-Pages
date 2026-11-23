@@ -212,10 +212,11 @@
         const nmcLoop = state.nmcTrace && rNow.C > 1e-6 ? M.nmcLoop(rNow) : null;
         const inWindow = state.burns.filter(b => b.t >= win.t0 - 1e-9 && b.t <= t + 1e-9);
         const ghosts = win.ghost && state.ghost ? [win.ghost] : [];
-        // The CW overlay: the course model's path, drawn faintly beside the exact one.
-        if (win.cw) ghosts.push(win.cw.subarray(3 * kTrail, 3 * (kAhead + 1)));
+        // The CW overlay: the course model's path and chase, in their own color beside the exact ones.
         const data = {
             chase: now, trail, predicted, ghosts, nmcLoop, rmoe: rNow,
+            cw: win.cw ? win.cw.subarray(3 * kTrail, 3 * (kAhead + 1)) : null,
+            cwChase: win.cw ? cwState(t) : null,
             burns: inWindow.map(b => ({ at: b.after, dv: b.dv }))
         };
         stage.visiblePlanes().forEach(p => p.draw(data));

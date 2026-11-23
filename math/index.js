@@ -8,7 +8,8 @@
 //   settings.js                                the reader's choices and their store
 //   common.js                                  vectors, angles, Kepler's equation, sections
 //   time.js, elements.js                       time and the Sun and Moon; elements and r, v
-//   motion/kepler.js, forces.js, cowell.js     the two propagators and Cowell's forces
+//   motion/kepler.js, perturbations.js,
+//     cowell.js                                the two propagators and Cowell's forces
 //   motion/propagate.js                        satellites moved by the propagator setting
 //   relative/cw.js, exact.js, rpo.js           the two relative motion models, joined
 //
@@ -18,7 +19,7 @@
 const FILES = [
     'constants/shared.js', 'constants/course.js', 'constants/wgs84.js',
     'motion/solvers.js', 'settings.js', 'common.js', 'time.js', 'elements.js',
-    'motion/kepler.js', 'motion/forces.js', 'motion/cowell.js', 'motion/propagate.js',
+    'motion/kepler.js', 'motion/perturbations.js', 'motion/cowell.js', 'motion/propagate.js',
     'relative/cw.js', 'relative/exact.js', 'relative/rpo.js'
 ];
 const PRACTICE_FILES = [...FILES.slice(0, 5), 'practice-common.js'];

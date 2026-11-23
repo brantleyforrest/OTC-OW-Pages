@@ -1,4 +1,4 @@
-// forces.js
+// perturbations.js
 // The force setting's seven toggles for Cowell's method (all off by default): J2, J3 and J4, J2,2,
 // atmospheric drag, the Sun, the Moon and solar radiation pressure, as accelerations in km/s^2, and
 // the mean atmosphere drag uses. Constants come from math/constants.
@@ -7,7 +7,7 @@
     'use strict';
 
     const OM = global.OrbitMath;
-    if (!OM) throw new Error('forces.js: load math/common.js first');
+    if (!OM) throw new Error('perturbations.js: load math/common.js first');
 
     /* Forces for Cowell's method, each behind a toggle -------------------------------------------- */
     OM.define('forces', ['time'], function (C, OC, T) {

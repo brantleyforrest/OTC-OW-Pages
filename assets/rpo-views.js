@@ -33,6 +33,7 @@
         ghost: 'rgba(224, 182, 79, 0.28)',
         model: 'rgba(240, 244, 250, 0.6)',
         nmc: 'rgba(224, 182, 79, 0.8)',
+        cw: '#7dd3fc',                  // the CW overlay beside the exact model: its path and chase
         keepOut: 'rgba(248, 113, 113, 0.7)'
     };
 
@@ -294,6 +295,7 @@
             }
             (data.ghosts || []).forEach(g => strokePath(g, COLORS.ghost, 2));
             strokePath(data.model, COLORS.model, 1, [5, 4]);
+            strokePath(data.cw, COLORS.cw, 1.6, [6, 4]);
             strokePath(data.predicted, COLORS.chase, 1.2, [4, 4]);
             strokePath(data.trail, COLORS.chase, 3);
             // The whole NMC chase is on now, dotted; it moves with chase as the center drifts.
@@ -323,8 +325,38 @@
                 ctx.moveTo(q[0], q[1] - 8); ctx.lineTo(q[0] + 7.5, q[1] + 5.5); ctx.lineTo(q[0] - 7.5, q[1] + 5.5);
                 ctx.closePath(); ctx.stroke();
             }
+            if (data.cwChase) {
+                // Where CW puts chase now: a hollow triangle in the CW color.
+                const q = project(data.cwChase);
+                ctx.strokeStyle = COLORS.cw; ctx.lineWidth = 1.6;
+                ctx.beginPath();
+                ctx.moveTo(q[0], q[1] - 8); ctx.lineTo(q[0] + 7.5, q[1] + 5.5); ctx.lineTo(q[0] - 7.5, q[1] + 5.5);
+                ctx.closePath(); ctx.stroke();
+            }
             if (data.chase) drawChase(data.chase);
             drawFrameLabels();
+            if (data.cw) drawCwKey();
+        }
+
+        // With the CW overlay on: a key in the top right corner saying which path is which.
+        function drawCwKey() {
+            const rows = [['Exact', COLORS.chase, []], ['CW', COLORS.cw, [6, 4]]];
+            ctx.font = (compact ? '600 9px' : '600 11px') + ' Inter, sans-serif';
+            const seg = compact ? 14 : 22, gap = 6, rowH = compact ? 12 : 16, pad = 5;
+            const textW = Math.max(...rows.map(r => ctx.measureText(r[0]).width));
+            const bw = pad * 2 + seg + gap + textW, bh = pad * 2 + rowH * rows.length - 2;
+            const x0 = w - bw - 4, y0 = 4;
+            ctx.fillStyle = 'rgba(6, 11, 20, 0.72)';
+            ctx.fillRect(x0, y0, bw, bh);
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            rows.forEach(([label, color, dash], i) => {
+                const y = y0 + pad + rowH * i + (rowH - 2) / 2;
+                ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash(dash);
+                ctx.beginPath(); ctx.moveTo(x0 + pad, y); ctx.lineTo(x0 + pad + seg, y); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = color;
+                ctx.fillText(label, x0 + pad + seg + gap, y);
+            });
         }
 
         return {

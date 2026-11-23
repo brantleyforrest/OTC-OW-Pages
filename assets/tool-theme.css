@@ -32,6 +32,9 @@
     --nav-h: 52px;
     --aside-w: 24.5rem;
 }
+/* Dropdown lists are drawn by the browser; dark colors keep their text readable. */
+select { color-scheme: dark; }
+option { background: var(--surface-card); color: var(--text-main); }
 
 * {
     box-sizing: border-box;

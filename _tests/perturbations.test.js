@@ -1,5 +1,5 @@
-// Run with: node _tests/forces.test.js
-// Checks math/motion/forces.js (the perturbation forces for Cowell's method) against references that do
+// Run with: node _tests/perturbations.test.js
+// Checks math/motion/perturbations.js (the perturbation forces for Cowell's method) against references that do
 // not share its code: gradients of the textbook potentials, Meeus's worked examples for sidereal time,
 // the Sun and the Moon, closed-form third-body values, the Perturbations Explorer's J2,2 and drag
 // formulas, and long-run behaviour (energy, GEO inclination growth, drag decay).

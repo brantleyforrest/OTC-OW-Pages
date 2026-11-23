@@ -58,38 +58,17 @@
     const SITE_BUTTON = document.querySelector('[data-orbit-settings]');
     const PRACTICE = !global.OrbitMath && !SITE_BUTTON;
     const PRACTICE_NOTE = 'Test 1 and Test 2 Practice always use the course material: course constants, two-body motion, and CW.';
-    const SITE_NOTE = 'These settings apply to every tool and are kept in this browser. ' + PRACTICE_NOTE;
-
-    /* Number display -------------------------------------------------------------------------- */
-    const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
-    function sci(x) {
-        if (x === undefined) return '';
-        if (Math.abs(x) >= 1e-2 && Math.abs(x) < 1e7) return String(x);
-        const [m, e] = x.toExponential().split('e');
-        return `${m} × 10${String(Number(e)).split('').map((c) => SUP[c]).join('')}`;
-    }
-    function setLine(set) {
-        return [
-            `μ = ${sci(set.mu)} km³/s²`,
-            `R⊕ = ${sci(set.re)} km`,
-            `J₂ = ${sci(set.J2)}`,
-            `ω⊕ = ${sci(set.omegaE)} rad/s`,
-            `g₀ = ${sci(set.g0)} m/s²`
-        ].join(' · ');
-    }
 
     /* Motion choices --------------------------------------------------------------------------- */
     const FORCES = [
-        ['j2', 'J₂', 'Earth’s oblateness'],
-        ['j34', 'J₃ and J₄', 'the next zonal terms (pear shape)'],
-        ['j22', 'J₂,₂', 'the equator’s slight ellipse, turning with Earth'],
-        ['drag', 'Drag', 'the upper atmosphere'],
-        ['sun', 'Sun', 'the Sun’s gravity'],
-        ['moon', 'Moon', 'the Moon’s gravity'],
-        ['srp', 'Solar radiation pressure', 'sunlight pushing on the spacecraft']
+        ['j2', 'J₂'],
+        ['j34', 'J₃ and J₄'],
+        ['j22', 'J₂,₂'],
+        ['drag', 'Drag'],
+        ['sun', 'Sun'],
+        ['moon', 'Moon'],
+        ['srp', 'Solar radiation pressure']
     ];
-    // Forces that depend on the date: Earth's turn (J₂,₂), the Sun and the Moon.
-    const TIME_FORCES = ['j22', 'sun', 'moon', 'srp'];
     const SOLAR_LEVELS = { min: 'Solar minimum', mean: 'Average', max: 'Solar maximum' };
     const loadTimeMs = () => (global.OrbitMath ? global.OrbitMath.LOAD_TIME_MS : Date.now());
     // The start time as the datetime-local field shows it, in UTC.
@@ -201,16 +180,13 @@
     const STATIC_BADGE = SITE_BUTTON || document.querySelector('.nav-inner > .model-badge');
     const badge = STATIC_BADGE || document.createElement('button');
     badge.setAttribute('aria-haspopup', 'dialog');
-    if (STATIC_BADGE) {
-        badge.insertAdjacentHTML('beforeend', '<span class="model-badge-dot" hidden></span>');
-    } else {
+    if (!STATIC_BADGE) {
     badge.type = 'button';
     badge.className = 'model-badge';
     badge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
         '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>' +
-        '<span class="model-badge-text">Settings</span><span class="model-badge-dot" hidden></span>';
+        '<span class="model-badge-text">Settings</span>';
     }
-    const badgeDot = badge.querySelector('.model-badge-dot');
 
     const overlay = document.createElement('div');
     overlay.className = 'orbit-settings';
@@ -218,8 +194,7 @@
     const setChoices = Object.values(OC.SETS).map((set) => `
                 <label class="orbit-settings-choice">
                     <input type="radio" name="orbit-constants" value="${set.id}">
-                    <span><span class="orbit-settings-choice-name">${set.name}</span>
-                    <span class="orbit-settings-choice-detail">${setLine(set)}</span></span>
+                    <span><span class="orbit-settings-choice-name">${set.name}</span></span>
                 </label>`).join('');
     overlay.innerHTML = `
         <div class="orbit-settings-card" role="dialog" aria-modal="true" aria-labelledby="orbit-settings-title">
@@ -227,8 +202,6 @@
                 <h2 id="orbit-settings-title">Settings</h2>
                 <button type="button" class="orbit-settings-close" aria-label="Close">×</button>
             </div>
-            <div class="orbit-settings-note practice" ${PRACTICE ? '' : 'hidden'}>${PRACTICE_NOTE}</div>
-            <div class="orbit-settings-note site" ${SITE_BUTTON ? '' : 'hidden'}>${SITE_NOTE}</div>
             <div class="orbit-settings-note shared" hidden>
                 <span>Opened from a shared link. These settings apply to this visit only.</span>
                 <button type="button" class="btn orbit-settings-keep">Keep these settings</button>
@@ -242,24 +215,22 @@
                 <legend>Motion</legend>
                 <label class="orbit-settings-choice">
                     <input type="radio" name="orbit-propagator" value="kepler">
-                    <span><span class="orbit-settings-choice-name">Kepler (two-body)</span>
-                    <span class="orbit-settings-choice-detail">Exact motion around a point-mass Earth, as the course teaches.</span></span>
+                    <span><span class="orbit-settings-choice-name">Kepler (two-body)</span></span>
                 </label>
                 <label class="orbit-settings-choice">
                     <input type="radio" name="orbit-propagator" value="cowell">
-                    <span><span class="orbit-settings-choice-name">Cowell (numerical)</span>
-                    <span class="orbit-settings-choice-detail">Integrates the motion step by step, with the forces chosen below.</span></span>
+                    <span><span class="orbit-settings-choice-name">Cowell (numerical)</span></span>
                 </label>
-                <div class="orbit-settings-sub">
-                    <label class="orbit-settings-row" for="orbit-settings-solver">Solver
+                <div class="orbit-settings-sub orbit-settings-cowell" hidden>
+                    <label class="orbit-settings-row" for="orbit-settings-solver"><span class="orbit-settings-label">Solver</span>
                         <select id="orbit-settings-solver">${OC.SOLVER_IDS.map((id) => `<option value="${id}">${OC.SOLVERS[id].name}</option>`).join('')}</select>
                     </label>
+                    <div class="orbit-settings-label orbit-settings-forces-label">Forces</div>
                     <div class="orbit-settings-forces">
-                        ${FORCES.map(([id, name, what]) => `<label class="orbit-settings-check"><input type="checkbox" data-force="${id}"> <span><b>${name}</b> <span class="orbit-settings-muted">${what}</span></span></label>`).join('')}
+                        ${FORCES.map(([id, name]) => `<label class="orbit-settings-check"><input type="checkbox" data-force="${id}"> <span><b>${name}</b></span></label>`).join('')}
                     </div>
-                    <p class="orbit-settings-why cowell-why">Solver and forces apply to Cowell only.</p>
                 </div>
-                <div class="orbit-settings-sub orbit-settings-time">
+                <div class="orbit-settings-sub orbit-settings-time" hidden>
                     <div class="orbit-settings-row">
                         <label for="orbit-settings-start">Start date and time (UTC)</label>
                         <span class="orbit-settings-time-input">
@@ -284,13 +255,11 @@
                 <legend>Relative motion (RIC)</legend>
                 <label class="orbit-settings-choice">
                     <input type="radio" name="orbit-ric-model" value="cw">
-                    <span><span class="orbit-settings-choice-name">CW (linear)</span>
-                    <span class="orbit-settings-choice-detail">The Clohessy-Wiltshire equations and RMOEs, as the course teaches. Good for a few km.</span></span>
+                    <span><span class="orbit-settings-choice-name">CW (linear)</span></span>
                 </label>
                 <label class="orbit-settings-choice">
                     <input type="radio" name="orbit-ric-model" value="exact">
-                    <span><span class="orbit-settings-choice-name">Exact difference</span>
-                    <span class="orbit-settings-choice-detail">Both spacecraft fly their own orbits (with the Motion settings above); the chase's offset is read in the target's axes.</span></span>
+                    <span><span class="orbit-settings-choice-name">Exact difference</span></span>
                 </label>
                 <div class="orbit-settings-sub">
                     <div class="orbit-settings-row">
@@ -300,9 +269,7 @@
                             <label class="orbit-settings-check"><input type="radio" name="orbit-ric-axes" value="curvilinear"> <span>Curvilinear</span></label>
                         </span>
                     </div>
-                    <label class="orbit-settings-check"><input type="checkbox" id="orbit-settings-cw-overlay"> <span>Show the CW path too, and the gap between them</span></label>
-                    <p class="orbit-settings-why ric-why">Axes and the CW overlay apply to the exact model only. Curvilinear: y is the arc along the target's orbit, not a straight line.</p>
-                </div>
+                    <label class="orbit-settings-check"><input type="checkbox" id="orbit-settings-cw-overlay"> <span>Also show the CW path</span></label>                </div>
             </fieldset>
             <div class="orbit-settings-foot">
                 <button type="button" class="btn orbit-settings-reset" ${PRACTICE ? 'disabled' : ''}>Reset to defaults</button>
@@ -322,7 +289,6 @@
         const s = S.get();
         badge.title = PRACTICE ? PRACTICE_NOTE : `Settings: ${summary(s)}`;
         badge.classList.toggle('practice', PRACTICE);
-        badgeDot.hidden = PRACTICE || !(S.isShared() || !S.isDefault());
         const shown = PRACTICE ? 'course' : s.constants;   // practice always uses the course set
         for (const r of overlay.querySelectorAll('input[name="orbit-constants"]')) r.checked = r.value === shown;
         // Motion: practice always shows the course model (Kepler, no forces).
@@ -335,17 +301,17 @@
             box.checked = !PRACTICE && s.forces[box.dataset.force];
             box.disabled = !cowell;
         }
-        q('.cowell-why').hidden = cowell;
-        const timeForces = cowell && TIME_FORCES.some((id) => s.forces[id]);
+        q('.orbit-settings-cowell').hidden = !cowell;   // solver and forces show with Cowell only
+        // The start time shows with Cowell, or while the page's own real-date view is on (Ground
+        // Track's Start date), and can always be set while it shows.
         const pageTime = !!(page && page.usesStartTime && page.usesStartTime());
-        const timeOn = !PRACTICE && (timeForces || pageTime);
+        const timeOn = !PRACTICE && (cowell || pageTime);
+        q('.orbit-settings-time').hidden = !timeOn;
         const start = q('#orbit-settings-start');
         if (document.activeElement !== start) start.value = toField(s.startMs === null ? loadTimeMs() : s.startMs);
         start.disabled = !timeOn;
         q('.orbit-settings-now').disabled = !timeOn;
-        q('.time-why').textContent = timeOn
-            ? (s.startMs === null ? 'The computer’s clock when the page opened.' : 'Set for this visit; a new visit starts at the computer’s clock.')
-            : 'The start time matters only for J₂,₂, the Sun, the Moon and solar radiation pressure' + (page && page.usesStartTime ? ', or for this page’s real-date view' : '') + '.';
+        q('.time-why').textContent = s.startMs === null ? 'The computer’s clock when the page opened.' : 'Set for this visit; a new visit starts at the computer’s clock.';
         const craft = cowell && (s.forces.drag || s.forces.srp);
         q('.orbit-settings-craft').hidden = !craft;
         const sc = s.spacecraft;
@@ -364,9 +330,7 @@
         const ov = q('#orbit-settings-cw-overlay');
         ov.checked = exact && s.cwOverlay;
         ov.disabled = !exact;
-        q('.ric-why').textContent = exact
-            ? 'Curvilinear: x is the difference in radius and y the arc along the target\'s orbit, so a chase on the same orbit keeps a fixed y.'
-            : 'Axes and the CW overlay apply to the exact model only.';
+        ov.closest('label').hidden = !exact;   // the CW overlay shows with the exact model only
         const note = q('.orbit-settings-pagenote');
         note.textContent = cowell && page && page.modelNote ? page.modelNote : '';
         note.hidden = !note.textContent;
