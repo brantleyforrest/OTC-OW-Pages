@@ -25,7 +25,7 @@ Every number the math uses, each with its source.
 | `wgs84.js` | The WGS-84 constant set, the alternative the reader can choose in Settings. |
 | `shared.js` | The numbers that stay the same under either set: time, the gravity terms beyond J2, the Sun and Moon, the atmosphere, the rounded figures the lessons print, and limits. |
 
-### `motion/`
+### `propagation/`
 
 Moving a satellite through time.
 
@@ -37,7 +37,7 @@ Moving a satellite through time.
 | `perturbations.js` | The seven perturbing forces Cowell's method can include: J2, J3 and J4, J2,2, drag, the Sun, the Moon and solar radiation pressure. All are off by default. |
 | `propagate.js` | Moves a satellite with the propagator the reader chose. Every page that draws a moving satellite uses it. |
 
-### `relative/`
+### `relative-motion/`
 
 One spacecraft's motion as seen from another, in the target's RIC frame.
 

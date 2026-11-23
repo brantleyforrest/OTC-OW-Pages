@@ -143,7 +143,7 @@ check('constants: no orbital constant is written anywhere but math/constants', (
 check("Kepler's equation: every solver agrees with bisection for e up to 0.9", () => {
     const solvers = {
         'math/common.js kepler.solve': OM.kepler.solve,
-        'math/relative/exact.js keplerE': Rpo.keplerE,
+        'math/relative-motion/exact.js keplerE': Rpo.keplerE,
         'tools/inertial-frame/perturbations/perturbations-math.js solveKepler': PM.solveKepler,
         'study/test-1-practice/test-1-practice-math.js groundTrack.solveKepler': TRM.groundTrack.solveKepler,
         'math/practice-common.js kepler.solve': TRM.kepler.solve

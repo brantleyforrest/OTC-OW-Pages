@@ -40,6 +40,7 @@ check('starts on the defaults: course constants, Kepler, PD78, no forces, CW, re
     assert.strictEqual(s.ricModel, 'cw');
     assert.strictEqual(s.ricAxes, 'rectilinear');
     assert.strictEqual(s.cwOverlay, false);
+    assert.strictEqual(s.ricAxesOther, false);
     assert.strictEqual(s.startMs, null);
     assert.strictEqual(S.active(), OC.SETS.course);
     assert.ok(S.isDefault());

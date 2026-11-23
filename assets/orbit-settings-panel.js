@@ -59,7 +59,7 @@
     const PRACTICE = !global.OrbitMath && !SITE_BUTTON;
     const PRACTICE_NOTE = 'Test 1 and Test 2 Practice always use the course material: course constants, two-body motion, and CW.';
 
-    /* Motion choices --------------------------------------------------------------------------- */
+    /* Propagation choices --------------------------------------------------------------------------- */
     const FORCES = [
         ['j2', 'J₂'],
         ['j34', 'J₃ and J₄'],
@@ -211,8 +211,8 @@
                 <legend>Constants</legend>
                 ${setChoices}
             </fieldset>
-            <fieldset class="orbit-settings-group orbit-settings-motion" ${PRACTICE ? 'disabled' : ''}>
-                <legend>Motion</legend>
+            <fieldset class="orbit-settings-group orbit-settings-propagation" ${PRACTICE ? 'disabled' : ''}>
+                <legend>Propagation</legend>
                 <label class="orbit-settings-choice">
                     <input type="radio" name="orbit-propagator" value="kepler">
                     <span><span class="orbit-settings-choice-name">Kepler (two-body)</span></span>
@@ -261,7 +261,7 @@
                     <input type="radio" name="orbit-ric-model" value="exact">
                     <span><span class="orbit-settings-choice-name">Exact difference</span></span>
                 </label>
-                <div class="orbit-settings-sub">
+                <div class="orbit-settings-sub orbit-settings-ric-exact" hidden>
                     <div class="orbit-settings-row">
                         <span>Axes</span>
                         <span class="orbit-settings-time-input">
@@ -269,7 +269,9 @@
                             <label class="orbit-settings-check"><input type="radio" name="orbit-ric-axes" value="curvilinear"> <span>Curvilinear</span></label>
                         </span>
                     </div>
-                    <label class="orbit-settings-check"><input type="checkbox" id="orbit-settings-cw-overlay"> <span>Also show the CW path</span></label>                </div>
+                    <label class="orbit-settings-check"><input type="checkbox" id="orbit-settings-cw-overlay"> <span>Also show the CW path</span></label>
+                    <label class="orbit-settings-check"><input type="checkbox" id="orbit-settings-axes-other"> <span>Also show the <span class="orbit-settings-axes-other-name">curvilinear</span> guide in the 3D ECI view</span></label>
+                </div>
             </fieldset>
             <div class="orbit-settings-foot">
                 <button type="button" class="btn orbit-settings-reset" ${PRACTICE ? 'disabled' : ''}>Reset to defaults</button>
@@ -291,7 +293,7 @@
         badge.classList.toggle('practice', PRACTICE);
         const shown = PRACTICE ? 'course' : s.constants;   // practice always uses the course set
         for (const r of overlay.querySelectorAll('input[name="orbit-constants"]')) r.checked = r.value === shown;
-        // Motion: practice always shows the course model (Kepler, no forces).
+        // Propagation: practice always shows the course model (Kepler, no forces).
         const cowell = !PRACTICE && s.propagator === 'cowell';
         for (const r of overlay.querySelectorAll('input[name="orbit-propagator"]')) r.checked = r.value === (cowell ? 'cowell' : 'kepler');
         const solver = q('#orbit-settings-solver');
@@ -330,7 +332,11 @@
         const ov = q('#orbit-settings-cw-overlay');
         ov.checked = exact && s.cwOverlay;
         ov.disabled = !exact;
-        ov.closest('label').hidden = !exact;   // the CW overlay shows with the exact model only
+        const other = q('#orbit-settings-axes-other');
+        other.checked = exact && s.ricAxesOther;
+        other.disabled = !exact;
+        q('.orbit-settings-axes-other-name').textContent = s.ricAxes === 'curvilinear' ? 'rectilinear' : 'curvilinear';
+        q('.orbit-settings-ric-exact').hidden = !exact;   // axes and the CW overlay show with the exact model only
         const note = q('.orbit-settings-pagenote');
         note.textContent = cowell && page && page.modelNote ? page.modelNote : '';
         note.hidden = !note.textContent;
@@ -376,6 +382,7 @@
         else if (el.name === 'orbit-ric-model') S.set({ ricModel: el.value });
         else if (el.name === 'orbit-ric-axes') S.set({ ricAxes: el.value });
         else if (el.id === 'orbit-settings-cw-overlay') S.set({ cwOverlay: el.checked });
+        else if (el.id === 'orbit-settings-axes-other') S.set({ ricAxesOther: el.checked });
         else if (el.dataset.force) S.set({ forces: { [el.dataset.force]: el.checked } });
         else if (el.id === 'orbit-settings-start') {
             const ms = fromField(el.value);

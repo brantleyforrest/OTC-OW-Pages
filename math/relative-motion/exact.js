@@ -1,8 +1,8 @@
 // exact.js
 // The relative motion setting's exact model: both spacecraft propagated on their own
-// (math/motion/propagate.js, with the settings' propagator), subtracted, and turned into the
+// (math/propagation/propagate.js, with the settings' propagator), subtracted, and turned into the
 // target's RIC axes, rectilinear or curvilinear. The course model is cw.js beside this file.
-// No DOM. Load after math/motion/propagate.js.
+// No DOM. Load after math/propagation/propagate.js.
 (function (global) {
     'use strict';
 

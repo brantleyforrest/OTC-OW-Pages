@@ -271,6 +271,7 @@
                         </div>
                         <div class="ctl-checks">
                             <label class="check"><input type="checkbox" id="opt-orbits" checked>Orbit Paths</label>
+                            <label class="check" title="From the target to chase in the 3D ECI view: how chase's x and y are measured on the RIC axes in use"><input type="checkbox" id="opt-guides">x and y Guides</label>
                             <label class="check" title="The whole NMC chase is on right now, dotted"><input type="checkbox" id="opt-nmc" checked>NMC Trace</label>
                             <label class="check" title="The path chase would have flown without the last burn"><input type="checkbox" id="opt-ghost" checked>Old Path</label>
                         </div>
@@ -327,18 +328,18 @@
                         '../../../math/constants/shared.js',
                         '../../../math/constants/course.js',
                         '../../../math/constants/wgs84.js',
-                        '../../../math/motion/solvers.js',
+                        '../../../math/propagation/solvers.js',
                         '../../../math/settings.js',
                         '../../../math/common.js',
                         '../../../math/time.js',
                         '../../../math/elements.js',
-                        '../../../math/motion/kepler.js',
-                        '../../../math/motion/perturbations.js',
-                        '../../../math/motion/cowell.js',
-                        '../../../math/motion/propagate.js',
-                        '../../../math/relative/cw.js',
-                        '../../../math/relative/exact.js',
-                        '../../../math/relative/rpo.js',
+                        '../../../math/propagation/kepler.js',
+                        '../../../math/propagation/perturbations.js',
+                        '../../../math/propagation/cowell.js',
+                        '../../../math/propagation/propagate.js',
+                        '../../../math/relative-motion/cw.js',
+                        '../../../math/relative-motion/exact.js',
+                        '../../../math/relative-motion/rpo.js',
                         'burn-sandbox-math.js',
                         '../../../assets/orbit-settings-panel.js',
                         '../../../assets/rpo-views.js',

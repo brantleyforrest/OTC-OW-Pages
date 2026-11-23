@@ -2,7 +2,7 @@
 // OrbitMath.rpo, the relative motion section pages use: the CW model (cw.js) and the exact model
 // (exact.js) together, with the course's element-difference method (RMOEs from two sets of
 // elements and back), the example orbits, and number formatting for the readouts.
-// No DOM. Load after math/relative/cw.js and math/relative/exact.js.
+// No DOM. Load after math/relative-motion/cw.js and math/relative-motion/exact.js.
 (function (global) {
     'use strict';
 

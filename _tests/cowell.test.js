@@ -1,5 +1,5 @@
 // Run with: node _tests/cowell.test.js
-// Checks Cowell's method (math/motion/cowell.js) and every solver tableau in math/motion/solvers.js against references that do not
+// Checks Cowell's method (math/propagation/cowell.js) and every solver tableau in math/propagation/solvers.js against references that do not
 // share its code: the site's universal-variable Kepler (section rendezvous), an own Kepler-equation
 // solution, energy and angular momentum conservation with J2, and the J2 secular node rate.
 const assert = require('node:assert');

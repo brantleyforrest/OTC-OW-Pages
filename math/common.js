@@ -18,7 +18,7 @@
     'use strict';
 
     const OC = global.OrbitConstants;
-    if (!OC || !OC.Settings) throw new Error('common.js: load math/constants/*.js, math/motion/solvers.js and math/settings.js first');
+    if (!OC || !OC.Settings) throw new Error('common.js: load math/constants/*.js, math/propagation/solvers.js and math/settings.js first');
 
     // The start time pages use when none is set: the computer clock, read once when this file loads.
     const LOAD_TIME_MS = Date.now();

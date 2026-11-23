@@ -8,7 +8,7 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
-    // Relative-motion math from ../../math/relative/rpo.js (section rpo), on the constants the site's
+    // Relative-motion math from ../../math/relative-motion/rpo.js (section rpo), on the constants the site's
     // settings choose. RpoViews reads OrbitMath.rpo itself.
     const Kit = window.ToolKit, V = window.RpoViews;
     let M = window.OrbitMath.rpo;
@@ -57,7 +57,7 @@
     const state = {
         orbit: 'geo', start: 'rest', corner: 0, dir: '+R', burns: [],
         t: 0, playing: !Kit.prefersReducedMotion(), speed: 0.02, coastEnd: null, coastSpeed: FAST,
-        second: 'behind', frame: 'ECI', mag: 'auto', orbits: true, nmcTrace: true, ghost: true
+        second: 'behind', frame: 'ECI', mag: 'auto', orbits: true, guides: false, nmcTrace: true, ghost: true
     };
     let coe, n, P, win = null, dirty = true, fitted = false;
 
@@ -229,6 +229,8 @@
         if (stage.inertial) {
             stage.inertial.update({
                 t, rho: rectNow, basis, rT: basis.r, from: kTrail, to: k, ghost: true,
+                // The x and y guides: CW is measured on rectilinear axes, the exact model on the axes chosen.
+                guides: isExact() ? { axes: model().ricAxes, other: model().ricAxesOther } : { axes: 'rectilinear', other: false },
                 burns: inWindow.map(b => ({ t: b.t, rho: isExact() ? chaseRect(b.t) : b.after, dv: b.dv, basis: M.ricBasis(coe, b.t) }))
             });
         }
@@ -478,7 +480,7 @@
         inertial.setFrame(state.frame);
         inertial.setCamera('earth');
         inertial.setTrails({ inertial: true, carried: true });
-        inertial.setExtras({ axes: false, equator: false, orbits: state.orbits });
+        inertial.setExtras({ axes: false, equator: false, orbits: state.orbits, guides: state.guides });
         inertial.setLabels(true);
         updateMagRead();
     }
@@ -490,6 +492,7 @@
         dirty = true;
     });
     $('opt-orbits').addEventListener('change', e => { state.orbits = e.target.checked; applyViewOptions(); dirty = true; });
+    $('opt-guides').addEventListener('change', e => { state.guides = e.target.checked; applyViewOptions(); dirty = true; });
     $('opt-nmc').addEventListener('change', e => { state.nmcTrace = e.target.checked; dirty = true; });
     $('opt-ghost').addEventListener('change', e => { state.ghost = e.target.checked; refit(); dirty = true; });
 

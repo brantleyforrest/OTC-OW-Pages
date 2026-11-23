@@ -1,7 +1,7 @@
 // propagate.js
 // Satellites stored as r and v, moved by the propagator the settings choose: Kepler (kepler.js) or
 // Cowell (cowell.js) with cached samples. Every page that draws a moving satellite uses this.
-// No DOM. Load after the other files in math/motion.
+// No DOM. Load after the other files in math/propagation.
 (function (global) {
     'use strict';
 
@@ -35,7 +35,7 @@
             return satellite(r, v, t, props);
         }
 
-        // Two-body motion from (r0, v0) over dt seconds (math/motion/kepler.js).
+        // Two-body motion from (r0, v0) over dt seconds (math/propagation/kepler.js).
         const kepler = KP.kepler;
 
         /* Cowell, with cached samples */

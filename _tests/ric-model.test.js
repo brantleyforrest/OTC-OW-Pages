@@ -1,5 +1,5 @@
 // Run with: node _tests/ric-model.test.js
-// The RIC model setting (math/relative/cw.js and exact.js): CW against the exact difference of two
+// The RIC model setting (math/relative-motion/cw.js and exact.js): CW against the exact difference of two
 // propagated orbits, in rectilinear and curvilinear axes. References: the CW closed form for small
 // separations, geometry (a co-orbital chase keeps a fixed arc), and the axis round trip.
 const assert = require('node:assert');

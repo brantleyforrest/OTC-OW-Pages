@@ -50,7 +50,7 @@
         const trueFromEccentric = (E, e) => 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
 
         /* 3. Atmospheric drag */
-        // The mean atmosphere and solar-activity scale the Cowell drag force uses (math/motion/perturbations.js).
+        // The mean atmosphere and solar-activity scale the Cowell drag force uses (math/propagation/perturbations.js).
         const { DENSITY, density, SOLAR } = FO;
         const AREA = OC.ATMOSPHERE.AREA;   // A/m, m^2/kg
 

@@ -2,12 +2,12 @@
 // The reader's choices for the whole site (constant set, propagator, solver, forces, RIC model and
 // axes, start time, spacecraft), their defaults, and the store that keeps them in the browser.
 // OrbitMath follows it (math/common.js); the settings panel (assets/orbit-settings-panel.js) edits it.
-// No DOM needed. Load after the constant files and math/motion/solvers.js.
+// No DOM needed. Load after the constant files and math/propagation/solvers.js.
 (function (global) {
     'use strict';
 
     const OC = global.OrbitConstants;
-    if (!OC || !OC.SOLVER_IDS) throw new Error('settings.js: load math/constants/*.js and math/motion/solvers.js first');
+    if (!OC || !OC.SOLVER_IDS) throw new Error('settings.js: load math/constants/*.js and math/propagation/solvers.js first');
     const { SETS, ATMOSPHERE, SOLVER_IDS } = OC;
 
     /* 10. Spacecraft and setting defaults ------------------------------------- */
@@ -20,7 +20,8 @@
         forces: { j2: false, j34: false, j22: false, drag: false, sun: false, moon: false, srp: false },
         ricModel: 'cw',
         ricAxes: 'rectilinear',
-        cwOverlay: false
+        cwOverlay: false,
+        ricAxesOther: false       // the ECI view's x and y guides: also draw the other axes' guide
     };
     const STORAGE_KEY = 'otc-orbit-settings';
     // The choices each setting allows; anything else read from storage or a link falls back to the default.
@@ -47,6 +48,7 @@
         out.forces = {};
         for (const id of FORCE_IDS) out.forces[id] = forces[id] === true;
         out.cwOverlay = src.cwOverlay === true;
+        out.ricAxesOther = src.ricAxesOther === true;
         const ms = typeof src.startMs === 'number' ? src.startMs : Date.parse(src.startMs);
         out.startMs = Number.isFinite(ms) ? ms : null;
         // Spacecraft properties for drag and solar radiation pressure, used by every satellite on the

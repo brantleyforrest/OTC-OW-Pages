@@ -168,25 +168,7 @@
         .el-notes li { font-size: 0.74rem; line-height: 1.35; color: #fbbf24; margin-top: 0.2rem; }
         .el-notes:empty { display: none; }
 
-        /* Dev mode: COE mode stays hidden unless it is on. */
-        html:not(.dev-mode) .dev-only {
-            display: none !important;
-        }
-        html.dev-mode .public-only {
-            display: none !important;
-        }
-        /* When COE mode is hidden, the mode switch has 2 buttons instead of 3. */
-        html:not(.dev-mode) .set-mode .segmented {
-            grid-template-columns: 0.8fr 1.4fr;
-        }
     </style>
-    <script>
-        try {
-            if (new URLSearchParams(location.search).has('dev') || localStorage.getItem('otc-dev-mode') === '1') {
-                document.documentElement.classList.add('dev-mode');
-            }
-        } catch (e) { /* storage is blocked: dev mode starts off */ }
-    </script>
 </head>
 <body>
 
@@ -309,9 +291,8 @@
                         <button class="mode-switch" type="button" aria-checked="false" title="Show every control, readout, and note"><span class="track" aria-hidden="true"></span>Advanced</button>
                     </div>
                     <div class="set-mode">
-                        <div class="set-mode-label">What you set</div>
                         <div class="segmented" id="mode-pick" role="group" aria-label="What to set">
-                            <button type="button" data-value="coe" class="dev-only" aria-pressed="false">COEs</button>
+                            <button type="button" data-value="coe" aria-pressed="false">COEs</button>
                             <button type="button" data-value="rmoe" aria-pressed="true">RMOEs</button>
                             <button type="button" data-value="pv" aria-pressed="false">Position and Velocity</button>
                         </div>
@@ -333,7 +314,7 @@
                             </div>
                             <label class="a-field course-only" title="The target's semi-major axis (its orbit is circular here). GEO, GPS, and LEO fill it in; type any value from 6500 to 50000 km for Custom">a <input type="number" step="any" min="6500" max="50000" id="target-a" aria-label="Target semi-major axis in km"> km</label>
                         </div>
-                        <div class="coe-only dev-only" id="coe-block">
+                        <div class="coe-only" id="coe-block">
                             <div class="el-table" id="el-table"></div>
                             <div class="sub-row" id="starts-row" data-advanced>
                                 <span>Chase starts at</span>
@@ -394,6 +375,7 @@
                              keep their controls and code and stay at their defaults. -->
                         <div class="ctl-checks">
                             <label class="check"><input type="checkbox" id="opt-orbits" checked>Orbit Paths</label>
+                            <label class="check" title="From the target to chase in the 3D ECI view: how chase's x and y are measured on the RIC axes in use"><input type="checkbox" id="opt-guides">x and y Guides</label>
                             <label class="check" style="display: none;"><input type="checkbox" id="opt-inertial" checked>Inertial Trail</label>
                             <label class="check" style="display: none;"><input type="checkbox" id="opt-carried" checked>Carried Trail</label>
                             <label class="check" title="Earth and the stars behind the 3D RIC box, in their true directions from the target"><input type="checkbox" id="opt-backdrop" checked>Earth and Stars</label>
@@ -431,8 +413,8 @@
                             <li><b>Drifting NMC</b>: both at once, NMC loops that walk along the track.</li>
                             <li><b>Cross-Track NMC</b>: an NMC that also swings left and right of the target’s plane, so the ellipse tilts but stays put.</li>
                             <li><b>Snake</b>: a drift that also swings left and right of the target’s plane; from above it winds like a snake.</li>
-                            <li class="dev-only"><b>COEs</b>: the six classical orbital elements of an orbit, a, e, i, Ω, ω, and ν.</li>
-                            <li class="dev-only"><b>Exact model</b> (Set COEs): each spacecraft flies its own orbit, and the picture shows where chase really is from the target. It works for any target orbit, even an eccentric one.</li>
+                            <li><b>COEs</b>: the six classical orbital elements of an orbit, a, e, i, Ω, ω, and ν.</li>
+                            <li><b>Exact model</b> (Set COEs): each spacecraft flies its own orbit, and the picture shows where chase really is from the target. It works for any target orbit, even an eccentric one.</li>
                             <li><b>Course model</b> (Set RMOEs, Set Position and Velocity): the linear (CW) equations. They are simple and match the exact model when the target’s orbit is circular and chase is close to it.</li>
                             <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track.</li>
                         </ul>
@@ -456,18 +438,18 @@
                         '../../../math/constants/shared.js',
                         '../../../math/constants/course.js',
                         '../../../math/constants/wgs84.js',
-                        '../../../math/motion/solvers.js',
+                        '../../../math/propagation/solvers.js',
                         '../../../math/settings.js',
                         '../../../math/common.js',
                         '../../../math/time.js',
                         '../../../math/elements.js',
-                        '../../../math/motion/kepler.js',
-                        '../../../math/motion/perturbations.js',
-                        '../../../math/motion/cowell.js',
-                        '../../../math/motion/propagate.js',
-                        '../../../math/relative/cw.js',
-                        '../../../math/relative/exact.js',
-                        '../../../math/relative/rpo.js',
+                        '../../../math/propagation/kepler.js',
+                        '../../../math/propagation/perturbations.js',
+                        '../../../math/propagation/cowell.js',
+                        '../../../math/propagation/propagate.js',
+                        '../../../math/relative-motion/cw.js',
+                        '../../../math/relative-motion/exact.js',
+                        '../../../math/relative-motion/rpo.js',
                         '../../../assets/orbit-settings-panel.js',
                         '../../../assets/rpo-views.js',
                         'relative-motion-explorer.js'

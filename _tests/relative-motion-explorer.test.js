@@ -172,6 +172,10 @@ if (!TEST_SET) throw new Error('Unknown CONSTANTS set: ' + process.env.CONSTANTS
 const M = OM.bind(TEST_SET).rpo;
 // The page reads OrbitMath.rpo, which follows the settings: put them on the same set.
 globalThis.OrbitConstants.Settings.set({ constants: TEST_SET.id });
+// The settings panel, reduced to what the page needs: its onSettingsChange runs on every change.
+globalThis.OrbitSettingsPanel = {
+    registerPage(page) { globalThis.OrbitConstants.Settings.onChange((s, changed) => page.onSettingsChange(s, changed)); }
+};
 
 globalThis.ToolKit = {
     startLoop: () => {},
@@ -380,20 +384,14 @@ async function runTests() {
         assert.strictEqual(timeRead, '0.75 rev', 'time-read matches preserved phase');
     });
 
-    check('COE mode is gated behind dev mode', () => {
-        globalThis.__DEV__ = false;
+    check('COE mode is open to everyone', () => {
         rme.selectMode('rmoe');
         assert.strictEqual(rme.state.mode, 'rmoe');
         rme.selectMode('coe');
-        assert.strictEqual(rme.state.mode, 'rmoe', 'COE mode must be blocked when dev mode is off');
-
-        globalThis.__DEV__ = true;
-        rme.selectMode('coe');
-        assert.strictEqual(rme.state.mode, 'coe', 'COE mode must be allowed when dev mode is on');
+        assert.strictEqual(rme.state.mode, 'coe', 'COE mode must be allowed without dev mode');
     });
 
     check('COE mode: changing a updates chase orbit, n, P, and DOM a-field', () => {
-        globalThis.__DEV__ = true;
         rme.selectMode('coe');
         // Initial GEO
         rme.setOrbits({ a: 42164, e: 0, i: 0, raan: 0, argp: 0, nu: 0 }, { da: 5, de: 0.0002, di: 0.01, draan: 0, dargp: 0, dnu: 0 });
@@ -427,6 +425,42 @@ async function runTests() {
 
         // Must keep the last valid target a (12000)
         near(rme.state.target.a, 12000, 1e-6, 'target.a not corrupted by out-of-range typing');
+    });
+
+    check('Switching COEs, RMOEs, and position and velocity keeps the RMOEs, across settings changes too', () => {
+        const S = globalThis.OrbitConstants.Settings, start = S.get();
+        const KEYS = ['xc', 'yc0', 'C', 'zmax', 'M0', 'dM0'];
+        const same = (a, b, tol, what) => KEYS.forEach(k => near(a[k], b[k], tol, what + ' ' + k));
+        const fromCoes = () => {
+            const R = globalThis.OrbitMath.rpo;
+            const r = R.rmoeFromCoes(rme.state.target, R.coeFromDifference(rme.state.target, rme.state.diff));
+            return { ...r, M0: r.M0 === null ? 0 : r.M0, dM0: r.dM0 === null ? 0 : r.dM0 };
+        };
+        const combos = [
+            { ricModel: 'cw', ricAxes: 'rectilinear' },
+            { ricModel: 'exact', ricAxes: 'rectilinear' },
+            { ricModel: 'exact', ricAxes: 'curvilinear', propagator: 'cowell' }
+        ];
+        for (const combo of combos) for (const preset of [0, 3, 6]) {
+            S.set({ constants: TEST_SET.id, propagator: 'kepler', ...combo });
+            rme.selectMode('rmoe');
+            rme.loadPreset(preset);
+            const r0 = { ...rme.state.rmoe };
+            rme.selectMode('coe');
+            same(rme.state.rmoe, r0, 1e-9, 'RMOEs to COEs');
+            same(fromCoes(), rme.state.rmoe, 1e-6, 'COEs give the RMOEs');
+            // A settings change in COE mode: the COEs and RMOEs must still agree.
+            S.set({ constants: TEST_SET.id === 'course' ? 'wgs84' : 'course' });
+            same(fromCoes(), rme.state.rmoe, 1e-6, 'after a constants change, COEs give the RMOEs');
+            const r1 = { ...rme.state.rmoe };
+            rme.selectMode('pv');
+            rme.selectMode('rmoe');
+            same(rme.state.rmoe, r1, 1e-6, 'COEs to position and velocity to RMOEs');
+            rme.selectMode('coe');
+            same(rme.state.rmoe, r1, 1e-6, 'and back to COEs');
+        }
+        S.set(start);
+        rme.selectMode('rmoe');
     });
 
     console.log(`\n${passed} passed, ${failed} failed`);

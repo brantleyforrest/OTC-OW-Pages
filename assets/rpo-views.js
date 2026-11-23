@@ -34,6 +34,8 @@
         model: 'rgba(240, 244, 250, 0.6)',
         nmc: 'rgba(224, 182, 79, 0.8)',
         cw: '#7dd3fc',                  // the CW overlay beside the exact model: its path and chase
+        rectilinear: '#a78bfa',         // the ECI view's x and y guides, one color per axis type
+        curvilinear: '#2dd4bf',
         keepOut: 'rgba(248, 113, 113, 0.7)'
     };
 
@@ -601,6 +603,7 @@
             mesh.userData.ready = segs > 0;
         };
         mesh.setResolution = (wd, ht) => mat.uniforms.resolution.value.set(Math.max(1, wd), Math.max(1, ht));
+        mesh.setOpacity = (o) => { mat.uniforms.opacity.value = o; };
         return mesh;
     }
 
@@ -1156,7 +1159,7 @@
 
         const s = {
             target: null, chaseOrbit: null, frame: 'ECI', cam: 'earth', mag: 'auto',
-            trails: { inertial: true, carried: true }, extras: { axes: false, equator: false, orbits: true },
+            trails: { inertial: true, carried: true }, extras: { axes: false, equator: false, orbits: true, guides: false },
             labels: true, path: null, t: 0, from: 0, to: -1, rFar: M.GEO_A
         };
         const camView = { az: -60, el: 24, dist: 24 };
@@ -1219,6 +1222,24 @@
         const inertialTrail = makeTrace(COLORS.chase, 0.95, false, 2.5);
         const carriedTrail = makeTrace(COLORS.ric, 0.95, false, 2.5);
         let trailBuf = new Float32Array(3), carriedBuf = new Float32Array(3);
+        // The x and y guides (extras.guides): from the target to chase, how x and y are measured.
+        // Rectilinear: y straight along I, then x straight along R. Curvilinear: y along the
+        // target's own orbit, then x straight out from Earth's center. Both then go z along C. The
+        // page names the axes in use (data.guides.axes) and whether to draw the other one too.
+        const GUIDE_ARC = 64;
+        const guideLines = { rectilinear: makeTrace(COLORS.rectilinear, 0.95, false, 2.5), curvilinear: makeTrace(COLORS.curvilinear, 0.95, false, 2.5) };
+        const guideBufs = { rectilinear: new Float32Array(4 * 3), curvilinear: new Float32Array((GUIDE_ARC + 3) * 3) };
+        // The guide's points in RIC (km, rectilinear components), target first, chase last.
+        function guideRic(type, x, y, z, rt) {
+            if (type === 'rectilinear') return [[0, 0, 0], [0, y, 0], [x, y, 0], [x, y, z]];
+            const phi = Math.atan2(y, rt + x), pts = [];
+            for (let j = 0; j <= GUIDE_ARC; j++) {
+                const a = phi * j / GUIDE_ARC;
+                pts.push([rt * (Math.cos(a) - 1), rt * Math.sin(a), 0]);
+            }
+            pts.push([x, y, 0], [x, y, z]);
+            return pts;
+        }
         let ghostBuf = new Float32Array(3), carriedGhostBuf = new Float32Array(3);
 
         // The translucent rectangle in the R-I plane that the carried trail is drawn on.
@@ -1279,6 +1300,10 @@
         const layer = options.labels && Kit ? new Kit.LabelLayer(options.labels) : null;
         const triadLabels = layer ? ['R', 'I', 'C'].map(n => layer.add('<b style="color:#f87171">' + n + '</b>', { rank: 1 })) : [];
         const eciLabels = layer ? ['Î', 'Ĵ', 'K̂'].map(n => layer.add('<b style="color:#60a5fa">' + n + '</b>', { rank: 2, optional: true })) : [];
+        const guideLabels = layer ? {
+            rectilinear: layer.add('<b style="color:' + COLORS.rectilinear + '">Rectilinear</b>', { rank: 2, optional: true }),
+            curvilinear: layer.add('<b style="color:' + COLORS.curvilinear + '">Curvilinear</b>', { rank: 2, optional: true })
+        } : {};
         const burnArrows = [];
 
         // ---------- frames and magnification ----------
@@ -1457,6 +1482,26 @@
                 setPoints(plateEdge, arr, 4);
             }
 
+            // The x and y guides, magnified like chase's offset so each ends where chase is drawn.
+            const guideCorner = {};
+            const g = s.extras.guides && now.guides;
+            ['rectilinear', 'curvilinear'].forEach(type => {
+                const line = guideLines[type];
+                const main = g && g.axes === type, shown = g && (main || g.other);
+                if (!shown) { line.visible = false; return; }
+                const pts = guideRic(type, rho[0], rho[1], rho[2], Math.hypot(rT[0], rT[1], rT[2]));
+                const buf = guideBufs[type];
+                pts.forEach((p, j) => put(buf, j,
+                    rT[0] + k * (p[0] * b.R[0] + p[1] * b.I[0] + p[2] * b.C[0]),
+                    rT[1] + k * (p[0] * b.R[1] + p[1] * b.I[1] + p[2] * b.C[1]),
+                    rT[2] + k * (p[0] * b.R[2] + p[1] * b.I[2] + p[2] * b.C[2]), th));
+                if (line.setOpacity) line.setOpacity(main ? 0.95 : 0.5);
+                setPoints(line, buf, pts.length);
+                // Where y ends: the label goes there.
+                const c = 3 * (pts.length - 3);
+                guideCorner[type] = new THREE.Vector3(buf[c], buf[c + 1], buf[c + 2]);
+            });
+
             updateCamera();
             const camDist = camera.position.distanceTo(tPos);
             const len = camDist * 0.09;
@@ -1500,6 +1545,7 @@
                 layer.begin();
                 if (s.labels) {
                     triad.forEach((arrow, j) => showLabel(triadLabels[j], tmp.copy(tPos).addScaledVector(basisNow[['R', 'I', 'C'][j]], len * 1.15)));
+                    Object.keys(guideCorner).forEach(type => showLabel(guideLabels[type], guideCorner[type]));
                     if (s.extras.axes) eciDirs.forEach((d, j) => {
                         const L = 1.3 * s.rFar / RE, c = Math.cos(-th), sn = Math.sin(-th);
                         showLabel(eciLabels[j], tmp.set((c * d[0] - sn * d[1]) * L, (sn * d[0] + c * d[1]) * L, d[2] * L));

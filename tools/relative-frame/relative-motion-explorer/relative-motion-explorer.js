@@ -13,7 +13,7 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
-    // Relative-motion math from ../../math/relative/rpo.js (section rpo), on the constants the site's
+    // Relative-motion math from ../../math/relative-motion/rpo.js (section rpo), on the constants the site's
     // settings choose; RpoViews reads OrbitMath.rpo itself.
     const Kit = window.ToolKit, V = window.RpoViews;
     let M = window.OrbitMath.rpo;
@@ -122,7 +122,7 @@
         t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
         annot: { center: true, size: false, corners: false, cross: false },
         hot: null, lastRow: null,
-        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, orbits: true, backdrop: true, inset: false, orbit3d: true, nmcTrace: true, labels: true
+        frame: 'ECI', camera: 'earth', mag: 'auto', inertialTrail: true, carried: true, orbits: true, guides: false, backdrop: true, inset: false, orbit3d: true, nmcTrace: true, labels: true
     };
     let sim = null, dirty = true;
 
@@ -141,16 +141,6 @@
     });
 
     /* ---------- Derived values ---------- */
-    const isDev = () => {
-        try {
-            if (typeof window !== 'undefined' && window.__DEV__ !== undefined) return Boolean(window.__DEV__);
-            if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('dev')) return true;
-            if (typeof localStorage !== 'undefined' && localStorage.getItem('otc-dev-mode') === '1') return true;
-            if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('dev-mode')) return true;
-            if (typeof location === 'undefined') return true;
-        } catch (e) {}
-        return false;
-    };
     const isCircular = () => state.target.e < 1e-6;
     const isAdvanced = () => document.body.classList.contains('advanced-on');
     const chaseCoe = () => M.coeFromDifference(state.target, state.diff);
@@ -354,7 +344,9 @@
         if (stage.inertial) {
             // ghost: the whole path is drawn faintly from the start, so the carried trail never
             // vanishes when the clock wraps back to epoch.
-            stage.inertial.update({ t, rho: rectNow, basis, rT: basis.r, from: 0, to: k, ghost: true });
+            // The x and y guides: CW is measured on rectilinear axes, the exact model on the axes chosen.
+            const guides = sim.exact ? { axes: sim.axes, other: ricModel().ricAxesOther } : { axes: 'rectilinear', other: false };
+            stage.inertial.update({ t, rho: rectNow, basis, rT: basis.r, from: 0, to: k, ghost: true, guides });
         }
         updateLive(rTable);
         updateModelLabels(now, t);
@@ -724,11 +716,10 @@
         });
     }
 
-    /* ---------- What you set ---------- */
+    /* ---------- The three ways to set the motion ---------- */
     // Switching keeps the motion. To COEs: chase's elements from the RMOEs (coesFromRmoe). From
     // COEs: the RMOEs the elements give (rmoeFromCoes); an eccentric target is made circular first.
     function applyMode(mode) {
-        if (mode === 'coe' && !isDev()) return;
         const from = state.mode;
         state.modeNote = '';
         if (mode === 'coe' && from !== 'coe') {
@@ -755,7 +746,6 @@
         drawAll();
     }
     const selectMode = Kit.bindSegmented($('mode-pick'), mode => {
-        if (mode === 'coe' && !isDev()) return;
         if (mode !== state.mode) applyMode(mode === 'coe' || mode === 'pv' ? mode : 'rmoe');
     });
 
@@ -996,7 +986,7 @@
         inertial.setFrame(state.frame);
         inertial.setCamera(state.camera);
         inertial.setTrails({ inertial: state.inertialTrail, carried: state.carried });
-        inertial.setExtras({ axes: false, equator: false, orbits: state.orbits });
+        inertial.setExtras({ axes: false, equator: false, orbits: state.orbits, guides: state.guides });
         inertial.setLabels(state.labels);
         updateMagRead();
     }
@@ -1007,7 +997,7 @@
         applyViewOptions();
         dirty = true;
     });
-    [['opt-orbits', 'orbits'], ['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-nmc', 'nmcTrace'], ['opt-labels', 'labels']].forEach(([id, key]) => {
+    [['opt-orbits', 'orbits'], ['opt-guides', 'guides'], ['opt-inertial', 'inertialTrail'], ['opt-carried', 'carried'], ['opt-backdrop', 'backdrop'], ['opt-inset', 'inset'], ['opt-orbit3d', 'orbit3d'], ['opt-nmc', 'nmcTrace'], ['opt-labels', 'labels']].forEach(([id, key]) => {
         $(id).addEventListener('change', e => { state[key] = e.target.checked; applyViewOptions(); dirty = true; });
     });
 
@@ -1016,7 +1006,6 @@
     buildElTable();
     buildPv();
     fillPresets();
-    if (state.mode === 'coe' && !isDev()) state.mode = 'rmoe';
     document.body.classList.add('mode-' + state.mode);
     loadPreset(state.preset);
     applyViewOptions();
@@ -1037,7 +1026,6 @@
     window.relativeMotionExplorer = {
         state, sim: () => sim, stage, presets: PRESETS, loadPreset, drawNow: drawAll,
         selectMode,
-        isDev,
         setTargetA: v => { $('target-a').value = String(v); setTargetA(true); },
         set(values) {
             Object.assign(state.rmoe, values);
@@ -1050,7 +1038,7 @@
     // The model settings panel (../../assets/orbit-settings-panel.js): redraw on a settings change.
     if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
         // Shown in the settings panel when Cowell is chosen.
-        // The COE mode (developer only) is always exact, so it uses Cowell whatever the RIC setting.
+        // The COE mode is always exact, so it uses Cowell whatever the RIC setting.
         modelNote: "Cowell changes this page only when Relative motion is set to Exact difference: then both spacecraft fly under these forces. With CW, the path comes from the CW equations, so these settings do not change it.",
         onSettingsChange() {
             rebindMath();

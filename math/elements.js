@@ -1,6 +1,6 @@
 // elements.js
 // Classical orbital elements to position and velocity and back, with the circular and equatorial
-// cases. Every satellite is stored as r and v (math/motion/propagate.js), so any page that takes or
+// cases. Every satellite is stored as r and v (math/propagation/propagate.js), so any page that takes or
 // shows elements goes through here.
 // No DOM. Load after math/common.js.
 (function (global) {

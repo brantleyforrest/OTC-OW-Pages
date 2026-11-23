@@ -81,7 +81,7 @@
             return scale(du, V);
         }
 
-        // Universal-variable Kepler propagation (math/motion/kepler.js).
+        // Universal-variable Kepler propagation (math/propagation/kepler.js).
         const propagate = KP.universal;
 
         // State of both chase and target at physical time t

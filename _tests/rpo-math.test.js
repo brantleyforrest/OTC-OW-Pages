@@ -1,5 +1,5 @@
 // Run with: node _tests/rpo-math.test.js
-// Checks the relative-motion math (math/relative, section rpo) against values that were worked out and verified separately.
+// Checks the relative-motion math (math/relative-motion, section rpo) against values that were worked out and verified separately.
 const assert = require('node:assert');
 globalThis.window = globalThis;
 const OM = require('./load-math.js');

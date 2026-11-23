@@ -2,7 +2,7 @@
 // The numbers both constant sets use, each with its source: time, the gravity field beyond J2, the
 // Sun, Moon and radiation, the atmosphere, the Sun and Moon position series and sidereal time, the
 // round figures the lessons print, and limits. The two sets themselves are in course.js and
-// wgs84.js beside this file; the solver tableaus are in math/motion/solvers.js. No formula in the
+// wgs84.js beside this file; the solver tableaus are in math/propagation/solvers.js. No formula in the
 // site declares a physical constant of its own.
 //
 // Load this first: it starts window.OrbitConstants, which the other constant files add to.
