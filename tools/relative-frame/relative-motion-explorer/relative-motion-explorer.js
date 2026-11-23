@@ -664,12 +664,12 @@
         const n = sim.n, a = sim.coe.a;
         const [x0, y0, z0, vx, vy, vz] = s;
         const r = M.rmoeFromState(s, n);
-        const ms = v => tnum(v * 1000, 6) + '/1000';     // a velocity typed in m/s, put into km/s
+        const ms = v => '(' + tres(v * 1000, 6) + ')/1000';     // a velocity typed in m/s, put into km/s; always in parentheses
         const nT = tsci(n);
         const rows = [];
         rows.push({ key: null, eq: `n = \\sqrt{\\mu / a^3} = \\sqrt{${fmtNum(M.MU, 2)} / ${fmtNum(a, 3)}^3} = ${nT}\\ \\text{rad/s}` });
-        rows.push({ key: 'xc', eq: `x_C = 4x_0 + \\frac{2\\dot y_0}{n} = 4${tnum(x0, 4)} + \\frac{2\\,${ms(vy)}}{${nT}} = ${tres(r.xc, 3)}\\ \\text{km}` });
-        rows.push({ key: 'yc0', eq: `y_{C0} = y_0 - \\frac{2\\dot x_0}{n} = ${tnum(y0, 4)} - \\frac{2\\,${ms(vx)}}{${nT}} = ${tres(r.yc0, 3)}\\ \\text{km}` });
+        rows.push({ key: 'xc', eq: `x_C = 4x_0 + \\frac{2\\dot y_0}{n} = 4(${tres(x0, 4)}) + \\frac{2${ms(vy)}}{${nT}} = ${tres(r.xc, 3)}\\ \\text{km}` });
+        rows.push({ key: 'yc0', eq: `y_{C0} = y_0 - \\frac{2\\dot x_0}{n} = ${tnum(y0, 4)} - \\frac{2${ms(vx)}}{${nT}} = ${tres(r.yc0, 3)}\\ \\text{km}` });
         rows.push({ key: 'C', eq: `C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2} = \\sqrt{${tnum(r.xc - x0, 3)}^2 + ${tnum((r.yc0 - y0) / 2, 3)}^2} = ${tres(r.C, 3)}\\ \\text{km}` });
         rows.push({ key: 'zmax', eq: `z_{max} = \\sqrt{z_0^2 + (\\dot z_0 / n)^2} = \\sqrt{${tnum(z0, 4)}^2 + ${tnum(vz / n, 3)}^2} = ${tres(r.zmax, 3)}\\ \\text{km}` });
         // M_0 and ΔM_0: the inverse cosine or sine has two angles that fit, and the sign of the

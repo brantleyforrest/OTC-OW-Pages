@@ -52,10 +52,10 @@
         const steps = [nStep(a, n)];
         steps.push({ key: 'xc', title: 'Center height, x<sub>C</sub>', result: '$x_C = ' + C2.texNum(C2.fixed(truth.xc, 3)) + '$ km',
             caption: 'x<sub>C</sub> is the height of the NMC center; above the target it drifts backward.',
-            methods: [{ name: 'Formula', html: calc('x_C = 4x_0 + \\frac{2\\dot y_0}{n}', ['4' + p(x0, 4) + ' + \\frac{2' + vms(vy) + '}{' + sci(n) + '}'], C2.fixed(truth.xc, 3) + '\\ \\text{km}') }] });
+            methods: [{ name: 'Formula', html: calc('x_C = 4x_0 + \\frac{2\\dot y_0}{n}', ['4(' + C2.fixed(x0, 4) + ') + \\frac{2(' + C2.fixed(vy * 1000, 6) + ')/1000}{' + sci(n) + '}'], C2.fixed(truth.xc, 3) + '\\ \\text{km}') }] });
         steps.push({ key: 'yc0', title: 'Center along the track, y<sub>C0</sub>', result: '$y_{C0} = ' + C2.texNum(C2.fixed(truth.yc0, 3)) + '$ km',
             caption: 'y<sub>C0</sub> is where the NMC center is along the track at epoch.',
-            methods: [{ name: 'Formula', html: calc('y_{C0} = y_0 - \\frac{2\\dot x_0}{n}', [p(y0, 4) + ' - \\frac{2' + vms(vx) + '}{' + sci(n) + '}'], C2.fixed(truth.yc0, 3) + '\\ \\text{km}') }] });
+            methods: [{ name: 'Formula', html: calc('y_{C0} = y_0 - \\frac{2\\dot x_0}{n}', [p(y0, 4) + ' - \\frac{2(' + C2.fixed(vx * 1000, 6) + ')/1000}{' + sci(n) + '}'], C2.fixed(truth.yc0, 3) + '\\ \\text{km}') }] });
         steps.push({ key: 'C', title: 'NMC size, C', result: '$C = ' + C2.fixed(truth.C, 3) + '$ km',
             caption: 'C is the radial half-height of the NMC; it is 2C long on each side of its center.',
             methods: [{ name: 'Formula', html: calc('C = \\sqrt{(x_C - x_0)^2 + \\left(\\frac{y_{C0} - y_0}{2}\\right)^2}',

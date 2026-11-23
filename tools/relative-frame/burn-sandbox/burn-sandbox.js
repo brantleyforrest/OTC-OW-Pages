@@ -324,12 +324,12 @@
         const axis = DIRS[b.dir].axis;
         const dvMs = b.dv[axis] * 1000;
         const nT = tsci(n);
-        const dvT = tnum(dvMs, 4) + '/1000';
+        const dvT = '(' + tres(dvMs, 4) + ')/1000';     // always in parentheses: 2(0.5000)/1000, not 2 0.5000
         const eq = s => '<div class="rule-eq">' + tex(s) + '</div>';
         const note = s => '<p class="rule-note">' + s + '</p>';
         const out = [];
         if (axis === 0) {
-            out.push(eq(`\\Delta V_x = -\\tfrac{n}{2}\\,\\Delta y_C \\;\\Rightarrow\\; \\Delta y_C = -\\frac{2\\,\\Delta V_x}{n} = -\\frac{2\\,${dvT}}{${nT}} = ${tres(-2 * b.dv[0] / n, 3)}\\ \\text{km}`));
+            out.push(eq(`\\Delta V_x = -\\tfrac{n}{2}\\,\\Delta y_C \\;\\Rightarrow\\; \\Delta y_C = -\\frac{2\\,\\Delta V_x}{n} = -\\frac{2${dvT}}{${nT}} = ${tres(-2 * b.dv[0] / n, 3)}\\ \\text{km}`));
             out.push(note('The center slides along the track; x<sub>C</sub> and the drift do not change.'));
             // At the front or back (x = x_C), the same burn changes C by the least ΔV.
             const atSide = r0.C > 1e-6 && Math.abs(b.before[0] - r0.xc) < 0.02 * r0.C;
@@ -340,8 +340,8 @@
             }
         } else if (axis === 1) {
             const dxc = 2 * b.dv[1] / n;
-            out.push(eq(`\\Delta V_y = \\tfrac{n}{2}\\,\\Delta x_C \\;\\Rightarrow\\; \\Delta x_C = \\frac{2\\,\\Delta V_y}{n} = \\frac{2\\,${dvT}}{${nT}} = ${tres(dxc, 3)}\\ \\text{km}`));
-            out.push(eq(`\\Delta \\dot y_C = -3\\pi\\,\\Delta x_C = -3\\pi\\,${tnum(dxc, 3)} = ${tres(-3 * Math.PI * dxc, 3)}\\ \\text{km/rev}`));
+            out.push(eq(`\\Delta V_y = \\tfrac{n}{2}\\,\\Delta x_C \\;\\Rightarrow\\; \\Delta x_C = \\frac{2\\,\\Delta V_y}{n} = \\frac{2${dvT}}{${nT}} = ${tres(dxc, 3)}\\ \\text{km}`));
+            out.push(eq(`\\Delta \\dot y_C = -3\\pi\\,\\Delta x_C = -3\\pi(${tres(dxc, 3)}) = ${tres(-3 * Math.PI * dxc, 3)}\\ \\text{km/rev}`));
             out.push(note(dxc > 0 ? 'The center moves up, so chase now drifts backward (or more slowly forward).' : 'The center moves down, so chase now drifts forward (or more slowly backward).'));
         } else {
             const z = b.before[2], zd0 = b.before[5], zd1 = b.after[5];
