@@ -5,8 +5,10 @@
 //  - Set RMOEs: the six relative motion orbital elements, with sliders (the course model, the CW
 //    solution in OrbitMath.rpo.stateFromRmoe; needs a circular target).
 //  - Set Position and Velocity: chase's RIC state at epoch, with each RMOE worked from it.
-// Switching modes keeps the motion: COEs to RMOEs by OrbitMath.rpo.rmoeFromCoes, RMOEs to COEs by its
-// inverse, OrbitMath.rpo.coesFromRmoe. The motion is drawn in the three flat RIC views (from the left,
+// Switching modes keeps the motion. CW always starts from chase's position and velocity: the RMOEs
+// are rmoeFromState of chase's relative state at epoch (on CW's straight axes), and from RMOEs chase's
+// orbit is the one through the CW position and velocity. The course's element formulas (x_C = Δa,
+// y_C0 = aΔu) only approximate that start. The motion is drawn in the three flat RIC views (from the left,
 // from behind, from above), the 3D RIC box, and an inertial view, with annotations for what each
 // RMOE controls. Built from the RMOE Explorer and Relative Motion: Two Views.
 (async function () {
@@ -116,7 +118,6 @@
         diff: { ...ZERO_DIFF },       // Set COEs: chase minus target
         mode: 'rmoe',
         rmoe: { ...ZERO },            // undefined angles are kept as 0; mathRmoe() turns them into null
-        modeNote: '',
         presetCustom: false,          // the user changed the numbers: the preset list reads Custom
         customTarget: false,          // Custom picked (or a typed): the target's a is the typed one
         t: 0, revs: 2, playing: !Kit.prefersReducedMotion(), speed: 0.02,
@@ -156,13 +157,30 @@
         return { ...r, M0: r.C > TINY ? r.M0 : null, dM0: r.zmax > TINY ? r.dM0 : null };
     }
     const stored = r => ({ xc: r.xc, yc0: r.yc0, C: r.C, zmax: r.zmax, M0: r.M0 === null ? 0 : r.M0, dM0: r.dM0 === null ? 0 : r.dM0 });
-    // Set COEs keeps state.rmoe equal to the RMOEs the elements give (for a circular target).
-    function syncRmoeFromCoes() { if (isCircular()) state.rmoe = stored(M.rmoeFromCoes(state.target, chaseCoe())); }
+    // CW starts from chase's position and velocity, never from the element formulas. The link between
+    // the two orbits and the RMOEs: chase's relative state at epoch, on CW's straight (rectilinear)
+    // axes unless others are given, through rmoeFromState; and back, chase placed at the CW position
+    // and velocity.
+    function rmoeOfOrbits(target, chase, axes) {
+        const rel = M.relativeStateSats(M.targetSat(target), M.targetSat(chase), 0, axes || 'rectilinear');
+        return M.rmoeFromState([...rel.rho, ...rel.rhoDot], M.meanMotion(target.a));
+    }
+    // Chase's elements from a relative state at epoch, keeping its current values for any angle the
+    // orbit leaves undefined (so a circular chase keeps its ω and ν split).
+    function chaseOfState(s, target, axes) {
+        const cSat = M.chaseSatFromRic(s, M.targetSat(target), 0, axes || 'rectilinear');
+        const el = window.OrbitMath.elements.elementsFromRv(cSat.r, cSat.v, chaseCoe());
+        return { a: el.a, e: el.e, i: el.i, raan: el.raan, argp: el.argp, nu: el.nu };
+    }
+    const diffOfRmoe = (target, r) => M.coeDifference(target, chaseOfState(M.stateFromRmoe(r, M.meanMotion(target.a), 0), target));
+    // Every mode keeps state.rmoe equal to the RMOEs the orbits give (for a circular target).
+    function syncRmoeFromCoes() { if (isCircular()) state.rmoe = stored(rmoeOfOrbits(state.target, chaseCoe())); }
 
     // The RIC model setting (site settings): CW (default) or the exact model. With CW every mode
-    // uses the CW equations on a circular target (the COE mode turns the elements into RMOEs).
-    // With the exact model both spacecraft fly their own orbits, the same ones in every mode (from
-    // the RMOEs, chase's elements are coesFromRmoe). Its RIC axes are rectilinear or curvilinear.
+    // uses the CW equations on a circular target, started from chase's position and velocity on
+    // straight axes. With the exact model both spacecraft fly their own orbits, the same ones in
+    // every mode, and the RIC axes are rectilinear or curvilinear as chosen; its RMOEs are CW's
+    // prediction, started from chase's position and velocity on those axes.
     const ricModel = () => window.OrbitConstants.Settings.get();
     function rebuild() {
         const oldP = sim ? sim.P : 0;
@@ -184,9 +202,26 @@
             const tSat = M.targetSat(coe), cSat = M.targetSat(chase);
             const s = M.sampleRelativeSats(tSat, cSat, 0, spanT, count, axes);
             const frame = V.framePath(coe, times, s.rect);
-            const rmoe = circular ? M.rmoeFromCoes(coe, chase) : null;
+            // CW starts where chase really is: its exact relative state at epoch, on the axes chosen,
+            // run through CW (as the Burn Sandbox does). The RMOE readouts and the CW overlay both use
+            // it, so the gap is CW's own error from that state, including the drift a rectilinear
+            // start gives. CW needs a circular target.
+            let rmoe = null;
+            if (circular) {
+                const rel0 = M.relativeStateSats(tSat, cSat, 0, axes);
+                rmoe = M.rmoeFromState([...rel0.rho, ...rel0.rhoDot], n);
+            }
+            // CW's path from that start, and its largest distance from the exact path over the span.
+            const cwAll = rmoe ? M.sampleTrajectory(rmoe, n, 0, spanT, count) : null;
+            let maxGap = 0;
+            if (cwAll) {
+                for (let k = 0; k < count; k++) {
+                    maxGap = Math.max(maxGap, Math.hypot(s.path[3 * k] - cwAll[3 * k], s.path[3 * k + 1] - cwAll[3 * k + 1], s.path[3 * k + 2] - cwAll[3 * k + 2]));
+                }
+            }
+            const cwRmoe = settings.cwOverlay ? rmoe : null;
             sim = { exact: true, coe, chase, circular, n, P, spanT, count, path: s.path, frame,
-                rmoe, tSat, cSat, axes, cwPath: rmoe && settings.cwOverlay ? M.sampleTrajectory(rmoe, n, 0, spanT, count) : null };
+                rmoe, tSat, cSat, axes, cwRmoe, cwPath: cwRmoe ? cwAll : null, maxGap };
         } else {
             const rmoe = mathRmoe();
             const path = M.sampleTrajectory(rmoe, n, 0, spanT, count);
@@ -327,7 +362,7 @@
         // The CW overlay: the course model's path and chase, in their own color beside the exact ones.
         const data = {
             chase: now, trail, ghosts: [sim.path], nmcLoop,
-            cw: sim.cwPath, cwChase: sim.cwPath ? M.stateFromRmoe(sim.rmoe, sim.n, t) : null,
+            cw: sim.cwPath, cwChase: sim.cwPath ? M.stateFromRmoe(sim.cwRmoe, sim.n, t) : null,
             rmoe: rDraw && (state.annot.center || state.hot === 'xc' || state.hot === 'yc0') ? rDraw : null,
             showNmc: state.annot.size || state.annot.corners
         };
@@ -379,7 +414,7 @@
                 markCustom();
                 state.rmoe[row.key] = value;
                 state.lastRow = row.key;
-                if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
+                if (isCircular()) state.diff = diffOfRmoe(state.target, mathRmoe());
                 rebuild();
                 refit(final);
                 updateInputs(row.key);
@@ -433,11 +468,13 @@
             $('drift-read').textContent = Math.abs(drift.kmPerRev) >= 0.005
                 ? `Drift ${fmt(drift.kmPerRev, 2)} km/rev (${fmt(drift.degPerRev, 4)}°/rev), ${drift.kmPerRev < 0 ? 'backward' : 'forward'}.`
                 : 'No drift: x_C = 0.';
-            const aChase = sim.coe.a + r.xc;
-            $('co-da').textContent = fmt(r.xc, 2) + ' km';
-            $('co-e').textContent = (r.C / aChase).toExponential(3);
-            $('co-th').textContent = fmt(r.zmax / sim.coe.a * M.R2D, 5) + '°';
         }
+        // Chase's own orbit; the labels give the course's approximations from the RMOEs.
+        const c = sim.chase, t0 = sim.coe;
+        $('co-da').textContent = fmt(c.a - t0.a, 3) + ' km';
+        $('co-e').textContent = c.e.toExponential(3);
+        const cosTh = Math.cos(c.i * M.D2R) * Math.cos(t0.i * M.D2R) + Math.sin(c.i * M.D2R) * Math.sin(t0.i * M.D2R) * Math.cos((c.raan - t0.raan) * M.D2R);
+        $('co-th').textContent = fmt(Math.acos(Math.min(1, Math.max(-1, cosTh))) * M.R2D, 5) + '°';
         const P = sim.P;
         $('co-p').textContent = P > 7200 ? (P / 3600).toFixed(3) + ' h' : (P / 60).toFixed(2) + ' min';
         const row = state.mode === 'rmoe' ? ROWS.find(x => x.key === state.lastRow) : null;
@@ -449,6 +486,58 @@
         }
         updatePv();
         updateNotes();
+        updateCwChecks();
+    }
+
+    /* ---------- How well CW's assumptions hold (Advanced) ---------- */
+    const FORCE_NAMES = { j2: 'J₂', j34: 'J₃ and J₄', j22: 'J₂,₂', drag: 'drag', sun: 'Sun', moon: 'Moon', srp: 'solar radiation pressure' };
+    const forcesOn = s => (s.propagator === 'cowell' ? Object.keys(s.forces || {}).filter(k => s.forces[k]).map(k => FORCE_NAMES[k] || k) : []);
+    const kmText = v => (Math.abs(v) < 1 ? fmt(v * 1000, 0) + ' m' : fmt(v, 2) + ' km');
+
+    const MARKS = { ok: ['✓', 'Holds'], stretched: ['~', 'Stretched'], broken: ['✗', 'Broken'] };
+    function updateCwChecks() {
+        const box = $('cw-checks');
+        if (!box || !sim) return;
+        const s = ricModel(), exact = sim.exact, a = sim.coe.a;
+        let maxR = 0, maxY = 0;
+        for (let k = 0; k < sim.count; k++) {
+            const x = sim.path[3 * k], y = sim.path[3 * k + 1], z = sim.path[3 * k + 2];
+            maxR = Math.max(maxR, Math.hypot(x, y, z));
+            maxY = Math.max(maxY, Math.abs(y));
+        }
+        const rows = [];
+        const mark = (level, name, detail) => rows.push({ level, name, detail });
+        mark(sim.circular ? 'ok' : 'broken', 'Circular target',
+            sim.circular ? 'e = 0.' : `e = ${eText()}. CW does not apply, so there are no RMOEs.`);
+        const near = maxR / a;
+        mark(near < 2e-3 ? 'ok' : near < 1e-2 ? 'stretched' : 'broken', 'Close to the target',
+            `Farthest ${fmt(maxR, 1)} km, ${(near * 100).toPrecision(2)}% of a. CW drops terms that grow with this.`);
+        const bend = maxY * maxY / (2 * a);
+        if (exact && s.ricAxes === 'curvilinear') {
+            mark('ok', 'Straight axes', `Curvilinear axes measure in-track along the orbit, so the ${kmText(bend)} bend of the track is taken out.`);
+        } else if (sim.rmoe) {
+            // Chase's state on straight axes gives a slightly wrong x_C (against the same orbits on
+            // curvilinear axes), and CW turns that into a drift of 3π x_C per rev.
+            const dxc = Math.abs(rmoeOfOrbits(sim.coe, sim.chase, 'curvilinear').xc - sim.rmoe.xc);
+            const drift = 3 * Math.PI * dxc * state.revs;
+            mark(drift < 0.1 ? 'ok' : drift < 1 ? 'stretched' : 'broken', 'Straight axes',
+                `${fmt(maxY, 1)} km along the track, the orbit bends ${kmText(bend)} away from CW’s straight in-track axis. ` +
+                `Starting CW there puts x_C ${kmText(dxc)} off, a false drift of about ${kmText(drift)} over the ${state.revs} revs shown.`);
+        } else {
+            mark(bend < 0.1 ? 'ok' : bend < 1 ? 'stretched' : 'broken', 'Straight axes',
+                `${fmt(maxY, 1)} km along the track, the orbit bends ${kmText(bend)} away from CW’s straight in-track axis.`);
+        }
+        const xc = sim.rmoe ? Math.abs(sim.rmoe.xc) : Math.abs(sim.chase.a - a);
+        const dr = xc / a;
+        mark(dr < 1e-4 ? 'ok' : dr < 1e-3 ? 'stretched' : 'broken', 'Small height difference',
+            `|${sim.rmoe ? 'x_C' : 'Δa'}| = ${fmt(xc, 2)} km. CW’s drift rate is only first order in it.`);
+        const forces = forcesOn(s);
+        if (!forces.length) mark('ok', 'Two-body motion', 'No extra forces are on.');
+        else if (exact) mark('stretched', 'Two-body motion', `${forces.join(', ')} act on both spacecraft; CW leaves them out.`);
+        else mark('stretched', 'Two-body motion', `${forces.join(', ')} are on in Settings, but CW leaves them out, so this path does not show them.`);
+        $('cw-checks-head').textContent = exact ? 'How well CW fits this motion' : 'What CW assumes, and how well it holds here';
+        $('cw-checks-list').innerHTML = rows.map(r => `<li class="${r.level}"><span class="ck-mark" aria-hidden="true">${MARKS[r.level][0]}</span>` +
+            `<span><b>${r.name}</b> <span class="ck-level">${MARKS[r.level][1]}.</span> ${r.detail}</span></li>`).join('');
     }
 
     // GEO, GPS, or LEO when the target is that orbit and Custom was not picked; otherwise Custom.
@@ -522,7 +611,6 @@
         clearBad();
         state.target = target;
         state.diff = diff;
-        state.modeNote = '';
         syncRmoeFromCoes();
         if (!isGeoTarget() && state.frame === 'ECEF') { state.frame = 'ECI'; selectFrame('ECI'); applyViewOptions(); }
         rebuild();
@@ -588,6 +676,7 @@
         if (Math.abs(state.diff.dnu) > 1e-12 && (t.e > 1e-6 || c.e > 1e-6 || Math.abs(state.diff.da) > 1e-9))
             notes.push('A difference in ν is a fixed distance along the track only when both orbits are circular and the same size.');
         $('el-notes').innerHTML = notes.map(s => '<li>' + s + '</li>').join('');
+
         const show = isCircular() && c.e > 1e-9;
         $('starts-row').style.display = show ? '' : 'none';
         if (show) {
@@ -598,25 +687,53 @@
             });
         }
     }
-    // Advanced off: an eccentric target goes back to circular.
+    // Advanced off: the Frame toggle hides, so the view goes back to ECI. An eccentric target needs
+    // Advanced, so turning it off with one asks first (Conflicts, below).
+    let advancedWas = isAdvanced();
+    const toEci = () => { if (state.frame !== 'ECI') { state.frame = 'ECI'; selectFrame('ECI'); } };
+    function keepAdvanced() {
+        const button = document.querySelector('.mode-switch');
+        if (button) button.click(); else document.body.classList.add('advanced-on');
+    }
     new MutationObserver(() => {
-        // The Frame toggle shows only with Advanced on, so turning Advanced off goes back to ECI.
-        if (!isAdvanced() && state.frame !== 'ECI') { state.frame = 'ECI'; selectFrame('ECI'); }
-        if (!eccOk() && state.target.e > 0) commit({ ...state.target, e: 0 }, { ...state.diff, de: Math.max(0, state.diff.de) }, null);
-        else fillElTable();
+        const adv = isAdvanced(), turnedOff = advancedWas && !adv;
+        advancedWas = adv;
+        if (turnedOff && !isCircular()) {
+            askChoice('An eccentric target needs Advanced',
+                `The target’s e is ${eText()}. With Advanced off, the target’s orbit must be circular.`,
+                [{ label: 'Keep Advanced on', run: keepAdvanced },
+                 { label: 'Set e to 0', primary: true, run: () => { makeCircular(); toEci(); refreshAll(); } }],
+                keepAdvanced);
+            return;
+        }
+        if (!adv) toEci();
+        fillElTable();
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
     /* ---------- Set Position and Velocity ---------- */
     // Fields hold km and m/s; the state array holds km and km/s.
     const PV_IDS = ['pv-x', 'pv-y', 'pv-z', 'pv-vx', 'pv-vy', 'pv-vz'];
-    const pvState = () => M.stateFromRmoe(mathRmoe(), sim.n, 0);
+    // With CW, position and velocity come from the RMOEs. With the exact model they are chase's own
+    // relative state at epoch, from the two orbits, on the RIC axes chosen in Settings; they work for
+    // an eccentric target too, which has no RMOEs.
+    function pvState() {
+        if (!sim.exact) return M.stateFromRmoe(mathRmoe(), sim.n, 0);
+        const rel = M.relativeStateSats(sim.tSat, sim.cSat, 0, sim.axes);
+        return [...rel.rho, ...rel.rhoDot];
+    }
+    // The exact model: chase's elements from a relative state at epoch on the axes chosen.
+    const chaseFromPv = (s, target) => chaseOfState(s, target, ricModel().ricAxes);
+    // A field's text: km to 4 places, m/s to 6.
+    const pvText = (s, k) => String(Number((k < 3 ? s[k] : s[k] * 1000).toFixed(k < 3 ? 4 : 6)));
+    // The state the fields hold. A field still showing the current value's rounded text counts as
+    // that value in full, so typing one field never rounds the other five.
     function currentPvInputs() {
+        const s = pvState();
         return PV_IDS.map((id, k) => {
             const el = $(id);
             const val = el ? Number(el.value) : NaN;
-            if (Number.isFinite(val)) return k < 3 ? val : val / 1000;
-            const s = pvState();
-            return s[k];
+            if (!Number.isFinite(val) || el.value.trim() === pvText(s, k)) return s[k];
+            return k < 3 ? val : val / 1000;
         });
     }
     function buildPv() {
@@ -629,10 +746,16 @@
                 if (!text || !Number.isFinite(value)) { if (final) updatePv(); return; }
                 const s = currentPvInputs();
                 s[k] = k < 3 ? value : value / 1000;
+                state.lastRow = null;
+                if (sim.exact) {
+                    // The exact model: chase flies the orbit this state gives (commit turns down one
+                    // that is not allowed, as the element table does).
+                    userCommit({ ...state.target }, M.coeDifference(state.target, chaseFromPv(s, state.target)), $(id), final, !final);
+                    return;
+                }
                 markCustom();
                 state.rmoe = stored(M.rmoeFromState(s, sim.n));
-                state.lastRow = null;
-                if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
+                state.diff = diffOfRmoe(state.target, mathRmoe());
                 rebuild();
                 refit(final);
                 updateInputs();
@@ -654,8 +777,14 @@
         const s = pvState();
         PV_IDS.forEach((id, k) => {
             if (document.activeElement === $(id)) return;
-            $(id).value = String(Number((k < 3 ? s[k] : s[k] * 1000).toFixed(k < 3 ? 4 : 6)));
+            $(id).value = pvText(s, k);
         });
+        if (sim.exact) {
+            // RMOEs are the CW model's constants: with the exact model there are none to work out.
+            $('pv-eqs').innerHTML = '<p class="panel-text muted">With Exact difference, chase flies its own orbit from this state, so there are no RMOEs to work out. ' +
+                'The CW equations that turn it into RMOEs show when Relative motion is set to CW.</p>';
+            return;
+        }
         const n = sim.n, a = sim.coe.a;
         const [x0, y0, z0, vx, vy, vz] = s;
         const r = M.rmoeFromState(s, n);
@@ -712,25 +841,13 @@
     }
 
     /* ---------- The three ways to set the motion ---------- */
-    // Switching keeps the motion. To COEs: chase's elements from the RMOEs (coesFromRmoe). From
-    // COEs: the RMOEs the elements give (rmoeFromCoes). RMOEs need a circular target, so leaving
-    // COEs with an eccentric one first asks whether to set its e to 0 or stay (askCircular).
+    // Switching only chooses which numbers are typed. Every edit keeps the COEs (state.target,
+    // state.diff) and the RMOEs (state.rmoe) in step, and position and velocity are read from them,
+    // so switching recomputes nothing: going round through the other set would move numbers the
+    // motion does not depend on (how a circular chase's position splits between ω and ν, an M_0 or
+    // ΔM_0 that is undefined). A switch the settings do not allow is asked about first (Conflicts).
     function applyMode(mode) {
-        const from = state.mode;
-        state.modeNote = '';
-        // Every edit keeps the COEs (state.target, state.diff) and the RMOEs (state.rmoe) in step, and
-        // position and velocity are read from the RMOEs, so switching recomputes nothing: going round
-        // through the other set would move numbers the motion does not depend on (how a circular
-        // chase's position splits between ω and ν, an M_0 or ΔM_0 that is undefined). The one change
-        // is an eccentric target leaving COEs, after the reader agrees to make it circular.
-        if (mode === 'coe' && from !== 'coe') {
-            clearBad();
-        } else if (mode !== 'coe' && from === 'coe' && !isCircular()) {
-            state.target = { ...state.target, e: 0 };
-            state.diff = { ...state.diff, de: Math.max(0, state.diff.de) };
-            state.modeNote = 'The target’s e is now 0.';
-            syncRmoeFromCoes();
-        }
+        if (mode === 'coe' && state.mode !== 'coe') clearBad();
         state.mode = mode;
         state.lastRow = null;
         ['coe', 'rmoe', 'pv'].forEach(m => document.body.classList.toggle('mode-' + m, m === mode));
@@ -746,34 +863,68 @@
     const selectMode = Kit.bindSegmented($('mode-pick'), mode => {
         if (mode === state.mode) return;
         mode = mode === 'coe' || mode === 'pv' ? mode : 'rmoe';
-        if (state.mode === 'coe' && !isCircular()) askCircular(mode);
-        else applyMode(mode);
+        if (mode === 'rmoe' && isExactRic()) { selectMode(state.mode); askRmoeNeedsCw(); return; }   // the old button stays pressed while asking
+        applyMode(mode);
     });
-    // Leaving COEs with an eccentric target: the other modes need e = 0, which changes the target's
-    // orbit, so the reader chooses to set it or to stay in COEs. Nothing changes until they do.
-    const eDialog = $('e-dialog');
-    let pendingMode = null;
-    function askCircular(mode) {
-        if (!eDialog || typeof eDialog.showModal !== 'function') { applyMode(mode); return; }
-        pendingMode = mode;
-        selectMode('coe');   // COEs stays pressed while the dialog asks
-        const name = mode === 'pv' ? 'Position and Velocity' : 'RMOEs';
-        $('e-dialog-text').textContent = `${name} need a circular target, and the target’s e is ${fmtNum(state.target.e, 6)}. ` +
-            `Setting e to 0 changes the target’s orbit; chase keeps its difference in e.`;
-        eDialog.showModal();
-        $('e-dialog-set').focus();
-    }
-    function stayInCoes() { pendingMode = null; selectMode('coe'); }   // puts the COEs button back
-    if (eDialog && typeof eDialog.showModal === 'function') {
-        $('e-dialog-set').addEventListener('click', () => {
-            const mode = pendingMode;
-            pendingMode = null;
-            eDialog.close();
-            if (mode) { applyMode(mode); selectMode(mode); }   // then press the new mode's button
+    const pressMode = mode => { applyMode(mode); selectMode(mode); };   // switch, then press its button
+
+    /* ---------- Conflicts: asked about, never changed quietly ---------- */
+    // A change that would break an assumption (CW needs a circular target; RMOEs exist only with
+    // CW; an eccentric target needs Advanced; presets are RMOEs) opens a dialog with the choices.
+    // Nothing changes until the reader picks one; Escape takes the choice that keeps things as they were.
+    const choiceDialog = $('choice-dialog');
+    let pendingCancel = null;   // what Escape, or any close without a choice, does
+    let resolving = false;      // a settings change made by a choice: not asked about again
+    function askChoice(title, text, choices, cancel) {
+        if (!choiceDialog || typeof choiceDialog.showModal !== 'function') { cancel(); return; }
+        $('choice-title').textContent = title;
+        $('choice-text').textContent = text;
+        const box = $('choice-buttons');
+        box.innerHTML = '';
+        let primary = null;
+        choices.forEach(c => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn' + (c.primary ? ' primary' : '');
+            b.textContent = c.label;
+            b.addEventListener('click', () => { pendingCancel = null; choiceDialog.close(); c.run(); });
+            box.appendChild(b);
+            if (c.primary) primary = b;
         });
-        $('e-dialog-stay').addEventListener('click', () => eDialog.close());
-        // Stay, Escape, or any other close without Set: back to COEs, nothing changed.
-        eDialog.addEventListener('close', () => { if (pendingMode) stayInCoes(); });
+        pendingCancel = cancel;
+        choiceDialog.showModal();
+        if (primary) primary.focus();
+    }
+    if (choiceDialog && typeof choiceDialog.showModal === 'function') {
+        choiceDialog.addEventListener('close', () => { const c = pendingCancel; pendingCancel = null; if (c) c(); });
+    }
+    const eText = () => fmtNum(state.target.e, 6);
+    // A settings change a choice makes: the settings panel and this page follow without asking again.
+    function setSettings(patch) {
+        resolving = true;
+        try { window.OrbitConstants.Settings.set(patch); } finally { resolving = false; }
+    }
+    // The target made circular; chase keeps its difference in e (at least 0).
+    function makeCircular() {
+        state.target = { ...state.target, e: 0 };
+        state.diff = { ...state.diff, de: Math.max(0, state.diff.de) };
+        syncRmoeFromCoes();
+    }
+    function refreshAll() { rebuild(); refit(true); updateInputs(); updateStatic(); fillElTable(); drawAll(); }
+    const MODE_NAMES = { coe: 'COEs', rmoe: 'RMOEs', pv: 'Position and Velocity' };
+    // RMOEs picked while Relative motion is Exact difference.
+    function askRmoeNeedsCw() {
+        const ecc = !isCircular();
+        askChoice('RMOEs need the CW model',
+            'RMOEs are the constants of the CW equations, so they exist only when Relative motion is set to CW. It is set to Exact difference.' +
+            (ecc ? ` CW also needs a circular target, so switching sets the target’s e (${eText()}) to 0.` : ''),
+            [{ label: 'Stay in ' + MODE_NAMES[state.mode], run: () => {} },
+             { label: ecc ? 'Use CW and set e to 0' : 'Use CW', primary: true, run: () => {
+                 if (ecc) makeCircular();
+                 setSettings({ ricModel: 'cw' });
+                 pressMode('rmoe');
+             } }],
+            () => {});
     }
 
     // Labels that say which model the readouts come from, and the CW overlay's live gap.
@@ -782,11 +933,17 @@
         if (head) head.textContent = 'Now (CW)';
         const gapEl = $('cw-gap');
         if (!gapEl) return;
-        gapEl.hidden = !sim.cwPath;
-        if (sim.cwPath) {
+        // Only with Exact difference: with CW the path is CW itself, so there is no gap to show.
+        gapEl.hidden = !sim.exact;
+        if (!sim.exact) {
+            gapEl.textContent = '';
+        } else if (!sim.rmoe) {
+            gapEl.textContent = 'No CW comparison: the target is not circular.';
+        } else {
             const c = M.stateFromRmoe(sim.rmoe, sim.n, t);
             const g = Math.hypot(now[0] - c[0], now[1] - c[1], now[2] - c[2]);
-            gapEl.textContent = 'Exact minus CW now: ' + (g < 1 ? fmt(g * 1000, 1) + ' m' : fmt(g, 3) + ' km');
+            gapEl.textContent = `Exact minus CW: ${kmText(g)} now, ${kmText(sim.maxGap)} at most over the span shown.` +
+                (sim.cwPath ? '' : ' Turn on “Also show the CW path” in Settings to draw it.');
         }
     }
 
@@ -841,8 +998,18 @@
         sel.addEventListener('change', () => { if (sel.value !== 'custom') loadPreset(Number(sel.value)); });
         $('reset-preset').addEventListener('click', () => loadPreset(state.preset));
     }
-    // A preset in the current mode, on the nearest target button's orbit (made circular).
+    // A preset in the current mode, on the nearest target button's orbit. Presets are RMOEs, which
+    // need a circular target, so loading one onto an eccentric target asks first.
     function loadPreset(index) {
+        if (isCircular()) { loadPresetNow(index); return; }
+        const back = () => { $('preset').value = state.presetCustom ? 'custom' : String(state.preset); };
+        askChoice('Presets need a circular target',
+            `Presets are set with RMOEs, which need a circular target. Loading ${PRESETS[index].name} sets the target’s e (${eText()}) to 0.`,
+            [{ label: 'Cancel', run: back },
+             { label: 'Set e to 0 and load', primary: true, run: () => loadPresetNow(index) }],
+            back);
+    }
+    function loadPresetNow(index) {
         const p = PRESETS[index];
         const key = nearestKey();
         const s = SCALE[key];
@@ -853,9 +1020,8 @@
         state.target = state.customTarget ? { ...state.target, e: 0 } : { ...TARGETS[key] };
         state.rmoe = { ...ZERO };
         Object.entries(p.rmoe).forEach(([k, value]) => { state.rmoe[k] = k === 'M0' || k === 'dM0' ? value : value * s; });
-        // Every mode gets the same motion: the element differences come from the RMOEs.
-        state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
-        state.modeNote = '';
+        // Every mode gets the same motion: chase's orbit is the one through the CW position and velocity.
+        state.diff = diffOfRmoe(state.target, mathRmoe());
         state.lastRow = null;
         state.t = 0; state.revs = p.span || 2;
         if (!isGeoTarget() && state.frame === 'ECEF') { state.frame = 'ECI'; selectFrame('ECI'); }
@@ -888,12 +1054,14 @@
         const r = mathRmoe();
         ['xc', 'yc0', 'C', 'zmax'].forEach(k => { r[k] *= ratio; });
         state.target = { ...TARGETS[key] };
-        state.modeNote = '';
-        if (state.mode === 'coe') {
-            if (circular) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, r));
-            else state.diff = { ...state.diff, de: Math.max(0, state.diff.de) };
+        // Every mode keeps the COEs and the RMOEs in step (an eccentric target had no RMOEs to scale).
+        if (circular) {
+            state.rmoe = stored(r);
+            state.diff = diffOfRmoe(state.target, r);
+        } else {
+            state.diff = { ...state.diff, de: Math.max(0, state.diff.de) };
             syncRmoeFromCoes();
-        } else state.rmoe = stored(r);
+        }
         if (key !== 'geo' && state.frame === 'ECEF') { state.frame = 'ECI'; selectFrame('ECI'); }
         state.t = 0;
         clearBad();
@@ -923,15 +1091,28 @@
         }
         el.title = A_TITLE;
         if (Math.abs(v - state.target.a) < 1e-9 && !final) return;
-        state.target = { ...state.target, a: v, e: 0 };
-        state.modeNote = '';
-        if (state.mode === 'pv') {
+        const target = { ...state.target, a: v };   // only a changes: an eccentric target keeps its e
+        if (state.mode === 'pv' && sim.exact) {
+            // The exact model keeps the typed relative state; chase's orbit follows the new target.
+            const chase = chaseFromPv(currentPvInputs(), target);
+            const problem = M.orbitProblem(chase);
+            if (problem) {
+                if (final) { el.classList.add('bad'); el.title = MESSAGES[problem]; el.value = fmtNum(state.target.a, 3); }
+                return;
+            }
+            state.target = target;
+            state.diff = M.coeDifference(target, chase);
+            syncRmoeFromCoes();
+        } else if (state.mode === 'pv') {
             const s = currentPvInputs();
+            state.target = target;
             state.rmoe = stored(M.rmoeFromState(s, M.meanMotion(v)));
-            if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
+            state.diff = diffOfRmoe(state.target, mathRmoe());
         } else if (state.mode === 'rmoe') {
-            if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
-        } else if (state.mode === 'coe') {
+            state.target = target;
+            state.diff = diffOfRmoe(state.target, mathRmoe());
+        } else {
+            state.target = target;
             syncRmoeFromCoes();
         }
         if (!isGeoTarget() && state.frame === 'ECEF') { state.frame = 'ECI'; selectFrame('ECI'); }
@@ -1031,6 +1212,7 @@
     fillPresets();
     document.body.classList.add('mode-' + state.mode);
     loadPreset(state.preset);
+    if (isExactRic()) selectMode('coe');   // RMOEs exist only with CW: with Exact difference the page opens on COEs
     applyViewOptions();
     setPlaying(state.playing);
 
@@ -1052,7 +1234,7 @@
         setTargetA: v => { $('target-a').value = String(v); setTargetA(true); },
         set(values) {
             Object.assign(state.rmoe, values);
-            if (isCircular()) state.diff = M.coeDifference(state.target, M.coesFromRmoe(state.target, mathRmoe()));
+            if (isCircular()) state.diff = diffOfRmoe(state.target, mathRmoe());
             rebuild(); refit(true); updateInputs(); updateStatic(); fillElTable(); drawAll();
         },
         setOrbits(target, diff) { return commit({ ...target }, { ...ZERO_DIFF, ...diff }, null); }
@@ -1064,12 +1246,24 @@
         modelNote: "Cowell changes this page only when Relative motion is set to Exact difference: then both spacecraft fly under these forces. With CW, the path comes from the CW equations, so these settings do not change it.",
         onSettingsChange() {
             rebindMath();
-            // CW assumes a circular target: switching to CW makes an eccentric one circular.
-            if (!eccOk() && state.target.e > 0) {
-                state.target = { ...state.target, e: 0 };
-                state.diff = { ...state.diff, de: Math.max(0, state.diff.de) };
-                syncRmoeFromCoes();
-                state.modeNote = 'CW needs a circular target, so the target’s e is now 0.';
+            // A Relative motion change that breaks an assumption asks first; until the reader
+            // chooses, the page stays as it was. "Keep" puts the setting back.
+            if (!resolving && !isExactRic() && !isCircular()) {
+                askChoice('CW needs a circular target',
+                    `Relative motion is now CW, which needs a circular target, and the target’s e is ${eText()}.`,
+                    [{ label: 'Keep Exact difference', run: () => setSettings({ ricModel: 'exact' }) },
+                     { label: 'Set e to 0', primary: true, run: () => { makeCircular(); refreshAll(); } }],
+                    () => setSettings({ ricModel: 'exact' }));
+                return;
+            }
+            if (!resolving && isExactRic() && state.mode === 'rmoe') {
+                askChoice('RMOEs need the CW model',
+                    'Relative motion is now Exact difference, but RMOEs exist only with CW. Set the motion with COEs or Position and Velocity instead, or keep CW.',
+                    [{ label: 'Keep CW', run: () => setSettings({ ricModel: 'cw' }) },
+                     { label: 'Use Position and Velocity', run: () => pressMode('pv') },
+                     { label: 'Use COEs', primary: true, run: () => pressMode('coe') }],
+                    () => setSettings({ ricModel: 'cw' }));
+                return;
             }
             rebuild();
             refit(true);

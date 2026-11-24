@@ -94,7 +94,8 @@
         function keepReferenceAngles(el, ref) {
             const s = el.i > 90 ? -1 : 1;
             const sum = s * el.raan + el.argp + el.nu;
-            if (el.undefinedAngles.raan && el.undefinedAngles.argp) {
+            // (An elliptical equatorial orbit also has argp undefined, so test nu for circular.)
+            if (el.undefinedAngles.raan && el.undefinedAngles.nu) {
                 // Circular equatorial: only the true longitude is defined.
                 el.raan = wrap360(ref.raan); el.argp = wrap360(ref.argp);
                 el.nu = wrap360(sum - s * el.raan - el.argp);

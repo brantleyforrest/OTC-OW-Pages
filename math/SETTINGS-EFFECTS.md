@@ -44,8 +44,8 @@ Legend: **Yes** = the setting changes what the page shows. **—** = no effect.
 | Orbital Maneuvers | Yes | Transfer flown after burn 1 | With Cowell | With Cowell + drag/SRP | — |
 | Perturbations | Yes | — | — | — | — |
 | Sun-Synchronous | Yes | — | — | — | — |
-| Burn Sandbox | Yes | Target always; chase with Exact | With Cowell | With Cowell + drag/SRP | Yes |
-| Relative Motion Explorer | Yes | With Exact, and in COE mode | With Cowell | With Cowell + drag/SRP | Yes |
+| Burn Sandbox | Yes | With Exact (target and chase) | With Cowell and Exact | With Cowell, Exact, drag/SRP | Yes |
+| Relative Motion Explorer | Yes | With Exact | With Cowell and Exact | With Cowell, Exact, drag/SRP | Yes |
 | Test 1 Practice | — | — | — | — | — |
 | Test 2 Practice | — | — | — | — | — |
 
@@ -111,15 +111,17 @@ Legend: **Yes** = the setting changes what the page shows. **—** = no effect.
 
 **Burn Sandbox** (`tools/relative-frame/burn-sandbox/`)
 - Constants: μ changes the target's mean motion and so every CW path.
-- Cowell: the target moves under the chosen forces.
-- RIC model: with CW, the chase's relative motion is the CW model. With Exact, the chase is flown too, its burns included, and the difference is drawn in the chosen axes (rectilinear or curvilinear). The CW path can be drawn alongside.
+- RIC model: with CW, the target flies a two-body circular orbit (CW assumes one, so Cowell does nothing) and the chase's relative motion is the CW model. With Exact, target and chase are both flown under the chosen forces, burns included, and the difference is drawn in the chosen axes (rectilinear or curvilinear). The CW path can be drawn alongside; it starts from the chase's position and velocity on those axes.
 - Any change clears the stored burn results and restarts the time window.
-- Note shown: "With Cowell, the target moves under the chosen forces. With the exact RIC model the chase does too, and its burns are flown; with CW the relative motion is the CW model."
+- Note shown: "Cowell changes this page only when Relative motion is set to Exact difference: then target and chase move under the chosen forces, and the burns are flown. With CW, the target flies a two-body circular orbit and the path comes from the CW equations, so these settings do not change it."
 
 **Relative Motion Explorer** (`tools/relative-frame/relative-motion-explorer/`)
-- Constants: μ changes the mean motion and so the CW path and the RMOEs.
-- RIC model: with CW, the path comes from the CW equations and Cowell does nothing. With Exact, both spacecraft are flown and their difference drawn in the chosen axes, with the CW path alongside if asked for.
-- COE mode always uses the exact model, so Cowell changes it whatever the RIC setting.
+- Constants: μ changes the mean motion and so the CW path. The RMOEs of given orbits do not change (positions and n·distance velocities scale together).
+- RIC model: with CW, every mode (COEs, RMOEs, Position and Velocity) draws the CW path on a circular target; Cowell and Axes do nothing. With Exact, both spacecraft are flown and their difference drawn in the chosen axes, with the CW path alongside if asked for. RMOEs can only be typed with CW; with Exact the RMOE readouts are CW's prediction.
+- CW start: CW always starts from the chase's position and velocity at epoch, never from the element formulas (x_C = Δa, y_C0 = aΔu). With CW that state is on straight (rectilinear) axes; with Exact it is on the chosen axes. Switching modes never changes the orbits or the RMOEs: they are kept in step only when a number is typed.
+- Eccentric target: only with Advanced on and Exact (COEs, or Position and Velocity). There are no RMOEs then.
+- Conflicts ask first: choosing CW with an eccentric target, RMOEs with Exact, Exact while in RMOEs, turning Advanced off with an eccentric target, or loading a preset with one, opens a dialog with the choices; closing it keeps things as they were.
+- On the page (Advanced): "What CW assumes" ("How well CW fits this motion" with Exact) rates circular target, closeness, straight axes, small height difference and two-body motion as holds, stretched or broken, with the numbers; with Exact the line above it gives Exact minus CW now and at most over the span.
 - Note shown: "Cowell changes this page only when Relative motion is set to Exact difference: then both spacecraft fly under these forces. With CW, the path comes from the CW equations, so these settings do not change it."
 
 ### Study

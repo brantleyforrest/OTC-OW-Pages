@@ -163,8 +163,22 @@
         .el-notes li { font-size: 0.74rem; line-height: 1.35; color: #fbbf24; margin-top: 0.2rem; }
         .el-notes:empty { display: none; }
 
-        /* Asked before leaving COEs with an eccentric target. */
-        .e-dialog {
+
+        /* The live Exact minus CW line keeps room for three lines and steady digits, so the
+           checklist below it does not jump as the number changes. */
+        #cw-gap { min-height: calc(3 * 1.45em); line-height: 1.45; font-variant-numeric: tabular-nums; }
+        /* How well CW's assumptions hold (Advanced). */
+        .cw-checks ul { margin: 0; padding: 0; list-style: none; }
+        .cw-checks { margin-top: 0.5rem; }
+        .cw-checks li { display: grid; grid-template-columns: 1.1rem 1fr; gap: 0.3rem; font-size: 0.74rem; line-height: 1.35; margin-top: 0.25rem; color: var(--text-muted); }
+        .cw-checks .ck-mark { font-weight: 700; text-align: center; }
+        .cw-checks b { color: var(--text-main); font-weight: 600; }
+        .cw-checks .ok .ck-mark, .cw-checks .ok .ck-level { color: #34d399; }
+        .cw-checks .stretched .ck-mark, .cw-checks .stretched .ck-level { color: #fbbf24; }
+        .cw-checks .broken .ck-mark, .cw-checks .broken .ck-level { color: #f87171; }
+
+        /* Asks before a change that breaks an assumption (CW needs a circular target, and so on). */
+        .choice-dialog {
             margin: auto;   /* centered: the site's reset sets every margin to 0 */
             max-width: min(26rem, calc(100vw - 2rem));
             padding: 1rem 1.1rem;
@@ -174,10 +188,10 @@
             border-radius: 12px;
             box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.7);
         }
-        .e-dialog::backdrop { background: rgba(0, 0, 0, 0.62); }
-        .e-dialog h2 { margin: 0 0 0.5rem; font-size: 1rem; }
-        .e-dialog p { margin: 0 0 0.9rem; font-size: 0.86rem; line-height: 1.45; color: var(--text-muted); }
-        .e-dialog-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
+        .choice-dialog::backdrop { background: rgba(0, 0, 0, 0.62); }
+        .choice-dialog h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+        .choice-dialog p { margin: 0 0 0.9rem; font-size: 0.86rem; line-height: 1.45; color: var(--text-muted); }
+        .choice-dialog-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -306,6 +320,7 @@
                             <button type="button" data-value="rmoe" aria-pressed="true">RMOEs</button>
                             <button type="button" data-value="pv" aria-pressed="false">Position and Velocity</button>
                         </div>                    </div>
+
                     <div class="panel accent">
                         <div class="panel-title" id="set-title">RMOEs</div>
                         <div class="preset-row">
@@ -335,6 +350,7 @@
                             </div>
                             <div class="el-msg" id="el-msg" role="status"></div>
                             <ul class="el-notes" id="el-notes" data-advanced></ul>
+
                             <div class="live-head rmoe-view">The RMOEs these give</div>
                         </div>
                         <div class="pv-block" id="pv-block" hidden>
@@ -362,6 +378,10 @@
                         </div>
                         <div class="motion-name rmoe-view" id="motion" data-advanced></div>
                         <p class="panel-text muted" id="cw-gap" hidden></p>
+                        <div class="cw-checks" id="cw-checks" data-advanced>
+                            <div class="live-head" id="cw-checks-head">What CW assumes</div>
+                            <ul id="cw-checks-list"></ul>
+                        </div>
                         <p class="panel-text muted rmoe-view" id="drift-read" data-advanced></p>
                     </div>
 
@@ -404,9 +424,9 @@
                     <div class="panel course-only" data-advanced>
                         <div class="panel-title">Chase Orbit</div>
                         <div class="stat-grid">
-                            <div class="stat-item"><span class="stat-label">a<sub>chase</sub> − a<sub>target</sub></span><span class="stat-value small" id="co-da"></span></div>
-                            <div class="stat-item"><span class="stat-label">e<sub>chase</sub> = C / a</span><span class="stat-value small" id="co-e"></span></div>
-                            <div class="stat-item"><span class="stat-label">Plane angle θ = z<sub>max</sub> / a</span><span class="stat-value small" id="co-th"></span></div>
+                            <div class="stat-item"><span class="stat-label">a<sub>chase</sub> − a<sub>target</sub> (≈ x<sub>C</sub>)</span><span class="stat-value small" id="co-da"></span></div>
+                            <div class="stat-item"><span class="stat-label">e<sub>chase</sub> (≈ C / a)</span><span class="stat-value small" id="co-e"></span></div>
+                            <div class="stat-item"><span class="stat-label">Plane angle θ (≈ z<sub>max</sub> / a)</span><span class="stat-value small" id="co-th"></span></div>
                             <div class="stat-item"><span class="stat-label">Target period</span><span class="stat-value small" id="co-p"></span></div>
                         </div>
                     </div>
@@ -414,13 +434,10 @@
             </aside>
         </div>
     </main>
-    <dialog class="e-dialog" id="e-dialog" aria-labelledby="e-dialog-title">
-        <h2 id="e-dialog-title">The target’s e must be 0</h2>
-        <p id="e-dialog-text"></p>
-        <div class="e-dialog-buttons">
-            <button type="button" class="btn" id="e-dialog-stay">Stay in COEs</button>
-            <button type="button" class="btn primary" id="e-dialog-set">Set e to 0</button>
-        </div>
+    <dialog class="choice-dialog" id="choice-dialog" aria-labelledby="choice-title" aria-describedby="choice-text">
+        <h2 id="choice-title"></h2>
+        <p id="choice-text"></p>
+        <div class="choice-dialog-buttons" id="choice-buttons"></div>
     </dialog>
 
     <script>
