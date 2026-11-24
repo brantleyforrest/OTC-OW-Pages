@@ -87,8 +87,10 @@ check('solver setting: default PD78, follows the site settings, unknown ids fall
     const S = OC.Settings;
     assert.strictEqual(Cowell.getSolver(), 'PD78');
     assert.deepStrictEqual(Cowell.solverIds(), ['PD78', 'DP45', 'RKF45', 'RK4']);
-    S.set({ solver: 'RKF45' });
-    assert.strictEqual(Cowell.getSolver(), 'RKF45');
+    S.set({ solver: 'RK4' });
+    assert.strictEqual(Cowell.getSolver(), 'RK4');
+    S.set({ solver: 'RKF45' });                      // hidden for now: the store keeps the default
+    assert.strictEqual(Cowell.getSolver(), 'PD78');
     S.set({ solver: 'Euler' });                      // not a choice: the store keeps the default
     assert.strictEqual(Cowell.getSolver(), 'PD78');
     S.reset();

@@ -293,9 +293,16 @@
         .stat-grid {
             margin-top: 0.35rem;
             gap: 0.45rem 0.6rem;
+            /* Columns may shrink below their text's width, so a narrow side column keeps them inside the box. */
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
+        /* In a narrow column the value and its m/s form wrap onto two lines instead of overflowing. */
+        .stat-item .stat-value { white-space: normal; }
+        .stat-item .stat-value > span { white-space: nowrap; }
+
         .stat-item {
+            min-width: 0;
             padding: 0.35rem 0.5rem;
             background: rgba(255, 255, 255, 0.02);
             border-radius: 4px;

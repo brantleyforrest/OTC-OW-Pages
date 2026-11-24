@@ -125,8 +125,6 @@
     };
 
     const INTRO_BODY = 'The path of the point directly below the satellite. Earth turns under the orbit, so each pass lands farther west. Select an element to see what it changes.';
-    const PERIOD_TITLE = 'Phase differential (Δλ).';
-    const PERIOD_BODY = 'During one orbit Earth turns east beneath the satellite, so the next pass crosses the equator farther west. The orange slice is the part of Earth that turned past the orbit. Earth turns 15.04° each hour, so the ruler on the equator reads that slice as the period.';
     const CAPTIONS = {
         a: ['Semi-major axis (a): sets the period.', 'A longer period gives Earth more time to turn during each orbit, so the phase differential grows.'],
         e: ['Eccentricity (e): stretches the track.', 'The satellite moves fastest at perigee and slowest at apogee, so the track stretches out near perigee and bunches up near apogee. Below 0.02 the orbit is nearly a circle, so neither is marked.'],
@@ -816,8 +814,9 @@
     let captionKey = '';
     function updateCaption(hp) {
         const preset = PRESETS[state.activePreset];
-        let title = state.onePeriod ? PERIOD_TITLE : 'Ground track.';
-        let body = state.onePeriod ? PERIOD_BODY : INTRO_BODY;
+        // With one period shown and nothing selected, there is no caption.
+        let title = state.onePeriod ? '' : 'Ground track.';
+        let body = state.onePeriod ? '' : INTRO_BODY;
         if (state.selected) {
             [title, body] = CAPTIONS[state.selected];
         } else if (state.presetCaption && preset) {
@@ -839,13 +838,15 @@
         captionKey = key;
 
         hud.textContent = '';
-        const titleEl = document.createElement('b');
-        titleEl.textContent = title;
-        hud.append(titleEl, document.createTextNode(` ${body}`));
+        if (title) {
+            const titleEl = document.createElement('b');
+            titleEl.textContent = title;
+            hud.append(titleEl, document.createTextNode(` ${body}`));
+        }
         if (note) {
             const noteEl = document.createElement('span');
             noteEl.className = 'hud-note';
-            noteEl.textContent = ` ${note}`;
+            noteEl.textContent = title ? ` ${note}` : note;
             hud.append(noteEl);
         }
     }
@@ -1105,7 +1106,7 @@
     // The caption changes length with the selected element. Space is reserved for the longest
     // caption, so that the view does not change size when the selection changes.
     function reserveCaptionSpace() {
-        const texts = [['Ground track.', INTRO_BODY], [PERIOD_TITLE, PERIOD_BODY], ...Object.values(CAPTIONS)];
+        const texts = [['Ground track.', INTRO_BODY], ...Object.values(CAPTIONS)];
         Object.values(PRESETS).forEach((preset) => texts.push([`${preset.name}.`, preset.desc]));
         const probe = document.createElement('div');
         probe.className = hud.className;

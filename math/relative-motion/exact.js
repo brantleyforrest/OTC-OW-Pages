@@ -89,8 +89,14 @@
             return t ? PR.stateAt(entry.sat, t) : entry.sat;
         }
 
+        // CW assumes the target flies an unperturbed two-body orbit, so with the CW RIC model the
+        // target's frame ignores the Cowell forces; with the exact model it follows the propagator.
+        let ricModelName = OC.Settings.get().ricModel;
+        OC.Settings.onChange((s) => { ricModelName = s.ricModel; });
         function ricBasis(targetCoe, t) {
-            return basisFromRv(rvAt(targetCoe, t));
+            if (ricModelName === 'exact') return basisFromRv(rvAt(targetCoe, t));
+            const s = rvAt(targetCoe, 0);
+            return basisFromRv(t ? PR.kepler(s.r, s.v, t) : s);
         }
         // The target's RIC axes from its r and v: R along r, C along h, I = C x R; omega = |h| / r^2.
         function basisFromRv(rv) {

@@ -115,7 +115,14 @@
             gap: 0.5rem;
         }
 
-        #rendezvous-mode { flex: 1 1 24rem; }
+        /* Parameters panel */
+        #rendezvous-mode { display: flex; }
+        #rendezvous-mode button { flex: 1 1 0; }
+        .param-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.6rem; }
+        /* Parameters and View Options keep their own height, so both stay in sight. */
+        .tool-side > .col:first-child > .panel { flex-grow: 0; }
+        #sliders-container .control-label { flex-wrap: wrap; column-gap: 0.5rem; }
+        #sliders-container .control-label label { white-space: nowrap; }
         .timeline-grow { flex: 3 1 14rem; }
         .speed-grow { flex: 1 1 7rem; min-width: 7rem; }
         #btn-back, #btn-next { min-width: 4.6rem; }
@@ -131,12 +138,6 @@
             margin-left: 0.35rem;
             font-weight: 600;
             vertical-align: middle;
-        }
-
-        .ctl-checks-row {
-            padding-top: 0.35rem;
-            border-top: 1px solid var(--border-subtle);
-            margin-top: 0.2rem;
         }
 
         .ctl-checks {
@@ -164,14 +165,8 @@
         /* Sliders Grid */
         .sliders-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.4rem 0.85rem;
-        }
-
-        @media (max-width: 680px) {
-            .sliders-grid {
-                grid-template-columns: 1fr;
-            }
+            grid-template-columns: minmax(0, 1fr);
+            gap: 0.5rem;
         }
 
         .slider-field {
@@ -363,6 +358,7 @@
         }
 
         .chip-container[hidden] { display: none; }
+        #trade-panel[hidden] { display: none; }
 
         .eq-note .note-warn { color: #f87171; font-style: normal; font-weight: 600; }
         .eq-note .note-ok { color: #34d399; font-style: normal; font-weight: 600; }
@@ -374,7 +370,6 @@
             font-size: 0.8rem;
         }
 
-        .trade-caption,
         .trade-head {
             font-size: 0.72rem;
             color: var(--text-muted);
@@ -465,42 +460,6 @@
         .trade-dv-val { font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); }
         .trade-flag { color: #f87171; font-family: var(--font-sans, inherit); font-size: 0.68rem; margin-left: 0.25rem; }
 
-        .trade-bar-track {
-            height: 10px;
-            background: rgba(255, 255, 255, 0.06);
-            border-radius: 5px;
-            overflow: hidden;
-            display: flex;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            margin: 0.35rem 0 0.2rem;
-            position: relative;
-        }
-
-        .trade-bar-fill {
-            height: 100%;
-            background: var(--param-dv);
-            transition: width 0.15s ease-out;
-        }
-
-        .trade-bar-fill.wait { background: var(--param-theta); opacity: 0.75; }
-
-        .trade-bar-marker {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: #ffffff;
-        }
-
-        .trade-bar-scale {
-            display: flex;
-            justify-content: space-between;
-            font-family: var(--font-mono);
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-        }
-
         .trade-note {
             font-size: 0.74rem;
             color: var(--text-muted);
@@ -532,7 +491,6 @@
 
         /* Phone layout */
         @media (max-width: 640px) and (orientation: portrait) {
-            #rendezvous-mode { flex-basis: 100%; }
             .tool-hud { font-size: 0.8rem; min-height: 0; }
             input[type="range"] { min-height: 28px; }
         }
@@ -611,19 +569,8 @@
                     <div class="tool-hud" id="hud" aria-live="polite"></div>
                 </div>
 
+                <!-- Playback only. Parameters and view options are side panels. -->
                 <div class="panel controls">
-                    <!-- Row 1: Rendezvous Mode Selector -->
-                    <!-- Note: Noncoplanar and Gauss modes were removed per user instruction as they are not useful for this project. -->
-                    <div class="ctl-row">
-                        <div class="segmented" id="rendezvous-mode" role="group" aria-label="Select rendezvous mode">
-                            <button type="button" data-mode="coplanar" aria-pressed="true">Coplanar</button>
-                            <button type="button" data-mode="coorbital" aria-pressed="false">Co-orbital</button>
-                        </div>
-                        <button type="button" class="btn btn-sm" id="btn-lesson-example" aria-pressed="false" title="Load the lesson's worked example">Lesson Example</button>
-                        <button type="button" class="btn btn-sm" id="btn-reset-values" title="Restore default slider values for current mode">Reset Values</button>
-                    </div>
-
-                    <!-- Row 2: Playback -->
                     <div class="ctl-row">
                         <div class="buttons">
                             <button type="button" class="btn" id="btn-back">Back</button>
@@ -645,12 +592,29 @@
                             <input type="range" id="speed" min="0" max="2" step="1" value="1">
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- Row 3: Sliders per Mode -->
-                    <div id="sliders-container"></div>
+            <!-- Two Side Columns on Desktop -->
+            <aside class="tool-side">
+                <!-- Column 1: Parameters and View Options -->
+                <div class="col">
+                    <div class="panel accent">
+                        <div class="panel-title">Parameters</div>
+                        <!-- Note: Noncoplanar and Gauss modes were removed per user instruction as they are not useful for this project. -->
+                        <div class="segmented" id="rendezvous-mode" role="group" aria-label="Select rendezvous mode">
+                            <button type="button" data-mode="coplanar" aria-pressed="true">Coplanar</button>
+                            <button type="button" data-mode="coorbital" aria-pressed="false">Co-orbital</button>
+                        </div>
+                        <div class="param-buttons">
+                            <button type="button" class="btn btn-sm" id="btn-lesson-example" aria-pressed="false" title="Load the lesson's worked example">Lesson Example</button>
+                            <button type="button" class="btn btn-sm" id="btn-reset-values" title="Restore default slider values for current mode">Reset Values</button>
+                        </div>
+                        <div id="sliders-container"></div>
+                    </div>
 
-                    <!-- Row 4: View Checkboxes -->
-                    <div class="ctl-row ctl-checks-row">
+                    <div class="panel">
+                        <div class="panel-title">View Options</div>
                         <div class="ctl-checks">
                             <label class="check"><input type="checkbox" id="check-vectors" checked>Velocity vectors</label>
                             <label class="check"><input type="checkbox" id="check-angles" checked>Angles</label>
@@ -658,22 +622,16 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Two Side Columns on Desktop -->
-            <aside class="tool-side">
-                <!-- Column 1: Equations Panel -->
+                <!-- Column 2: Equations, and Trade in co-orbital mode -->
                 <div class="col">
                     <div class="panel equations-panel">
                         <div class="panel-title">Equations</div>
                         <div class="chip-container" id="constraint-chips" hidden></div>
                         <div class="equation-cards" id="equation-cards"></div>
                     </div>
-                </div>
 
-                <!-- Column 2: Trade -->
-                <div class="col">
-                    <div class="panel">
+                    <div class="panel" id="trade-panel">
                         <div class="panel-title">Trade (ΔV vs. Time)</div>
                         <div class="trade-content" id="trade-content"></div>
                     </div>

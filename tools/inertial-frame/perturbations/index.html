@@ -41,11 +41,16 @@
 
         .chart-box { position: relative; height: 11.5rem; }
         .chart-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        #leads-box { height: 16rem; }
+        .leads-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.85rem; margin-top: 0.45rem; font-size: 0.76rem; color: var(--text-muted); }
+        .leads-unit { color: var(--text-dim); }
+        .leads-key { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+        .leads-key.on { color: var(--text-main); font-weight: 600; }
+        .leads-swatch { width: 1.1rem; border-top: 2px solid var(--c); opacity: 0.7; }
+        .leads-swatch.dashed { border-top-style: dashed; }
+        .leads-key.on .leads-swatch { border-top-width: 3px; opacity: 1; }
         #leads-text { margin-top: 0.4rem; }
         .eq-row[hidden] { display: none; }
-        .term + .term { margin-top: 0.4rem; }
-        .term b { font-weight: 600; color: var(--text-main); }
-        .term.note { color: var(--text-muted); }
 
         @media (min-width: 1300px) and (min-height: 600px) {
             .tool-layout { --aside-w: 40rem; }
@@ -122,7 +127,6 @@
                         <div class="tool-hint" id="view-hint" style="display: none;">Drag to rotate the view. Scroll or pinch to zoom.</div>
                         <div class="tool-status" id="status" style="display: none;"></div>
                     </div>
-                    <div class="tool-hud" id="hud"></div>
                 </div>
 
                 <div class="panel controls">
@@ -137,7 +141,7 @@
                                 <label for="speed">Speed</label>
                                 <span class="control-value" id="speed-value"></span>
                             </div>
-                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                            <input type="range" id="speed" min="-100" max="100" step="1" value="0">
                         </div>
                     </div>
                     <div class="ctl-row">
@@ -153,6 +157,7 @@
                         </div>
                         <div class="ctl-checks">
                             <label class="check"><input type="checkbox" id="show-labels" checked>Labels</label>
+                            <label class="check"><input type="checkbox" id="show-advanced">Advanced</label>
                         </div>
                     </div>
 
@@ -266,13 +271,6 @@
 
             <aside class="tool-side">
                 <div class="col">
-                    <div class="panel accent">
-                        <div class="panel-title">Impact and Regime</div>
-                        <p class="panel-text term"><b>Impact:</b> <span id="impact"></span></p>
-                        <p class="panel-text term"><b>Regime:</b> <span id="regime"></span></p>
-                        <p class="panel-text term note"><b>Watch:</b> <span id="notice"></span></p>
-                    </div>
-
                     <div class="panel">
                         <div class="panel-title">Live Values</div>
                         <div class="stat-grid">
@@ -285,15 +283,8 @@
                         </div>
                     </div>
 
-                    <div class="panel">
-                        <div class="panel-title" id="chart-title"></div>
-                        <div class="chart-box" id="chart-box"><canvas id="chart" aria-label="Chart for the selected perturbation"></canvas></div>
-                    </div>
-                </div>
-
-                <div class="col">
                     <div class="panel eq-panel">
-                        <div class="panel-title" id="eq-title"></div>
+                        <div class="panel-title">Relevant Values</div>
                         <div class="eq-list">
                             <div class="eq-row">
                                 <div class="eq-head"><span class="eq-name"><b id="eq-0-name"></b></span><span class="eq-result" id="eq-0-result"></span></div>
@@ -318,10 +309,18 @@
                         </div>
                         <p class="eq-constants" id="eq-constants"></p>
                     </div>
+                </div>
+
+                <div class="col">
+                    <div class="panel">
+                        <div class="panel-title" id="chart-title"></div>
+                        <div class="chart-box" id="chart-box"><canvas id="chart" aria-label="Chart for the selected perturbation"></canvas></div>
+                    </div>
 
                     <div class="panel">
                         <div class="panel-title">Which Perturbation Leads?</div>
                         <div class="chart-box" id="leads-box"><canvas id="leads" aria-label="Log-log chart of each perturbing acceleration against altitude, from 200 to 50,000 km"></canvas></div>
+                        <div class="leads-legend" id="leads-legend"><span class="leads-unit">Acceleration, m/s²:</span></div>
                         <p class="panel-text muted" id="leads-text"></p>
                     </div>
                 </div>

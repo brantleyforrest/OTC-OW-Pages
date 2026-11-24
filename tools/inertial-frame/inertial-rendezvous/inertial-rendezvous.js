@@ -198,6 +198,7 @@
     const equationCardsEl = $('equation-cards');
     const constraintChipsEl = $('constraint-chips');
     const tradeContentEl = $('trade-content');
+    const tradePanelEl = $('trade-panel');
     const whatToNoticeText = $('what-to-notice-text');
 
     /* ------------------------------------------------------------------ */
@@ -570,8 +571,6 @@
                 chipsHtml += `<span class="constraint-chip warn">Phasing orbit hits Earth (h<sub>p</sub> = ${group(h)} km)</span>`;
             } else if (model.h_p <= MIN_ALT) {
                 chipsHtml += `<span class="constraint-chip warn">Perigee below 100 km (${group(h)} km)</span>`;
-            } else {
-                chipsHtml += `<span class="constraint-chip ok">Perigee ${group(h)} km: above 100 km</span>`;
             }
         }
         // With Cowell, the plan is flown under the chosen forces: how far it misses the target.
@@ -590,29 +589,10 @@
     function renderTrade(model) {
         if (!tradeContentEl) return;
 
-        if (model.mode === 'coplanar') {
-            if (isSameOrbit(model)) {
-                tradeContentEl.innerHTML = '<p class="trade-note">The orbits never drift apart, so a Hohmann rendezvous has no window. Use Co-orbital mode.</p>';
-                return;
-            }
-            const wtPct = (Math.min(1, model.WT / model.T_syn) * 100).toFixed(1);
-            const rows = [0, 1, 2].map((i) => `
-                <div class="trade-row ${i === 0 ? 'active' : ''}">
-                    <span>${['First', 'Second', 'Third'][i]} opportunity${i ? ` (WT + ${i === 1 ? '' : '2'}T<sub>syn</sub>)` : ' (WT)'}</span>
-                    <span class="trade-time">${formatHms(model.WT + i * model.T_syn)}</span>
-                </div>`).join('');
-            tradeContentEl.innerHTML = `
-                <div class="trade-caption">Wait within one synodic period (${formatHms(model.T_syn)})</div>
-                <div class="trade-bar-track">
-                    <div class="trade-bar-fill wait" style="width: ${wtPct}%;"></div>
-                    <div class="trade-bar-marker" style="left: ${wtPct}%;"></div>
-                </div>
-                <div class="trade-bar-scale"><span>0</span><span>WT ${formatHms(model.WT)}</span><span>T<sub>syn</sub></span></div>
-                <div class="trade-row-list">${rows}</div>
-                <p class="trade-note">Every opportunity costs the same ΔV (${fmtKms(model.dv_total)}). Waiting costs time, not ΔV.</p>
-            `;
+        // The trade panel is for co-orbital mode only.
+        tradePanelEl.hidden = model.mode !== 'coorbital';
 
-        } else if (model.mode === 'coorbital') {
+        if (model.mode === 'coorbital') {
             if (model.phi0 === 0) {
                 tradeContentEl.innerHTML = '<p class="trade-note">With φ<sub>0</sub> = 0° there is nothing to trade: no burns, no wait.</p>';
                 return;

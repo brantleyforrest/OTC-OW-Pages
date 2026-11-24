@@ -56,14 +56,13 @@
     const hex = (css) => new THREE.Color(css);
 
     /* Global state. Each mode owns the rest. */
-    const state = { mode: 'drag', playing: !Kit.prefersReducedMotion(), speed: 1, showLabels: true, earthDeg: 0 };
+    const state = { mode: 'drag', playing: !Kit.prefersReducedMotion(), speed: 0, showLabels: true, advanced: false, earthDeg: 0 };
     const camView = { az: -90, el: 66, dist: 7.5 };
     const blend = { from: null, to: null, t: 1 };
 
     /* Renderer */
     const view = $('view');
     const canvas = $('scene');
-    const hud = $('hud');
     let renderer;
     try {
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -473,8 +472,8 @@
 
         const mode = {
             id: 'drag', group,
-            // Whole-decay playback times, not rates.
-            speeds: [{ rate: 48, label: 'Decay in 48 s' }, { rate: 24, label: 'Decay in 24 s' }, { rate: 12, label: 'Decay in 12 s' }],
+            // Whole-decay playback time in seconds, not a rate.
+            speed: { ref: 24, def: 48, unit: 'decay' },
             home: { az: -90, el: 66, dist: 7.5 },
             aria: 'Earth seen from above the equator. A gray starting orbit and a glowing red orbit that shrinks and rounds out as drag removes energy, brightest near perigee.',
             chartTitle: 'Altitude Over Time',
@@ -554,7 +553,6 @@
                 const va = M.speedAt(a, ra), va0 = M.speedAt(first.a, first.a * (1 + first.e));
                 const period = M.periodSeconds(a) / 60, period0 = M.periodSeconds(first.a) / 60;
                 return {
-                    title: 'Two-Body Values as Drag Acts',
                     constants: `${MU_RE_LINE()}. Drag removes energy every orbit, so ε, a, e, and the period all fall.`,
                     rows: [
                         { name: 'Semi-major axis', result: `${comma(a)} km`, work: work('a = (R<sub>a</sub> + R<sub>p</sub>) / 2', `R<sub>a</sub> = ${comma(ra)}, R<sub>p</sub> = ${comma(rp)}`) },
@@ -564,19 +562,6 @@
                         { name: 'Speed at apogee', result: `${va.toFixed(3)} km/s`, work: work('V = √(μ (2/R − 1/a))', `R = R<sub>a</sub>, start ${va0.toFixed(3)}`) }
                     ]
                 };
-            },
-            impact: () => 'Drag removes orbital energy. Each pass near perigee lowers apogee, so the orbit shrinks and becomes circular, then spirals down to reentry. The period shortens and the satellite speeds up as it sinks.',
-            regime: () => 'Low Earth orbit. Drag is strongest from 120 to 600 km and is the largest non-gravitational force below about 630 km. Below 120 km, reentry follows within hours. Solar activity and area-to-mass ratio set the lifetime.',
-            notice: () => 'The glow shows where drag acts: mostly near perigee. Watch apogee fall while perigee barely moves.',
-            hud() {
-                if (s.done) {
-                    return s.history.reentered
-                        ? `<span class="key-drag">Reentry</span> after ${formatDuration(s.history.days)}.`
-                        : `Still in orbit after ${M.CAP_YEARS} years. Above 600 km, drag has much less effect.`;
-                }
-                return M.dragPhase(current().e) === 1
-                    ? '<span class="key-drag">Phase 1:</span> perigee barely moves while apogee falls.'
-                    : '<span class="key-drag">Phase 2:</span> the orbit is nearly circular. Drag now acts all the way around, and altitude falls everywhere.';
             },
             caption: () => `${AREA_TEXT[s.area]} ${SOLAR_TEXT[s.solar]} Heights are compressed. The satellite's motion is slowed.`,
             altitudeMarker() {
@@ -762,7 +747,7 @@
 
         const mode = {
             id: 'j2', group,
-            speeds: [{ rate: 1, label: '1 day/s' }, { rate: 5, label: '5 days/s' }, { rate: 25, label: '25 days/s' }],
+            speed: { ref: 5, def: 1, unit: 'day' },
             home: { az: 35, el: 24, dist: 8 },
             aria: 'Earth with an exaggerated equatorial bulge. A blue orbit whose plane turns about the spin axis compared with a gray fixed orbit, with a shaded wedge showing how far the node has moved.',
             chartTitle: 'Drift Rate vs. Inclination',
@@ -846,7 +831,6 @@
                 const ra = s.a * (1 + s.e), rp = s.a * (1 - s.e);
                 const n = M.meanMotion(s.a);
                 return {
-                    title: 'Two-Body Values J₂ Leaves Alone',
                     constants: `${MU_RE_LINE()}. J₂ turns Ω and ω (rates in Live Values) but leaves a, e, and i unchanged on average, so these values stay fixed.`,
                     rows: [
                         { name: 'Perigee radius', result: `${comma(rp)} km`, work: work('R<sub>p</sub> = a(1 − e)', `a = ${comma(s.a)} km, e = ${s.e.toFixed(3)}`) },
@@ -855,17 +839,6 @@
                         { name: 'Orbital period', result: `${(M.periodSeconds(s.a) / 60).toFixed(1)} min`, work: work('Period = 2π √(a³ / μ)') }
                     ]
                 };
-            },
-            impact: () => 'The equatorial bulge turns the orbit plane: the ascending node moves west for prograde orbits and east for retrograde ones. It also turns perigee within the plane, unless the inclination is 63.4° or 116.6°. Sun-synchronous and Molniya orbits are built on these two effects.',
-            regime: () => 'All Earth orbits, strongest in low orbits, and weaker with altitude. It is the largest perturbation from LEO up to about 33,800 km, above which the Sun and Moon take over.',
-            notice: () => 'The shaded wedge shows how far the node has moved from the gray two-body orbit. Try 90° (no node motion) and 63.4° (frozen perigee).',
-            hud() {
-                const dir = M.nodeDirection(s.inc);
-                const node = { west: 'Prograde: the node moves <span class="key-j2">west</span>.', none: 'Polar: the node stays <span class="key-j2">fixed</span>.', east: 'Retrograde: the node moves <span class="key-j2">east</span>.' }[dir];
-                if (circular()) return node;
-                const p = M.perigeeDirection(s.inc);
-                const per = { forward: 'Perigee moves forward.', backward: 'Perigee moves backward.', none: 'Perigee is frozen, but the node still drifts.' }[p];
-                return `${node} ${per}`;
             },
             caption: () => `${s.preset ? PRESETS[s.preset].text : 'Custom orbit.'} Heights are compressed. The satellite and Earth's spin are slowed.`,
             altitudeMarker() {
@@ -1075,7 +1048,7 @@
 
         const mode = {
             id: 'j22', group,
-            speeds: [{ rate: 30, label: '30 days/s' }, { rate: 100, label: '100 days/s' }, { rate: 300, label: '300 days/s' }],
+            speed: { ref: 100, def: 30, unit: 'day' },
             home: { az: -90, el: 78, dist: 9 },
             aria: 'Earth seen from above the North Pole and held fixed, with the GEO ring, shaded wedges for the elliptical equator, and a satellite that swings in longitude about a stable point.',
             chartTitle: 'Drift Potential W(λ)',
@@ -1177,7 +1150,6 @@
                 const n = M.meanMotion(r);
                 const side = Math.abs(off) < 0.05 ? 'equal: it stays put' : off > 0 ? 'smaller: it falls behind (west)' : 'larger: it pulls ahead (east)';
                 return {
-                    title: 'Why Height Moves Longitude',
                     constants: `${MU_RE_LINE()}. The J₂,₂ push changes a by only kilometers, but that is enough to make n differ from Earth's spin.`,
                     rows: [
                         { name: 'Orbital radius', result: `${comma(r, 1)} km`, work: work('R = altitude + R⊕', `altitude = ${comma(r - M.RE, 1)} km`) },
@@ -1187,14 +1159,6 @@
                         { name: 'Circular-orbit speed', result: `${M.circularSpeed(r).toFixed(4)} km/s`, work: work('V = √(μ / R)') }
                     ]
                 };
-            },
-            impact: () => 'Earth\'s equator is slightly elliptical. Its uneven pull pushes a GEO satellite along its orbit, which changes the orbit\'s size by a few kilometers. The satellite then slowly drifts east or west and swings back and forth about 75° E or 105° W, over 2 to 3 years. Holding a slot costs at most 1.715 m/s per year.',
-            regime: () => 'Geosynchronous orbits only. A GEO satellite stays over the same longitude, so the same push acts day after day and adds up. In other orbits the satellite passes over every longitude, and the push averages out.',
-            notice: () => 'Earth is held still here, as if you rode along with it. A forward push raises the orbit, which makes it slower than Earth\'s spin, so the satellite drifts backward: the drift is opposite the push. The chart shows the same swing as a ball rolling in a valley.',
-            hud() {
-                if (s.hold) return '<span class="key-j22">Station-keeping</span> keeps the satellite over its slot, at a small yearly cost.';
-                if (!arrowsShown()) return 'The J₂,₂ push is zero at this longitude, so the satellite stays over it.';
-                return 'Earth-fixed view: the satellite orbits once a day, keeping pace with Earth, so it seems to hover. Over years, J₂,₂ slowly moves the spot it hovers over.';
             },
             caption: () => 'Earth is held still, so a GEO satellite appears to hover. Each swing takes years; the satellite still circles Earth once a day. The ring is not to scale, and the wedges are exaggerated.',
             altitudeMarker: () => [35786, 35786],
@@ -1290,7 +1254,7 @@
 
         const mode = {
             id: 'third', group,
-            speeds: [{ rate: 1, label: '1 yr/s' }, { rate: 3, label: '3 yr/s' }, { rate: 10, label: '10 yr/s' }],
+            speed: { ref: 3, def: 1, unit: 'yr' },
             home: { az: 40, el: 12, dist: 9 },
             aria: 'Earth with a gray equatorial GEO ring and a tilting colored GEO ring. Arrows around the ring show how the Moon or Sun pulls differently on each part of the orbit.',
             chartTitle: 'Inclination and Ground Trace',
@@ -1358,7 +1322,6 @@
                 const planeChange = (deg) => M.planeChangeDv(v, deg) * 1000; // m/s
                 const yearTilt = M.geoTilt(1).incDeg;
                 return {
-                    title: 'Undoing the Tilt',
                     constants: `${MU_LINE()}. A plane change at the node removes the tilt. The lesson's yearly budget, 51.4 m/s, comes from a fuller model.`,
                     rows: [
                         { name: 'Circular-orbit speed at GEO', result: `${v.toFixed(3)} km/s`, work: work('V = √(μ / R)', 'R = 42,164 km') },
@@ -1367,12 +1330,6 @@
                     ]
                 };
             },
-            impact: () => 'The Sun and Moon pull harder on the near side of the orbit than on Earth, and harder on Earth than on the far side. Because they sit off the equator, that difference tilts a GEO orbit by about 0.75° to 0.95° per year, to about 15° after 27 years. The ground trace becomes a daily figure-eight. North-south station-keeping costs about 51.4 m/s per year, over 95% of a GEO budget.',
-            regime: () => 'High orbits. The effect grows with altitude and passes J₂ above about 33,800 km, so it leads at GEO and beyond. In LEO it is far smaller than J₂ and drag.',
-            notice: () => 'Arrows show only the difference from the pull on Earth. The gray ring is the two-body orbit, which would stay on the equator.',
-            hud: () => (s.hold
-                ? '<span class="key-moon">Station-keeping</span> holds the orbit flat. This is over 95% of station-keeping Δv.'
-                : 'The Sun and Moon slowly tilt the orbit out of the equator.'),
             caption: () => 'Ring, arrows, and body distance are not to scale. The body stays at one direction for clarity.',
             altitudeMarker: () => [35786, 35786],
             drawChartBase(g, w, h) {
@@ -1496,7 +1453,7 @@
 
         const mode = {
             id: 'srp', group,
-            speeds: [{ rate: 15, label: '15 days/s' }, { rate: 45, label: '45 days/s' }, { rate: 120, label: '120 days/s' }],
+            speed: { ref: 45, def: 15, unit: 'day' },
             home: { az: -90, el: 62, dist: 14 },
             aria: 'Earth seen from above the equator, with the Sun circling once a year. A gray circular GEO ring and a yellow ring that stretches into an ellipse and back over the year.',
             chartTitle: 'Eccentricity Over One Year',
@@ -1554,7 +1511,6 @@
                 const eText = e < 1e-3 ? sci(e, 3) : e.toFixed(4);
                 const d = rp < a - 100 ? 0 : 1;
                 return {
-                    title: 'Orbit Shape Under Sunlight',
                     constants: `${MU_RE_LINE()}. Sunlight changes e but not a, so the period stays fixed while perigee dips and apogee rises.`,
                     rows: [
                         { name: 'Perigee radius', result: `${comma(rp, d)} km`, work: work('R<sub>p</sub> = a(1 − e)', `a = 42,164 km, e = ${eText}`) },
@@ -1564,12 +1520,6 @@
                     ]
                 };
             },
-            impact: () => 'Sunlight pushes steadily away from the Sun. Over half a year this stretches a circular GEO orbit, and over the next half it rounds out again. A dense satellite\'s perigee dips about 12 km. Light, wide objects such as foil debris act like solar sails, and their perigee drops by thousands of km.',
-            regime: () => 'Every orbit in sunlight, with the same strength at any altitude. Above about 630 km it is larger than drag, so it is the main non-gravitational force at GEO. It grows with area-to-mass ratio.',
-            notice: () => 'The gray ring is the circular two-body orbit. Watch perigee swing to follow the Sun while the orbit stretches and relaxes.',
-            hud: () => (s.area === 'foil'
-                ? '<span class="key-srp">Foil debris</span> is pushed so hard that its perigee drops by thousands of km.'
-                : 'The orbit <span class="key-srp">stretches</span> for half a year, then rounds out again.'),
             caption: () => 'The shape is exaggerated, so read the true eccentricity in Live Values. The Sun is shown on the equator.',
             altitudeMarker: () => [35786, 35786],
             drawChartBase(g, w, h) {
@@ -1674,17 +1624,29 @@
     const HIGHLIGHT = { drag: ['drag'], j2: ['j2'], j22: ['j22'], third: ['moon', 'sun'], srp: ['srp'] };
     const LEAD_NAMES = { j2: 'J₂', j22: 'J₂,₂', thirdBody: 'Sun and Moon', srp: 'Solar radiation pressure', drag: 'Drag' };
     function leadsPlot(w, h) {
-        return makePlot({ x0: 38, y0: 8, x1: w - 12, y1: h - 28 }, Math.log10(200), Math.log10(50000), -10, 1);
+        return makePlot({ x0: 46, y0: 8, x1: w - 12, y1: h - 28 }, Math.log10(200), Math.log10(50000), -10, 1);
     }
+    // The curves are named in an HTML legend under the chart, not on the plot, where their ends crowd together.
+    const leadsLegend = $('leads-legend');
+    const legendItems = LEADS.map((c) => {
+        const item = document.createElement('span');
+        item.className = 'leads-key';
+        const swatch = document.createElement('span');
+        swatch.className = c.dash ? 'leads-swatch dashed' : 'leads-swatch';
+        swatch.style.setProperty('--c', c.color);
+        item.append(swatch, c.name);
+        leadsLegend.append(item);
+        return { key: c.key, item };
+    });
     function drawLeadsBase(g, w, h) {
         const p = leadsPlot(w, h);
         const xt = [[200, '200'], [500, '500'], [1000, '1k'], [2000, '2k'], [5000, '5k'], [10000, '10k'], [20000, '20k'], [50000, '50k']]
             .map(([v, label]) => ({ v: Math.log10(v), label }));
         const yt = [];
-        for (let d = -10; d <= 1; d++) yt.push({ v: d, label: (d - 1) % 3 === 0 ? (d === 0 ? '1' : `10${sup(d)}`) : '' });
+        for (let d = -10; d <= 1; d++) yt.push({ v: d, label: d % 2 === 0 ? (d === 0 ? '1' : `10${sup(d)}`) : '' });
         drawGrid(g, p, xt, yt, { xTitle: 'altitude, km', yTitle: '' });
         const hi = HIGHLIGHT[state.mode];
-        const ends = [];
+        for (const { key, item } of legendItems) item.classList.toggle('on', hi.includes(key));
         for (const c of LEADS) {
             const from = Math.log10(c.from || 200), to = Math.log10(c.to || 50000);
             const pts = [];
@@ -1694,30 +1656,8 @@
                 if (v) pts.push([p.X(x), p.Y(clamp(Math.log10(v), -10, 1))]);
             }
             const on = hi.includes(c.key);
-            strokePath(g, pts, c.color, on ? 2.2 : 1.3, on ? 1 : 0.55, c.dash);
-            const last = pts[pts.length - 1];
-            ends.push({ name: c.name, color: c.color, x: last[0], y: last[1], on });
+            strokePath(g, pts, c.color, on ? 2.4 : 1.4, on ? 1 : 0.55, c.dash);
         }
-        // Labels at each curve's end, nudged apart so they do not overlap.
-        ends.sort((a, b) => a.y - b.y);
-        for (let i = 1; i < ends.length; i++) {
-            if (Math.abs(ends[i].x - ends[i - 1].x) < 40 && ends[i].y - ends[i - 1].y < 11) ends[i].y = ends[i - 1].y + 11;
-        }
-        for (const e of ends) {
-            g.save();
-            g.font = `${e.on ? '600 ' : ''}11px Inter, sans-serif`;
-            g.globalAlpha = e.on ? 1 : 0.8;
-            g.fillStyle = e.color;
-            g.textAlign = 'right';
-            g.textBaseline = 'bottom';
-            g.strokeStyle = '#111215'; // a halo in the panel color keeps labels readable over the curves
-            g.lineWidth = 3;
-            g.lineJoin = 'round';
-            g.strokeText(e.name, e.x - 2, e.y - 1);
-            g.fillText(e.name, e.x - 2, e.y - 1);
-            g.restore();
-        }
-        chartText(g, 'm/s²', p.area.x0 + 4, p.area.y1 - 4, CHART_TEXT, 'left', 'bottom');
     }
     function drawLeadsLive(g, w, h) {
         const p = leadsPlot(w, h);
@@ -1773,13 +1713,39 @@
         camera.updateMatrixWorld();
     }
 
+    function showRows() {
+        for (const el of document.querySelectorAll('[data-mode]')) el.hidden = !state.advanced || el.dataset.mode !== state.mode;
+    }
+
+    // The speed slider is continuous, from 1/5 to 5 times each mode's default speed (slider -100 to 100,
+    // default 0). It sets how fast everything moves: the perturbation's clock, the satellite, and Earth's spin.
+    const SPEED_SPAN = 5;
+    const speedMultiple = () => Math.pow(SPEED_SPAN, state.speed / 100);
+    // The mode's rate at the slider's setting: days or years per second, or for drag the whole-decay time.
+    function speedRate() {
+        const sp = active().speed;
+        return sp.unit === 'decay' ? sp.def / speedMultiple() : sp.def * speedMultiple();
+    }
+    // How many times faster than the rate each mode's advance() is tuned to.
+    function speedFactor() {
+        const sp = active().speed;
+        return sp.unit === 'decay' ? sp.ref / speedRate() : speedRate() / sp.ref;
+    }
+    function speedLabel() {
+        const rate = speedRate(), unit = active().speed.unit;
+        const n = rate < 10 ? Number(rate.toFixed(1)) : Math.round(rate);
+        if (unit === 'decay') return `Decay in ${n} s`;
+        const word = unit === 'yr' ? 'yr' : (n === 1 ? 'day' : 'days');
+        return `${n} ${word}/s`;
+    }
+
     function setMode(id) {
         active().group.visible = false;
         state.mode = id;
         const mode = active();
         mode.group.visible = true;
-        for (const el of document.querySelectorAll('[data-mode]')) el.hidden = el.dataset.mode !== id;
-        $('speed-value').textContent = mode.speeds[state.speed].label;
+        showRows();
+        $('speed-value').textContent = speedLabel();
         canvas.setAttribute('aria-label', mode.aria);
         setText($('chart-title'), mode.chartTitle);
         modeChart.baseDirty = true;
@@ -1801,7 +1767,6 @@
             setText($(`stat-${i}`), stat.value);
         });
         const eq = mode.equations();
-        setText($('eq-title'), eq.title);
         setText($('eq-constants'), eq.constants);
         for (let i = 0; i < EQ_ROWS; i++) {
             const row = eq.rows[i];
@@ -1812,12 +1777,6 @@
             setText($(`eq-${i}-result`), row.result);
             setHTML($(`eq-${i}-work`), row.work);
         }
-        setText($('impact'), mode.impact());
-        setText($('regime'), mode.regime());
-        setText($('notice'), mode.notice());
-        const before = hud.innerHTML;
-        setHTML(hud, mode.hud());
-        if (hud.innerHTML !== before) layer.remeasure();
         setText($('leads-text'), leadsText());
         if (captionDirty) {
             setText($('mode-caption'), mode.caption());
@@ -1831,7 +1790,7 @@
             showLabel(northLabel, northPoint);
             active().labels();
         }
-        layer.place(viewW, viewH, [Kit.overlayBox(hud, view)]);
+        layer.place(viewW, viewH, []);
     }
 
     function renderFrame() {
@@ -1867,7 +1826,7 @@
     $('reset-view').addEventListener('click', () => startBlend(active().home));
     $('speed').addEventListener('input', (e) => {
         state.speed = Number(e.target.value);
-        $('speed-value').textContent = active().speeds[state.speed].label;
+        $('speed-value').textContent = speedLabel();
     });
     const selectMode = Kit.bindSegmented($('mode'), (value) => {
         if (value !== state.mode || !active().group.visible) setMode(value);
@@ -1876,6 +1835,12 @@
         state.showLabels = e.target.checked;
         dirty = true;
     });
+    // Each perturbation's own options show only in advanced mode.
+    $('show-advanced').addEventListener('change', (e) => {
+        state.advanced = e.target.checked;
+        showRows();
+        reserveRows();
+    });
 
     // On large screens, reserve the height of the tallest set of mode rows, so that the view does not
     // jump between modes. Not on phones or tablets, where the page scrolls.
@@ -1883,14 +1848,14 @@
     const largeScreen = matchMedia('(min-width: 1081px) and (min-height: 600px)');
     function reserveRows() {
         rowsBox.style.minHeight = '';
-        if (!largeScreen.matches) return;
+        if (!largeScreen.matches || !state.advanced) return;
         let tallest = 0;
         const rows = [...rowsBox.querySelectorAll('[data-mode]')];
         for (const id of Object.keys(MODES)) {
             for (const el of rows) el.hidden = el.dataset.mode !== id;
             tallest = Math.max(tallest, rowsBox.offsetHeight);
         }
-        for (const el of rows) el.hidden = el.dataset.mode !== state.mode;
+        showRows();
         rowsBox.style.minHeight = `${tallest}px`;
     }
     let reserveFrame = 0;
@@ -1964,8 +1929,10 @@
 
     Kit.startLoop((seconds) => {
         if (state.playing) {
-            state.earthDeg += seconds * EARTH_SPIN_RATE;
-            if (active().advance(seconds, active().speeds[state.speed].rate)) dirty = true;
+            // Advance at the tuned rate with scaled time, so that the satellite speeds up with the clock.
+            const scaled = seconds * speedFactor();
+            state.earthDeg += scaled * EARTH_SPIN_RATE;
+            if (active().advance(scaled, active().speed.ref)) dirty = true;
         }
         if (stepBlend(seconds)) dirty = true;
         if (!dirty) return;

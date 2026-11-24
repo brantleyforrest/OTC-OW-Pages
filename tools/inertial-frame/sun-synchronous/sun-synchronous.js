@@ -51,11 +51,16 @@
     }
 
     /* Settings */
-    const SPEEDS = [
-        { rate: 10, label: '10 days/s' },
-        { rate: 30, label: '30 days/s' },
-        { rate: 90, label: '90 days/s' }
-    ];
+    // The speed slider is continuous, from 1/5 to 5 times the default 10 days/s (slider -100 to 100,
+    // default 0). It sets how fast everything moves: the date, the satellite, and Earth's spin.
+    const SPEED_DEFAULT = 10;   // days per second
+    const SPEED_SPAN = 5;
+    const speedFactor = () => Math.pow(SPEED_SPAN, state.speed / 100);
+    function speedLabel() {
+        const rate = SPEED_DEFAULT * speedFactor();
+        const n = rate < 10 ? Number(rate.toFixed(1)) : Math.round(rate);
+        return `${n} ${n === 1 ? 'day' : 'days'}/s`;
+    }
     const NODE_TIMES = {
         dawn: { hours: 18, caption: 'Node at 18:00. The orbit rides the line between day and night, so its solar panels stay in sunlight almost all year.' },
         morning: { hours: 22.5, caption: 'Node at 22:30, so the descending pass crosses the equator at 10:30. This time is common for Earth imaging.' },
@@ -83,7 +88,7 @@
         satelliteDeg: 0,
         earthDeg: 0,
         playing: !Kit.prefersReducedMotion(),
-        speed: 1,
+        speed: 0,
         altitude: 700,
         nodeTime: 'dawn',
         shownHours: NODE_TIMES.dawn.hours,
@@ -97,7 +102,6 @@
     /* Renderer */
     const view = $('view');
     const canvas = $('scene');
-    const hud = $('hud');
     let renderer;
     try {
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -276,21 +280,6 @@
         earth.pivot.rotation.z = state.earthDeg * D2R;
     }
 
-    function updateHud() {
-        const gold = '<span class="key-sso">sun-synchronous orbit</span>';
-        const blue = '<span class="key-polar">polar orbit</span>';
-        if (state.frame === 'sun') {
-            hud.innerHTML = state.showPolar
-                ? `The camera follows the Sun. The ${gold} holds still, while the ${blue} drifts around once a year.`
-                : `The camera follows the Sun. The ${gold} holds still, so the wedge never changes.`;
-        } else {
-            hud.innerHTML = state.showPolar
-                ? `The Sun circles once a year. The ${gold} turns with it, while the ${blue} stays fixed in space.`
-                : `The Sun circles once a year. The ${gold} turns with it, so the wedge never changes.`;
-        }
-        layer.remeasure();
-    }
-
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const MARCH_EQUINOX = Date.UTC(2025, 2, 20);
 
@@ -372,7 +361,7 @@
             showLabel(northLabel, northPoint);
             for (const mark of seasonMarks) showLabel(mark.label, mark.position);
         }
-        layer.place(viewW, viewH, [Kit.overlayBox(hud, view)]);
+        layer.place(viewW, viewH, []);
     }
 
     function renderFrame() {
@@ -404,7 +393,7 @@
     });
     $('speed').addEventListener('input', (e) => {
         state.speed = Number(e.target.value);
-        $('speed-value').textContent = SPEEDS[state.speed].label;
+        $('speed-value').textContent = speedLabel();
     });
     $('altitude').addEventListener('input', (e) => {
         state.altitude = Number(e.target.value);
@@ -421,12 +410,10 @@
         frameChange.from = frameOffset();
         frameChange.blend = 0;
         state.frame = value;
-        updateHud();
         dirty = true;
     });
     $('show-polar').addEventListener('change', (e) => {
         state.showPolar = e.target.checked;
-        updateHud();
         dirty = true;
     });
     $('show-labels').addEventListener('change', (e) => {
@@ -495,11 +482,10 @@
     }
 
     /* Start */
-    $('speed-value').textContent = SPEEDS[state.speed].label;
+    $('speed-value').textContent = speedLabel();
     selectNodeTime(state.nodeTime);
     selectFrame(state.frame);
     setPlaying(state.playing);
-    updateHud();
     updateEquations();
     status.style.display = 'none';
 
@@ -515,9 +501,10 @@
 
     Kit.startLoop((seconds) => {
         if (state.playing) {
-            state.days += seconds * SPEEDS[state.speed].rate;
-            state.satelliteDeg += seconds * SATELLITE_RATE;
-            state.earthDeg += seconds * EARTH_SPIN_RATE;
+            const scaled = seconds * speedFactor();
+            state.days += scaled * SPEED_DEFAULT;
+            state.satelliteDeg += scaled * SATELLITE_RATE;
+            state.earthDeg += scaled * EARTH_SPIN_RATE;
             dirty = true;
         }
         if (stepTransitions(seconds)) dirty = true;

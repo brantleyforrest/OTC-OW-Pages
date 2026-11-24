@@ -1225,7 +1225,7 @@
         // The x and y guides (extras.guides): from the target to chase, how x and y are measured.
         // Rectilinear: y straight along I, then x straight along R. Curvilinear: y along the
         // target's own orbit, then x straight out from Earth's center. Both then go z along C. The
-        // page names the axes in use (data.guides.axes) and whether to draw the other one too.
+        // page names the axes in use (data.guides.axes), and only that guide is drawn.
         const GUIDE_ARC = 64;
         const guideLines = { rectilinear: makeTrace(COLORS.rectilinear, 0.95, false, 2.5), curvilinear: makeTrace(COLORS.curvilinear, 0.95, false, 2.5) };
         const guideBufs = { rectilinear: new Float32Array(4 * 3), curvilinear: new Float32Array((GUIDE_ARC + 3) * 3) };
@@ -1487,15 +1487,13 @@
             const g = s.extras.guides && now.guides;
             ['rectilinear', 'curvilinear'].forEach(type => {
                 const line = guideLines[type];
-                const main = g && g.axes === type, shown = g && (main || g.other);
-                if (!shown) { line.visible = false; return; }
+                if (!g || g.axes !== type) { line.visible = false; return; }
                 const pts = guideRic(type, rho[0], rho[1], rho[2], Math.hypot(rT[0], rT[1], rT[2]));
                 const buf = guideBufs[type];
                 pts.forEach((p, j) => put(buf, j,
                     rT[0] + k * (p[0] * b.R[0] + p[1] * b.I[0] + p[2] * b.C[0]),
                     rT[1] + k * (p[0] * b.R[1] + p[1] * b.I[1] + p[2] * b.C[1]),
                     rT[2] + k * (p[0] * b.R[2] + p[1] * b.I[2] + p[2] * b.C[2]), th));
-                if (line.setOpacity) line.setOpacity(main ? 0.95 : 0.5);
                 setPoints(line, buf, pts.length);
                 // Where y ends: the label goes there.
                 const c = 3 * (pts.length - 3);

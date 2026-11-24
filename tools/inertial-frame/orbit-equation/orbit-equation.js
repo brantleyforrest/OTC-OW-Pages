@@ -93,7 +93,6 @@
     /* Renderer */
     const view = $('view');
     const canvas = $('scene');
-    const hud = $('hud');
     let renderer;
     try {
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -414,7 +413,7 @@
                 if (ring.fade > 0.5) showLabel(ring.label, 0, -ring.radius, 0);
             }
         }
-        layer.place(viewW, viewH, [Kit.overlayBox(hud, view)]);
+        layer.place(viewW, viewH, []);
     }
 
     function renderFrame() {
@@ -495,36 +494,6 @@
             'vc-r': plain(values.r),
             'res-vc': `${values.vc.toFixed(2)} km/s`
         });
-
-        updateHud(values);
-    }
-
-    let hudText = '';
-    function updateHud(values) {
-        const below = values.rp < R_E;
-        let text;
-        if (below) {
-            text = `Perigee is ${km(R_E - values.rp)} below Earth's surface. The equation still gives this ellipse, but a spacecraft on this path would strike Earth.`;
-        } else if (state.playing && state.sweep === 'a') {
-            text = 'As a grows, the orbit expands across the rings, which mark fixed distances from Earth. The view also zooms out, so Earth looks smaller.';
-        } else if (state.playing && state.sweep === 'e') {
-            text = 'Changing e changes the shape of the orbit. The size a stays the same, so perigee moves in as apogee moves out by the same distance.';
-        } else if (state.playing && state.sweep === 'nu') {
-            text = state.e <= 0.001
-                ? 'With e at zero, the orbit is a circle, so r equals a at every ν.'
-                : 'As ν advances, r changes while the orbit stays fixed. The spacecraft moves fastest at perigee and slowest at apogee.';
-        } else if (aInFocus) {
-            text = 'The rings mark fixed distances from Earth, so the size of the orbit can be read against them.';
-        } else if (state.e <= 0.001) {
-            text = 'With e at zero, the orbit is a circle, so r equals a at every ν.';
-        } else {
-            text = 'The white line is r, the result of the equation for the current values.';
-        }
-        hud.classList.toggle('warning', below);
-        if (text !== hudText) {
-            hudText = text;
-            hud.textContent = text;
-        }
     }
 
     /* Controls */

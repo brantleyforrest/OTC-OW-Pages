@@ -5,6 +5,7 @@
 *.md
 !README.md
 !readme.md
+!math/SETTINGS-EFFECTS.md
 
 # Microsoft Word documents and lock files
 *.doc

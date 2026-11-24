@@ -230,7 +230,7 @@
             stage.inertial.update({
                 t, rho: rectNow, basis, rT: basis.r, from: kTrail, to: k, ghost: true,
                 // The x and y guides: CW is measured on rectilinear axes, the exact model on the axes chosen.
-                guides: isExact() ? { axes: model().ricAxes, other: model().ricAxesOther } : { axes: 'rectilinear', other: false },
+                guides: { axes: isExact() ? model().ricAxes : 'rectilinear' },
                 burns: inWindow.map(b => ({ t: b.t, rho: isExact() ? chaseRect(b.t) : b.after, dv: b.dv, basis: M.ricBasis(coe, b.t) }))
             });
         }
@@ -594,7 +594,7 @@
     // The model settings panel (../../assets/orbit-settings-panel.js): redraw on a settings change.
     if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
         // Shown in the settings panel when Cowell is chosen.
-        modelNote: "With Cowell, the target moves under the chosen forces. With the exact RIC model the chase does too, and its burns are flown; with CW the relative motion is the CW model.",
+        modelNote: "Cowell changes this page only when Relative motion is set to Exact difference: then target and chase move under the chosen forces, and the burns are flown. With CW, the target flies a two-body circular orbit and the path comes from the CW equations, so these settings do not change it.",
         onSettingsChange() {
             rebindMath();
             chains.clear();

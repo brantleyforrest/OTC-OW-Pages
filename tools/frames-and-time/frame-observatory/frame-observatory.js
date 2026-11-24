@@ -1206,34 +1206,14 @@
         const cfg = ORBITS[state.orbit];
         state.inclination = cfg.inclination;
         state.speedStop = cfg.speedStop;
-        $('tilt').value = cfg.inclination;
-        $('tilt-value').textContent = `${cfg.inclination}°`;
         $('speed').value = cfg.speedStop;
         $('speed-value').textContent = SPEEDS[cfg.speedStop].label;
-        $('orbit-caption').textContent = cfg.caption;
         views.global.dist = cfg.globalDistance;
         views.local.dist = cfg.localDistance;
     }
 
-    function selectOrbit(name) {
-        if (name === state.orbit) return;
-        beginTransition();
-        state.orbit = name;
-        state.t = 0;
-        document.querySelectorAll('[data-orbit]').forEach((btn) => {
-            btn.setAttribute('aria-pressed', String(btn.dataset.orbit === name));
-        });
-        applyOrbitDefaults();
-        rebuildScenario();
-        updateOrbitRing();
-        dirty = true;
-    }
-
     document.querySelectorAll('.frame-btn').forEach((btn) => {
         btn.addEventListener('click', () => selectFrame(btn.dataset.frame));
-    });
-    document.querySelectorAll('[data-orbit]').forEach((btn) => {
-        btn.addEventListener('click', () => selectOrbit(btn.dataset.orbit));
     });
     document.querySelectorAll('[data-object]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -1261,19 +1241,6 @@
         state.speedStop = Number(e.target.value);
         $('speed-value').textContent = SPEEDS[state.speedStop].label;
     });
-    $('tilt').addEventListener('input', (e) => {
-        state.inclination = Number(e.target.value);
-        $('tilt-value').textContent = `${state.inclination}°`;
-        rebuildScenario();
-        updateOrbitRing();
-        dirty = true;
-    });
-    for (const [id, key] of [['show-trails', 'trails'], ['show-plane', 'plane'], ['show-others', 'others'], ['show-labels', 'labels'], ['show-track', 'track']]) {
-        $(id).addEventListener('change', (e) => {
-            state.show[key] = e.target.checked;
-            dirty = true;
-        });
-    }
 
     /* Drag to rotate; wheel or pinch to zoom */
     const pointers = new Map();
@@ -1383,12 +1350,11 @@
             updateOrbitRing();
             dirty = true;
         },
-        // The orbit and frame buttons, then the inputs (choosing an orbit resets the tilt).
+        // The frame buttons, then the inputs.
         getShareState() {
-            return { ...window.OrbitSettingsPanel.genericState(), orbit: state.orbit, frame: state.frame };
+            return { ...window.OrbitSettingsPanel.genericState(), frame: state.frame };
         },
         applyShareState(s) {
-            if (Object.prototype.hasOwnProperty.call(ORBITS, s.orbit)) selectOrbit(s.orbit);
             if ([...document.querySelectorAll('.frame-btn')].some((b) => b.dataset.frame === s.frame)) selectFrame(s.frame);
             window.OrbitSettingsPanel.applyGenericState(s);
         }

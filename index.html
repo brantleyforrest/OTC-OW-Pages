@@ -541,20 +541,6 @@
             flex-shrink: 0;
         }
 
-        .lesson-count {
-            font-family: var(--font-display);
-            font-size: 0.85rem;
-            font-weight: 600;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            color: var(--accent-red-hi);
-            background: none;
-            border: 1px solid var(--accent-red);
-            padding: 0.15rem 0.6rem;
-            border-radius: 3px;
-            white-space: nowrap;
-        }
-
         .lesson-chevron {
             color: var(--text-muted);
             transition: transform 0.25s ease, color 0.2s ease;
@@ -738,10 +724,6 @@
 
         /* Dev mode: cards and tabs for pages that are still being built stay hidden unless it is on. */
         html:not(.dev-mode) .dev-only {
-            display: none !important;
-        }
-        /* The public text that a dev-only text replaces, such as a group's tool count. */
-        html.dev-mode .public-only {
             display: none !important;
         }
 
@@ -1026,10 +1008,6 @@
                 line-height: 1.3;
             }
 
-            .lesson-count {
-                display: none;
-            }
-
             .lesson-content {
                 padding: 0.5rem 0 0;
             }
@@ -1270,7 +1248,7 @@
                 <details class="lesson-group" open>
                     <summary class="lesson-summary">
                         <div class="lesson-meta"><h2 class="lesson-title">Relative Frame</h2></div>
-                        <div class="lesson-controls"><span class="lesson-count"><span class="dev-only">3 tools</span><span class="public-only">1 tool</span></span><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+                        <div class="lesson-controls"><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
                     </summary>
                     <div class="lesson-content">
                         <div class="tool-grid">
@@ -1328,7 +1306,7 @@
                 <details class="lesson-group" open>
                     <summary class="lesson-summary">
                         <div class="lesson-meta"><h2 class="lesson-title">Inertial Frame</h2></div>
-                        <div class="lesson-controls"><span class="lesson-count">8 tools</span><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+                        <div class="lesson-controls"><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
                     </summary>
                     <div class="lesson-content">
                         <div class="tool-grid">
@@ -1456,7 +1434,7 @@
                 <details class="lesson-group" open>
                     <summary class="lesson-summary">
                         <div class="lesson-meta"><h2 class="lesson-title">Reference Frames &amp; Time</h2></div>
-                        <div class="lesson-controls"><span class="lesson-count">2 tools</span><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+                        <div class="lesson-controls"><svg class="lesson-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
                     </summary>
                     <div class="lesson-content">
                         <div class="tool-grid">

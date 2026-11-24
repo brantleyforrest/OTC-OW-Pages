@@ -223,11 +223,11 @@
                 </label>
                 <div class="orbit-settings-sub orbit-settings-cowell" hidden>
                     <label class="orbit-settings-row" for="orbit-settings-solver"><span class="orbit-settings-label">Solver</span>
-                        <select id="orbit-settings-solver">${OC.SOLVER_IDS.map((id) => `<option value="${id}">${OC.SOLVERS[id].name}</option>`).join('')}</select>
+                        <select id="orbit-settings-solver">${OC.CHOICES.solver.map((id) => `<option value="${id}">${OC.SOLVERS[id].name}</option>`).join('')}</select>
                     </label>
                     <div class="orbit-settings-label orbit-settings-forces-label">Forces</div>
                     <div class="orbit-settings-forces">
-                        ${FORCES.map(([id, name]) => `<label class="orbit-settings-check"><input type="checkbox" data-force="${id}"> <span><b>${name}</b></span></label>`).join('')}
+                        ${FORCES.filter(([id]) => !OC.HIDDEN_FORCES.includes(id)).map(([id, name]) => `<label class="orbit-settings-check"><input type="checkbox" data-force="${id}"> <span><b>${name}</b></span></label>`).join('')}
                     </div>
                 </div>
                 <div class="orbit-settings-sub orbit-settings-time" hidden>
@@ -270,7 +270,6 @@
                         </span>
                     </div>
                     <label class="orbit-settings-check"><input type="checkbox" id="orbit-settings-cw-overlay"> <span>Also show the CW path</span></label>
-                    <label class="orbit-settings-check"><input type="checkbox" id="orbit-settings-axes-other"> <span>Also show the <span class="orbit-settings-axes-other-name">curvilinear</span> guide in the 3D ECI view</span></label>
                 </div>
             </fieldset>
             <div class="orbit-settings-foot">
@@ -332,10 +331,6 @@
         const ov = q('#orbit-settings-cw-overlay');
         ov.checked = exact && s.cwOverlay;
         ov.disabled = !exact;
-        const other = q('#orbit-settings-axes-other');
-        other.checked = exact && s.ricAxesOther;
-        other.disabled = !exact;
-        q('.orbit-settings-axes-other-name').textContent = s.ricAxes === 'curvilinear' ? 'rectilinear' : 'curvilinear';
         q('.orbit-settings-ric-exact').hidden = !exact;   // axes and the CW overlay show with the exact model only
         const note = q('.orbit-settings-pagenote');
         note.textContent = cowell && page && page.modelNote ? page.modelNote : '';
@@ -382,7 +377,6 @@
         else if (el.name === 'orbit-ric-model') S.set({ ricModel: el.value });
         else if (el.name === 'orbit-ric-axes') S.set({ ricAxes: el.value });
         else if (el.id === 'orbit-settings-cw-overlay') S.set({ cwOverlay: el.checked });
-        else if (el.id === 'orbit-settings-axes-other') S.set({ ricAxesOther: el.checked });
         else if (el.dataset.force) S.set({ forces: { [el.dataset.force]: el.checked } });
         else if (el.id === 'orbit-settings-start') {
             const ms = fromField(el.value);

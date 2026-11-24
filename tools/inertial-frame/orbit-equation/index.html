@@ -130,8 +130,6 @@
             color: #ffffff;
         }
 
-        .tool-hud.warning { border-color: var(--badge-amber); }
-
         /* Tablets: both panels fill the height of the row, so that neither leaves a blank space. */
         @media (min-width: 700px) and (max-width: 1080px) {
             .tool-side > .col > .panel { flex-grow: 1; }
@@ -207,7 +205,6 @@
                         <div class="tool-hint" id="view-hint">Drag to rotate the view. Scroll or pinch to zoom.</div>
                         <div class="tool-status" id="status" style="display: none;"></div>
                     </div>
-                    <div class="tool-hud" id="hud" aria-live="polite"></div>
                 </div>
 
                 <div class="panel controls">

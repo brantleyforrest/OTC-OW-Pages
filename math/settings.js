@@ -20,15 +20,18 @@
         forces: { j2: false, j34: false, j22: false, drag: false, sun: false, moon: false, srp: false },
         ricModel: 'cw',
         ricAxes: 'rectilinear',
-        cwOverlay: false,
-        ricAxesOther: false       // the ECI view's x and y guides: also draw the other axes' guide
+        cwOverlay: false
     };
+    // Choices the code keeps but the settings panel does not offer for now. A saved choice or a link
+    // naming one falls back to the default (the solver) or off (the force).
+    const HIDDEN_SOLVERS = ['DP45', 'RKF45'];
+    const HIDDEN_FORCES = ['j34'];
     const STORAGE_KEY = 'otc-orbit-settings';
     // The choices each setting allows; anything else read from storage or a link falls back to the default.
     const CHOICES = {
         constants: Object.keys(SETS),
         propagator: ['kepler', 'cowell'],
-        solver: SOLVER_IDS,
+        solver: SOLVER_IDS.filter((id) => !HIDDEN_SOLVERS.includes(id)),
         ricModel: ['cw', 'exact'],
         ricAxes: ['rectilinear', 'curvilinear']
     };
@@ -46,9 +49,8 @@
         }
         const forces = src.forces && typeof src.forces === 'object' ? src.forces : {};
         out.forces = {};
-        for (const id of FORCE_IDS) out.forces[id] = forces[id] === true;
+        for (const id of FORCE_IDS) out.forces[id] = forces[id] === true && !HIDDEN_FORCES.includes(id);
         out.cwOverlay = src.cwOverlay === true;
-        out.ricAxesOther = src.ricAxesOther === true;
         const ms = typeof src.startMs === 'number' ? src.startMs : Date.parse(src.startMs);
         out.startMs = Number.isFinite(ms) ? ms : null;
         // Spacecraft properties for drag and solar radiation pressure, used by every satellite on the
@@ -134,5 +136,5 @@
         return { get, set, reset, onChange, useShared, keepShared, isShared, isDefault, active, startMs, normalize: normalizeSettings };
     })();
 
-    Object.assign(OC, { SPACECRAFT, FORCE_IDS, DEFAULTS, STORAGE_KEY, CHOICES, Settings, active: Settings.active });
+    Object.assign(OC, { SPACECRAFT, FORCE_IDS, HIDDEN_SOLVERS, HIDDEN_FORCES, DEFAULTS, STORAGE_KEY, CHOICES, Settings, active: Settings.active });
 })(typeof window !== 'undefined' ? window : globalThis);

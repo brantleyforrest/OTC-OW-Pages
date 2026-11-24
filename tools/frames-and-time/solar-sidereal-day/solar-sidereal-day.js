@@ -615,7 +615,8 @@
     // The model settings panel (../../assets/orbit-settings-panel.js): redraw on a settings change.
     if (window.OrbitSettingsPanel) window.OrbitSettingsPanel.registerPage({
         // Shown in the settings panel when Cowell is chosen.
-        modelNote: "This page has no satellite; only the constants setting changes it.",
+        // Its math uses only the day and year lengths, which are the same in both constant sets.
+        modelNote: "This page has no satellite, and its day and year lengths are the same under both constant sets, so no setting changes it.",
         onSettingsChange() {
             rebindMath();
             updateComparison();

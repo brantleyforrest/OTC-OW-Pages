@@ -230,15 +230,12 @@
     const apoArrow = makeGhostArrow();
 
     /* Labels */
-    const hud = $('hud');
     const layer = new Kit.LabelLayer($('labels'));
     const labels = {
         craft: layer.add('', { rank: 0 }),
         perigee: layer.add('<b>Perigee</b><span class="hint">fastest</span>', { rank: 1 }),
-        apogee: layer.add('<b>Apogee</b><span class="hint">slowest</span>', { rank: 1 }),
-        earth: layer.add('<b>Earth</b>', { rank: 3, optional: true })
+        apogee: layer.add('<b>Apogee</b><span class="hint">slowest</span>', { rank: 1 })
     };
-    const earthLabelPos = new THREE.Vector3(0, 0, 1.08);
 
     const projected = new THREE.Vector3();
     const toPoint = new THREE.Vector3();
@@ -304,6 +301,8 @@
         if (fromCenter < 1.4) camera.position.multiplyScalar(1.4 / fromCenter);
 
         camera.lookAt(target);
+        // Match the view's shape, so that Earth is round and not stretched.
+        camera.aspect = viewW / viewH || 1;
         camera.near = Math.max(0.02, camDistance * 0.005);
         camera.far = camDistance * 8 + 30;
         camera.updateProjectionMatrix();
@@ -397,7 +396,6 @@
                 showLabel(labels.perigee, perigeeDot.position);
                 showLabel(labels.apogee, apogeeDot.position);
             }
-            showLabel(labels.earth, earthLabelPos);
         }
         layer.place(viewW, viewH, []);
     }
@@ -582,28 +580,6 @@
         const nuDeg = now.nu * 180 / Math.PI;
         $('nu-value').textContent = `${Math.round(nuDeg) % 360}°`;
         if (document.activeElement !== $('nu-range')) $('nu-range').value = Math.round(nuDeg) % 360;
-
-        updateHud(o, nuDeg);
-    }
-
-    let hudText = '';
-    function updateHud(o, nuDeg) {
-        let text;
-        if (o.e <= 0.0005) {
-            text = '<b>Circular orbit:</b> R never changes, so sPE, sKE, and speed stay the same all the way around.';
-        } else if (nuDeg < 4 || nuDeg > 356) {
-            text = '<b>At perigee:</b> closest and fastest. sPE is at its lowest and sKE at its highest.';
-        } else if (Math.abs(nuDeg - 180) < 4) {
-            text = '<b>At apogee:</b> farthest and slowest. sPE is at its highest and sKE at its lowest.';
-        } else if (nuDeg < 180) {
-            text = '<b>Climbing toward apogee:</b> R grows, so sPE rises. sKE drops by the same amount, so the spacecraft slows.';
-        } else {
-            text = '<b>Falling toward perigee:</b> R shrinks, so sPE drops. sKE gains what sPE loses, so the spacecraft speeds up.';
-        }
-        if (text !== hudText) {
-            hudText = text;
-            hud.innerHTML = text;
-        }
     }
 
     /* Controls */

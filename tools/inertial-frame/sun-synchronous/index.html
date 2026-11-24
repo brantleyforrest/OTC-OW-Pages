@@ -16,17 +16,12 @@
             --polar: #60a5fa;
         }
 
-        .key-sso { color: var(--sso); font-weight: 600; }
-        .key-polar { color: var(--polar); font-weight: 600; }
         .stat-value.sso { color: var(--sso); }
         .stat-value.polar { color: var(--polar); }
-        .term + .term { margin-top: 0.3rem; }
-        .term b { font-weight: 600; color: var(--text-main); }
 
-        @media (min-width: 1300px) and (min-height: 600px) {
-            .tool-layout { --aside-w: 40rem; }
-            .tool-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
+        /* Two short panels: one column, each panel at its own height, so the rows are not spread out. */
+        .tool-side > .col > .panel { flex-grow: 0; }
+        .tool-side .eq-list, .tool-side .eq-row { flex-grow: 0; }
     </style>
 </head>
 <body>
@@ -92,7 +87,6 @@
                         <div class="tool-hint" id="view-hint" style="display: none;">Drag to rotate the view. Scroll or pinch to zoom.</div>
                         <div class="tool-status" id="status" style="display: none;"></div>
                     </div>
-                    <div class="tool-hud" id="hud"></div>
                 </div>
 
                 <div class="panel controls">
@@ -107,7 +101,7 @@
                                 <label for="speed">Speed</label>
                                 <span class="control-value" id="speed-value"></span>
                             </div>
-                            <input type="range" id="speed" min="0" max="2" step="1" value="1">
+                            <input type="range" id="speed" min="-100" max="100" step="1" value="0">
                         </div>
                     </div>
                     <div class="ctl-row">
@@ -157,9 +151,7 @@
                             <div class="stat-item"><span class="stat-label">Polar node time</span><span class="stat-value polar" id="polar-time">18:00</span></div>
                         </div>
                     </div>
-                </div>
 
-                <div class="col">
                     <div class="panel eq-panel">
                         <div class="panel-title">Finding the Inclination</div>
                         <div class="eq-list">
@@ -177,13 +169,6 @@
                             </div>
                         </div>
                         <p class="eq-constants" id="eq-constants">J₂ = 1.0826 × 10⁻³, Rₑ = 6,378 km, μ = 398,600 km³/s². Circular orbit.</p>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title">Key Terms</div>
-                        <p class="panel-text muted term"><b>RAAN (Ω):</b> the direction of the ascending node, measured along the equator from a fixed point in space.</p>
-                        <p class="panel-text muted term"><b>Node time:</b> the local solar time on the ground below the ascending node.</p>
-                        <p class="panel-text muted term"><b>Scale:</b> the orbit is drawn larger than scale, the satellites and Earth's spin are slowed, and the Sun is at its mean position on the equator.</p>
                     </div>
                 </div>
             </aside>

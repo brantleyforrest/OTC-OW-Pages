@@ -276,6 +276,11 @@ const spSpeed = getOrCreate('sp-speed');
     speed.appendChild(b);
     spSpeed.appendChild(b);
 });
+// The dialog asked before leaving COEs with an eccentric target.
+const eDialogMock = getOrCreate('e-dialog', 'dialog');
+eDialogMock.open = false;
+eDialogMock.showModal = () => { eDialogMock.open = true; };
+eDialogMock.close = () => { if (!eDialogMock.open) return; eDialogMock.open = false; eDialogMock.dispatchEvent('close'); };
 
 async function runTests() {
     const code = fs.readFileSync(path.join(__dirname, '../tools/relative-frame/relative-motion-explorer/relative-motion-explorer.js'), 'utf8');
@@ -459,6 +464,65 @@ async function runTests() {
             rme.selectMode('coe');
             same(rme.state.rmoe, r1, 1e-6, 'and back to COEs');
         }
+        S.set(start);
+        rme.selectMode('rmoe');
+    });
+
+    check('Switching modes never changes the motion, with CW or the exact model', () => {
+        const S = globalThis.OrbitConstants.Settings, start = S.get();
+        const gap = (a, b) => { let g = 0; for (let k = 0; k < a.length; k++) g = Math.max(g, Math.abs(a[k] - b[k])); return g; };
+        const combos = [
+            { ricModel: 'cw', ricAxes: 'rectilinear' },
+            { ricModel: 'exact', ricAxes: 'rectilinear' },
+            { ricModel: 'exact', ricAxes: 'curvilinear' }
+        ];
+        for (const combo of combos) for (const preset of [1, 4, 7]) {
+            S.set({ constants: TEST_SET.id, propagator: 'kepler', ...combo });
+            rme.selectMode('rmoe');
+            rme.loadPreset(preset);
+            const path0 = Float64Array.from(rme.sim().path);
+            for (const mode of ['coe', 'pv', 'rmoe', 'coe']) {
+                rme.selectMode(mode);
+                const what = combo.ricModel + '/' + combo.ricAxes + ' preset ' + preset + ' in ' + mode;
+                assert.strictEqual(rme.sim().path.length, path0.length, what + ': path length');
+                assert.ok(gap(rme.sim().path, path0) < 1e-6, what + ': path moved ' + gap(rme.sim().path, path0) + ' km');
+            }
+        }
+        S.set(start);
+        rme.selectMode('rmoe');
+    });
+
+    check('Leaving COEs with an eccentric target asks first: stay keeps everything, set makes e 0', () => {
+        const S = globalThis.OrbitConstants.Settings, start = S.get();
+        S.set({ constants: TEST_SET.id, ricModel: 'exact' });
+        mockDoc.body.classList.add('advanced-on');
+        rme.selectMode('coe');
+        assert.ok(rme.setOrbits({ a: 7000, e: 0.01, i: 30, raan: 0, argp: 0, nu: 0 }, { da: 1, de: 0.001 }), 'eccentric target set');
+        const path0 = Float64Array.from(rme.sim().path);
+        for (const mode of ['rmoe', 'pv']) {
+            rme.selectMode(mode);
+            assert.ok(eDialogMock.open, mode + ': the dialog opens');
+            assert.strictEqual(rme.state.mode, 'coe', mode + ': still in COEs while asking');
+            getOrCreate('e-dialog-stay').dispatchEvent('click');
+            assert.ok(!eDialogMock.open, mode + ': Stay closes the dialog');
+            assert.strictEqual(rme.state.mode, 'coe', mode + ': Stay keeps COEs');
+            near(rme.state.target.e, 0.01, 1e-12, mode + ': Stay keeps e');
+            assert.ok(rme.sim().path.every((x, k) => x === path0[k]), mode + ': Stay keeps the motion');
+        }
+        // Escape (a close without Set) also stays.
+        rme.selectMode('rmoe');
+        eDialogMock.close();
+        assert.strictEqual(rme.state.mode, 'coe', 'Escape keeps COEs');
+        rme.selectMode('rmoe');
+        getOrCreate('e-dialog-set').dispatchEvent('click');
+        assert.ok(!eDialogMock.open, 'Set closes the dialog');
+        assert.strictEqual(rme.state.mode, 'rmoe', 'Set switches to RMOEs');
+        assert.strictEqual(rme.state.target.e, 0, 'Set makes the target circular');
+        // A circular target switches without asking.
+        rme.selectMode('coe');
+        rme.selectMode('pv');
+        assert.ok(!eDialogMock.open && rme.state.mode === 'pv', 'circular target: no dialog');
+        mockDoc.body.classList.remove('advanced-on');
         S.set(start);
         rme.selectMode('rmoe');
     });

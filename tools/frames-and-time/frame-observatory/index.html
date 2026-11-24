@@ -166,31 +166,6 @@
 
         .readout-time .mono { color: var(--text-main); }
 
-        /* View options */
-        .opt-row {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.35rem 0.6rem;
-            margin-bottom: 0.45rem;
-            font-size: 0.76rem;
-            color: var(--text-muted);
-        }
-        .opt-row .segmented button { padding: 0.22rem 0.6rem; font-size: 0.74rem; }
-        .opt-label { min-width: 5.2rem; font-weight: 500; }
-        .tilt-row { margin-bottom: 0.35rem; }
-        .tilt-row .control-label { margin-bottom: 0.1rem; }
-        .tilt-row input[type="range"] { width: 100%; display: block; margin: 0.15rem 0; }
-        .view-options .ctl-checks {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.2rem 0.6rem;
-            margin-top: 0.45rem;
-            margin-bottom: 0.45rem;
-        }
-        .view-options .check { font-size: 0.76rem; line-height: 1.35; white-space: nowrap; }
-        .view-options .ctl-caption { margin-top: 0.45rem; margin-bottom: 0; }
-
         /* Live coordinates */
         .coords-head {
             display: flex;
@@ -281,7 +256,6 @@
         @media (min-width: 700px) and (max-width: 1080px) {
             .tool-side { grid-template-columns: minmax(0, 1fr); }
             .tool-side > .col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .tool-side > .col > .view-options { grid-column: 1 / -1; }
         }
 
         @media (max-width: 640px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
@@ -399,32 +373,6 @@
 
             <aside class="tool-side">
                 <div class="col">
-                    <div class="panel view-options">
-                        <div class="panel-title">View Options</div>
-                        <div class="opt-row">
-                            <span class="opt-label">Target Orbit</span>
-                            <div class="segmented" role="group" aria-label="Choose an orbit">
-                                <button data-orbit="GEO" aria-pressed="true" title="Geostationary">GEO</button>
-                                <button data-orbit="LEO" aria-pressed="false" title="Low Earth Orbit">LEO</button>
-                            </div>
-                        </div>
-                        <div class="tilt-row">
-                            <div class="control-label">
-                                <label for="tilt">Orbit tilt (inclination)</label>
-                                <span class="control-value" id="tilt-value">0&deg;</span>
-                            </div>
-                            <input type="range" id="tilt" min="0" max="90" step="1" value="0">
-                        </div>
-                        <div class="ctl-checks">
-                            <label class="check"><input type="checkbox" id="show-trails" checked>Paths</label>
-                            <label class="check"><input type="checkbox" id="show-plane" checked>Fundamental plane</label>
-                            <label class="check"><input type="checkbox" id="show-others" checked>Other frames' axes</label>
-                            <label class="check"><input type="checkbox" id="show-labels" checked>Labels</label>
-                            <label class="check"><input type="checkbox" id="show-track" checked>Ground track</label>
-                        </div>
-                        <p class="ctl-caption"><span id="orbit-caption"></span> Tilt is measured from the equator. At 0&deg;, the orbit lies in the equatorial plane.</p>
-                    </div>
-
                     <div class="panel">
                         <div class="coords-head">
                             <div class="panel-title">Live Coordinates (km)</div>

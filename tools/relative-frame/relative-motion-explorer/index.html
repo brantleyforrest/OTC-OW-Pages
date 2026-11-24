@@ -56,9 +56,6 @@
         .mag-row input { flex: 1 1 auto; min-width: 0; }
         .mag-row .mono { min-width: 4.5rem; text-align: right; color: var(--text-main); }
 
-        .terms { margin: 0; padding: 0; list-style: none; }
-        .terms li { font-size: 0.78rem; line-height: 1.4; color: var(--text-main); margin-bottom: 0.25rem; }
-        .terms b { color: #ffffff; }
         .ric-c { color: var(--frame-ric); font-weight: 600; }
         .eci-c { color: var(--frame-eci); font-weight: 600; }
 
@@ -132,8 +129,6 @@
         body.advanced-on .simple-play { display: none !important; }
         .simple-play .ctl-row { align-items: center; }
         #sp-span { min-width: 3.4rem; text-align: center; align-self: center; }
-        .model-line { font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); margin: 0.35rem 0.1rem 0; }
-        .model-line b { color: var(--text-main); }
         /* Outside Set RMOEs the RMOE table is a read-only list of the epoch and current values. */
         body:not(.mode-rmoe) .rm-only { display: none !important; }
         body:not(.mode-rmoe) .rm-table input[type="range"] { visibility: hidden; }
@@ -168,6 +163,21 @@
         .el-notes li { font-size: 0.74rem; line-height: 1.35; color: #fbbf24; margin-top: 0.2rem; }
         .el-notes:empty { display: none; }
 
+        /* Asked before leaving COEs with an eccentric target. */
+        .e-dialog {
+            margin: auto;   /* centered: the site's reset sets every margin to 0 */
+            max-width: min(26rem, calc(100vw - 2rem));
+            padding: 1rem 1.1rem;
+            color: var(--text-main);
+            background: var(--surface-card);
+            border: 1px solid var(--border-accent);
+            border-radius: 12px;
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.7);
+        }
+        .e-dialog::backdrop { background: rgba(0, 0, 0, 0.62); }
+        .e-dialog h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+        .e-dialog p { margin: 0 0 0.9rem; font-size: 0.86rem; line-height: 1.45; color: var(--text-muted); }
+        .e-dialog-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -295,9 +305,7 @@
                             <button type="button" data-value="coe" aria-pressed="false">COEs</button>
                             <button type="button" data-value="rmoe" aria-pressed="true">RMOEs</button>
                             <button type="button" data-value="pv" aria-pressed="false">Position and Velocity</button>
-                        </div>
-                        <p class="model-line" id="model-line" data-advanced></p>
-                    </div>
+                        </div>                    </div>
                     <div class="panel accent">
                         <div class="panel-title" id="set-title">RMOEs</div>
                         <div class="preset-row">
@@ -402,27 +410,18 @@
                             <div class="stat-item"><span class="stat-label">Target period</span><span class="stat-value small" id="co-p"></span></div>
                         </div>
                     </div>
-
-                    <div class="panel" data-advanced>
-                        <div class="panel-title">Key Terms</div>
-                        <ul class="terms">
-                            <li><b>Target</b> (green square): the origin of the RIC frame. <b>Chase</b> (gold triangle): the other spacecraft.</li>
-                            <li><span class="ric-c">R</span> radial (up), <span class="ric-c">I</span> in-track (forward), <span class="ric-c">C</span> cross-track (left).</li>
-                            <li><b>NMC</b>: natural motion circumnavigation, the 2-by-1 ellipse chase traces around a fixed center with no burns.</li>
-                            <li><b>Drift</b>: chase slides steadily along the track, backward when its orbit is larger, forward when smaller.</li>
-                            <li><b>Drifting NMC</b>: both at once, NMC loops that walk along the track.</li>
-                            <li><b>Cross-Track NMC</b>: an NMC that also swings left and right of the target’s plane, so the ellipse tilts but stays put.</li>
-                            <li><b>Snake</b>: a drift that also swings left and right of the target’s plane; from above it winds like a snake.</li>
-                            <li><b>COEs</b>: the six classical orbital elements of an orbit, a, e, i, Ω, ω, and ν.</li>
-                            <li><b>Exact model</b> (Set COEs): each spacecraft flies its own orbit, and the picture shows where chase really is from the target. It works for any target orbit, even an eccentric one.</li>
-                            <li><b>Course model</b> (Set RMOEs, Set Position and Velocity): the linear (CW) equations. They are simple and match the exact model when the target’s orbit is circular and chase is close to it.</li>
-                            <li>Two different I's: blue <span class="eci-c">Î</span> is the ECI axis toward the vernal equinox; red <span class="ric-c">I</span> is in-track.</li>
-                        </ul>
-                    </div>
                 </div>
             </aside>
         </div>
     </main>
+    <dialog class="e-dialog" id="e-dialog" aria-labelledby="e-dialog-title">
+        <h2 id="e-dialog-title">The target’s e must be 0</h2>
+        <p id="e-dialog-text"></p>
+        <div class="e-dialog-buttons">
+            <button type="button" class="btn" id="e-dialog-stay">Stay in COEs</button>
+            <button type="button" class="btn primary" id="e-dialog-set">Set e to 0</button>
+        </div>
+    </dialog>
 
     <script>
         (function () {
